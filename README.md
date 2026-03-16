@@ -8,8 +8,14 @@
 
 ### 环境安装
 ```bash
+# 创建环境
 conda create -p ./env python=3.11 -y
 conda activate ./env
+
+# 配置阿里云镜像源
+pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+
+# 安装依赖
 pip install -r requirements.txt
 ```
 

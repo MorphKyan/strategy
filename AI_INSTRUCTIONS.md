@@ -14,7 +14,13 @@
   - **损耗计算**：换手额 * 0.02% 手续费。
 - `metrics.py`：包含 `annualized_return`, `max_drawdown`, `sharpe_ratio` 等标准指标计算逻辑。
 
+## 执行环境要求 (Execution Environment)
+- **Conda 环境**：必须使用项目根目录下的 `./env` 环境进行所有代码执行。
+- **Python 路径**：在执行命令时，优先使用 `./env/Scripts/python.exe` (Windows) 或 `./env/bin/python` (Unix)。
+- **包管理**：默认使用阿里云镜像源 (`https://mirrors.aliyun.com/pypi/simple/`) 进行依赖安装。
+
 ## 后续开发要求
+- **环境一致性**：Antigravity 在执行任何 Python 代码前，必须确保使用的是该项目特有的 `./env` 环境。
 - **向量化优化**：在不改变逻辑的前提下，尽可能利用 Pandas 向量化操作提升回测速度。
 - **绘图支持**：敏感度分析必须包含可视化输出 (`matplotlib`)，确保环境可用。
 - **代码注释**：所有策略逻辑必须包含详细的中文注释，解释调仓触发机制。

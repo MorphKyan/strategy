@@ -154,12 +154,13 @@ cython_debug/
 ### Custom Project Ignores ###
 
 # Data directories
-data/
 
 # Analysis and Backtest Results
 *.csv
 *.png
 *.txt
+!data/
+!data/**
 !requirements.txt
 !README.md
 !AI_INSTRUCTIONS.md
