@@ -1,0 +1,426 @@
+{
+  "eligible_assets": [
+    {
+      "code": "510050",
+      "name": "上证50ETF",
+      "bucket": "equity",
+      "sleeve": "mega_cap_equity",
+      "include": true,
+      "start_date": "2005-02-23",
+      "end_date": "2026-04-09",
+      "observations": 5134,
+      "history_years": 20.373015873015873
+    },
+    {
+      "code": "510180",
+      "name": "上证180ETF",
+      "bucket": "equity",
+      "sleeve": "large_cap_equity",
+      "include": true,
+      "start_date": "2006-05-18",
+      "end_date": "2026-04-09",
+      "observations": 4833,
+      "history_years": 19.178571428571427
+    },
+    {
+      "code": "510300",
+      "name": "沪深300ETF",
+      "bucket": "equity",
+      "sleeve": "broad_equity",
+      "include": true,
+      "start_date": "2012-05-28",
+      "end_date": "2026-03-16",
+      "observations": 3352,
+      "history_years": 13.301587301587302
+    },
+    {
+      "code": "510310",
+      "name": "沪深300ETF易方达",
+      "bucket": "equity",
+      "sleeve": "broad_equity_alt",
+      "include": true,
+      "start_date": "2013-03-25",
+      "end_date": "2026-03-16",
+      "observations": 3151,
+      "history_years": 12.503968253968255
+    },
+    {
+      "code": "510500",
+      "name": "中证500ETF",
+      "bucket": "equity",
+      "sleeve": "mid_cap_equity",
+      "include": true,
+      "start_date": "2013-03-15",
+      "end_date": "2026-04-09",
+      "observations": 3172,
+      "history_years": 12.587301587301587
+    },
+    {
+      "code": "510880",
+      "name": "红利ETF",
+      "bucket": "equity",
+      "sleeve": "dividend_equity",
+      "include": true,
+      "start_date": "2007-01-18",
+      "end_date": "2026-04-07",
+      "observations": 4668,
+      "history_years": 18.523809523809526
+    },
+    {
+      "code": "512890",
+      "name": "红利低波ETF",
+      "bucket": "equity",
+      "sleeve": "low_vol_equity",
+      "include": true,
+      "start_date": "2019-01-18",
+      "end_date": "2026-04-07",
+      "observations": 1746,
+      "history_years": 6.928571428571429
+    },
+    {
+      "code": "511260",
+      "name": "十年国债ETF",
+      "bucket": "bond",
+      "sleeve": "government_bond",
+      "include": true,
+      "start_date": "2017-08-24",
+      "end_date": "2026-03-16",
+      "observations": 2073,
+      "history_years": 8.226190476190476
+    },
+    {
+      "code": "518880",
+      "name": "黄金ETF",
+      "bucket": "gold",
+      "sleeve": "gold",
+      "include": true,
+      "start_date": "2013-07-29",
+      "end_date": "2026-03-16",
+      "observations": 3069,
+      "history_years": 12.178571428571429
+    }
+  ],
+  "rejected_assets": [
+    {
+      "code": "511130",
+      "name": "30年国债ETF",
+      "bucket": "bond",
+      "sleeve": "long_duration_bond",
+      "include": true,
+      "start_date": "2024-03-28",
+      "end_date": "2026-03-16",
+      "observations": 474,
+      "history_years": 1.880952380952381
+    }
+  ],
+  "missing_assets": [],
+  "top_baskets": [
+    {
+      "codes": [
+        "510880",
+        "511260",
+        "518880"
+      ],
+      "assets": [
+        {
+          "code": "510880",
+          "name": "红利ETF",
+          "bucket": "equity",
+          "sleeve": "dividend_equity",
+          "include": true,
+          "start_date": "2007-01-18",
+          "end_date": "2026-04-07",
+          "observations": 4668,
+          "history_years": 18.523809523809526
+        },
+        {
+          "code": "511260",
+          "name": "十年国债ETF",
+          "bucket": "bond",
+          "sleeve": "government_bond",
+          "include": true,
+          "start_date": "2017-08-24",
+          "end_date": "2026-03-16",
+          "observations": 2073,
+          "history_years": 8.226190476190476
+        },
+        {
+          "code": "518880",
+          "name": "黄金ETF",
+          "bucket": "gold",
+          "sleeve": "gold",
+          "include": true,
+          "start_date": "2013-07-29",
+          "end_date": "2026-03-16",
+          "observations": 3069,
+          "history_years": 12.178571428571429
+        }
+      ],
+      "score": 0.842714283159784,
+      "overlap_start": "2017-08-24",
+      "overlap_end": "2026-04-07",
+      "overlap_observations": 2089,
+      "overlap_years": 8.28968253968254,
+      "avg_abs_corr": 0.11453135043362105,
+      "annualized_volatility": {
+        "510880": 0.12414441597276549,
+        "511260": 0.027093084436412423,
+        "518880": 0.14884215896774053
+      },
+      "inverse_vol_weights": {
+        "510880": 0.1558552085415848,
+        "511260": 0.7141510183574611,
+        "518880": 0.1299937731009542
+      },
+      "concentration_hhi": 0.551200904095562,
+      "bucket_count": 3
+    },
+    {
+      "codes": [
+        "510050",
+        "511260",
+        "518880"
+      ],
+      "assets": [
+        {
+          "code": "510050",
+          "name": "上证50ETF",
+          "bucket": "equity",
+          "sleeve": "mega_cap_equity",
+          "include": true,
+          "start_date": "2005-02-23",
+          "end_date": "2026-04-09",
+          "observations": 5134,
+          "history_years": 20.373015873015873
+        },
+        {
+          "code": "511260",
+          "name": "十年国债ETF",
+          "bucket": "bond",
+          "sleeve": "government_bond",
+          "include": true,
+          "start_date": "2017-08-24",
+          "end_date": "2026-03-16",
+          "observations": 2073,
+          "history_years": 8.226190476190476
+        },
+        {
+          "code": "518880",
+          "name": "黄金ETF",
+          "bucket": "gold",
+          "sleeve": "gold",
+          "include": true,
+          "start_date": "2013-07-29",
+          "end_date": "2026-03-16",
+          "observations": 3069,
+          "history_years": 12.178571428571429
+        }
+      ],
+      "score": 0.8351929833041924,
+      "overlap_start": "2017-08-24",
+      "overlap_end": "2026-04-09",
+      "overlap_observations": 2091,
+      "overlap_years": 8.297619047619047,
+      "avg_abs_corr": 0.12218244932440503,
+      "annualized_volatility": {
+        "510050": 0.1590750117512654,
+        "511260": 0.027080218233938375,
+        "518880": 0.14877127958467748
+      },
+      "inverse_vol_weights": {
+        "510050": 0.1258895129244779,
+        "511260": 0.7395020075105931,
+        "518880": 0.134608479564929
+      },
+      "concentration_hhi": 0.5808308313473416,
+      "bucket_count": 3
+    },
+    {
+      "codes": [
+        "510180",
+        "511260",
+        "518880"
+      ],
+      "assets": [
+        {
+          "code": "510180",
+          "name": "上证180ETF",
+          "bucket": "equity",
+          "sleeve": "large_cap_equity",
+          "include": true,
+          "start_date": "2006-05-18",
+          "end_date": "2026-04-09",
+          "observations": 4833,
+          "history_years": 19.178571428571427
+        },
+        {
+          "code": "511260",
+          "name": "十年国债ETF",
+          "bucket": "bond",
+          "sleeve": "government_bond",
+          "include": true,
+          "start_date": "2017-08-24",
+          "end_date": "2026-03-16",
+          "observations": 2073,
+          "history_years": 8.226190476190476
+        },
+        {
+          "code": "518880",
+          "name": "黄金ETF",
+          "bucket": "gold",
+          "sleeve": "gold",
+          "include": true,
+          "start_date": "2013-07-29",
+          "end_date": "2026-03-16",
+          "observations": 3069,
+          "history_years": 12.178571428571429
+        }
+      ],
+      "score": 0.8328006284255446,
+      "overlap_start": "2017-08-24",
+      "overlap_end": "2026-04-09",
+      "overlap_observations": 2091,
+      "overlap_years": 8.297619047619047,
+      "avg_abs_corr": 0.13136420106981805,
+      "annualized_volatility": {
+        "510180": 0.15974995461251237,
+        "511260": 0.027080218233938375,
+        "518880": 0.14877127958467748
+      },
+      "inverse_vol_weights": {
+        "510180": 0.1254243413117638,
+        "511260": 0.7398955451085573,
+        "518880": 0.13468011357967888
+      },
+      "concentration_hhi": 0.5813154160588141,
+      "bucket_count": 3
+    },
+    {
+      "codes": [
+        "510300",
+        "511260",
+        "518880"
+      ],
+      "assets": [
+        {
+          "code": "510300",
+          "name": "沪深300ETF",
+          "bucket": "equity",
+          "sleeve": "broad_equity",
+          "include": true,
+          "start_date": "2012-05-28",
+          "end_date": "2026-03-16",
+          "observations": 3352,
+          "history_years": 13.301587301587302
+        },
+        {
+          "code": "511260",
+          "name": "十年国债ETF",
+          "bucket": "bond",
+          "sleeve": "government_bond",
+          "include": true,
+          "start_date": "2017-08-24",
+          "end_date": "2026-03-16",
+          "observations": 2073,
+          "history_years": 8.226190476190476
+        },
+        {
+          "code": "518880",
+          "name": "黄金ETF",
+          "bucket": "gold",
+          "sleeve": "gold",
+          "include": true,
+          "start_date": "2013-07-29",
+          "end_date": "2026-03-16",
+          "observations": 3069,
+          "history_years": 12.178571428571429
+        }
+      ],
+      "score": 0.8294231529131277,
+      "overlap_start": "2017-08-24",
+      "overlap_end": "2026-03-16",
+      "overlap_observations": 2074,
+      "overlap_years": 8.23015873015873,
+      "avg_abs_corr": 0.12698678983025166,
+      "annualized_volatility": {
+        "510300": 0.17354055090530665,
+        "511260": 0.027190169038913987,
+        "518880": 0.1493770032721595
+      },
+      "inverse_vol_weights": {
+        "510300": 0.1170379614403389,
+        "511260": 0.7469917629464541,
+        "518880": 0.135970275613207
+      },
+      "concentration_hhi": 0.5901824941782932,
+      "bucket_count": 3
+    },
+    {
+      "codes": [
+        "510500",
+        "511260",
+        "518880"
+      ],
+      "assets": [
+        {
+          "code": "510500",
+          "name": "中证500ETF",
+          "bucket": "equity",
+          "sleeve": "mid_cap_equity",
+          "include": true,
+          "start_date": "2013-03-15",
+          "end_date": "2026-04-09",
+          "observations": 3172,
+          "history_years": 12.587301587301587
+        },
+        {
+          "code": "511260",
+          "name": "十年国债ETF",
+          "bucket": "bond",
+          "sleeve": "government_bond",
+          "include": true,
+          "start_date": "2017-08-24",
+          "end_date": "2026-03-16",
+          "observations": 2073,
+          "history_years": 8.226190476190476
+        },
+        {
+          "code": "518880",
+          "name": "黄金ETF",
+          "bucket": "gold",
+          "sleeve": "gold",
+          "include": true,
+          "start_date": "2013-07-29",
+          "end_date": "2026-03-16",
+          "observations": 3069,
+          "history_years": 12.178571428571429
+        }
+      ],
+      "score": 0.8269745721003466,
+      "overlap_start": "2017-08-24",
+      "overlap_end": "2026-04-09",
+      "overlap_observations": 2091,
+      "overlap_years": 8.297619047619047,
+      "avg_abs_corr": 0.127958313900137,
+      "annualized_volatility": {
+        "510500": 0.21837816097875823,
+        "511260": 0.027080218233938375,
+        "518880": 0.14877127958467748
+      },
+      "inverse_vol_weights": {
+        "510500": 0.09494873082410743,
+        "511260": 0.7656780697080884,
+        "518880": 0.13937319946780416
+      },
+      "concentration_hhi": 0.6147030566469054,
+      "bucket_count": 3
+    }
+  ],
+  "generated_configs": [
+    "C:\\Users\\MorphKyan\\tm-strategy\\configs\\generated\\risk_parity_basket_510880_511260_518880.yaml",
+    "C:\\Users\\MorphKyan\\tm-strategy\\configs\\generated\\risk_parity_basket_510050_511260_518880.yaml",
+    "C:\\Users\\MorphKyan\\tm-strategy\\configs\\generated\\risk_parity_basket_510180_511260_518880.yaml",
+    "C:\\Users\\MorphKyan\\tm-strategy\\configs\\generated\\risk_parity_basket_510300_511260_518880.yaml",
+    "C:\\Users\\MorphKyan\\tm-strategy\\configs\\generated\\risk_parity_basket_510500_511260_518880.yaml"
+  ]
+}

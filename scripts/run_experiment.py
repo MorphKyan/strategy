@@ -164,6 +164,8 @@ def build_report(
     baseline_strategy: str,
     command: list[str],
     baseline_command: list[str] | None,
+    candidate_assets: list[dict],
+    baseline_assets: list[dict] | None,
     strategy_metrics: dict,
     baseline_metrics: dict | None,
 ) -> str:
@@ -191,6 +193,15 @@ def build_report(
 
     if baseline_command is not None:
         lines.append(f"- Baseline: `{' '.join(baseline_command)}`")
+
+    lines.extend(["", "## Candidate Basket"])
+    for asset in candidate_assets:
+        lines.append(f"- `{asset['code']}` {asset.get('name', '')}".rstrip())
+
+    if baseline_assets is not None:
+        lines.extend(["", "## Baseline Basket"])
+        for asset in baseline_assets:
+            lines.append(f"- `{asset['code']}` {asset.get('name', '')}".rstrip())
 
     lines.extend(
         [
@@ -255,12 +266,21 @@ def main() -> int:
     parser.add_argument("--strategy", required=True, help="Strategy module name under src/strategies.")
     parser.add_argument("--config", default="configs/risk_parity.yaml", help="Config file path.")
     parser.add_argument("--baseline-strategy", default="risk_parity", help="Baseline strategy name for comparison.")
+    parser.add_argument("--baseline-config", help="Optional baseline config path. Defaults to --config.")
     parser.add_argument("--skip-baseline", action="store_true", help="Skip running the baseline during this invocation.")
     args = parser.parse_args()
 
     config_path = (ROOT / args.config).resolve()
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
+    runtime_config = load_config(config_path)
+    candidate_assets = runtime_config.get("backtest", {}).get("assets", [])
+
+    baseline_config_path = (ROOT / args.baseline_config).resolve() if args.baseline_config else config_path
+    if not baseline_config_path.exists():
+        raise FileNotFoundError(f"Baseline config file not found: {baseline_config_path}")
+    baseline_config = load_config(baseline_config_path)
+    baseline_assets = baseline_config.get("backtest", {}).get("assets", [])
 
     report_dir = create_report_dir(args.strategy)
     candidate_command = [choose_python(), "main.py", "--config", str(config_path), "--strategy", args.strategy]
@@ -284,8 +304,8 @@ def main() -> int:
     baseline_metrics = None
     baseline_command = None
     if not args.skip_baseline:
-        baseline_command = [choose_python(), "main.py", "--config", str(config_path), "--strategy", args.baseline_strategy]
-        baseline_run = run_backtest(config_path, args.baseline_strategy)
+        baseline_command = [choose_python(), "main.py", "--config", str(baseline_config_path), "--strategy", args.baseline_strategy]
+        baseline_run = run_backtest(baseline_config_path, args.baseline_strategy)
         write_text(report_dir / "baseline_stdout.txt", baseline_run.stdout)
         write_text(report_dir / "baseline_stderr.txt", baseline_run.stderr)
         if baseline_run.returncode == 0:
@@ -296,6 +316,8 @@ def main() -> int:
         baseline_strategy=args.baseline_strategy,
         command=candidate_command,
         baseline_command=baseline_command,
+        candidate_assets=candidate_assets,
+        baseline_assets=baseline_assets if not args.skip_baseline else None,
         strategy_metrics=candidate_metrics,
         baseline_metrics=baseline_metrics,
     )
@@ -303,6 +325,9 @@ def main() -> int:
     payload = {
         "strategy": args.strategy,
         "config": str(config_path),
+        "assets": candidate_assets,
+        "baseline_config": None if args.skip_baseline else str(baseline_config_path),
+        "baseline_assets": None if args.skip_baseline else baseline_assets,
         "candidate": candidate_metrics,
         "baseline": baseline_metrics,
         "generated_at": datetime.now().isoformat(timespec="seconds"),

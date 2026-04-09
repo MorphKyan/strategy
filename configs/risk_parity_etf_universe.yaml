@@ -1,0 +1,66 @@
+selection:
+  min_history_years: 5
+  min_overlap_years: 5
+  min_basket_size: 3
+  max_basket_size: 5
+  required_buckets:
+    - equity
+    - bond
+  optional_buckets:
+    - gold
+  max_per_bucket:
+    equity: 3
+    bond: 2
+    gold: 1
+
+candidates:
+  - code: "510050"
+    name: "上证50ETF"
+    bucket: "equity"
+    sleeve: "mega_cap_equity"
+    include: true
+  - code: "510180"
+    name: "上证180ETF"
+    bucket: "equity"
+    sleeve: "large_cap_equity"
+    include: true
+  - code: "510300"
+    name: "沪深300ETF"
+    bucket: "equity"
+    sleeve: "broad_equity"
+    include: true
+  - code: "510310"
+    name: "沪深300ETF易方达"
+    bucket: "equity"
+    sleeve: "broad_equity_alt"
+    include: true
+  - code: "510500"
+    name: "中证500ETF"
+    bucket: "equity"
+    sleeve: "mid_cap_equity"
+    include: true
+  - code: "510880"
+    name: "红利ETF"
+    bucket: "equity"
+    sleeve: "dividend_equity"
+    include: true
+  - code: "512890"
+    name: "红利低波ETF"
+    bucket: "equity"
+    sleeve: "low_vol_equity"
+    include: true
+  - code: "511260"
+    name: "十年国债ETF"
+    bucket: "bond"
+    sleeve: "government_bond"
+    include: true
+  - code: "511130"
+    name: "30年国债ETF"
+    bucket: "bond"
+    sleeve: "long_duration_bond"
+    include: true
+  - code: "518880"
+    name: "黄金ETF"
+    bucket: "gold"
+    sleeve: "gold"
+    include: true

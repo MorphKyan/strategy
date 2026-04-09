@@ -22,6 +22,20 @@ Codex should behave like a disciplined research engineer, not an unconstrained o
 6. Every experiment must produce a markdown summary under `reports/experiments/`.
 7. Prefer low-complexity, literature-supported changes over speculative redesigns.
 8. Keep code changes small, auditable, and compatible with the current `main.py` workflow.
+9. Keep the default ETF basket in `configs/risk_parity.yaml` as the fixed reference basket unless the user explicitly asks to replace it.
+
+## ETF Basket Research Rules
+- ETF basket selection is allowed for research variants, but it must be additive and reviewable.
+- Only use China-market ETFs defined in `configs/risk_parity_etf_universe.yaml` unless the user explicitly approves broader coverage.
+- Prefer ETFs with longer adjusted local history and enough common overlap for backtests.
+- Evaluate candidate baskets using metrics aligned with risk parity:
+  - cross-asset sleeve coverage
+  - common history length
+  - pairwise correlation
+  - inverse-vol concentration
+- Prefer baskets with at least one equity ETF and one defensive sleeve such as government bond or gold.
+- Avoid redundant baskets that are only small code-level substitutions of the same exposure.
+- New basket configs should go under `configs/generated/` or another additive config path.
 
 ## Variant Naming
 - Use names like:
@@ -50,6 +64,7 @@ Prefer:
 - volatility targeting overlays
 - rebalance frequency adjustment
 - turnover-aware constraints
+- ETF basket selection within the China ETF universe when justified by risk-parity criteria
 
 Avoid:
 - broad architecture rewrites

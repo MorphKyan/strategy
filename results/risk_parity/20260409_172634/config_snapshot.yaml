@@ -1,0 +1,36 @@
+backtest:
+  assets:
+  - code: '510050'
+    name: 上证50ETF
+  - code: '511260'
+    name: 十年国债ETF
+  - code: '518880'
+    name: 黄金ETF
+  end_date: null
+  start_date: '2017-08-24'
+output:
+  results_dir: results
+  save_csv: true
+  save_plots: true
+selection_metadata:
+  avg_abs_corr: 0.1222
+  inverse_vol_weights:
+    '510050': 0.1258895129244779
+    '511260': 0.7395020075105931
+    '518880': 0.134608479564929
+  overlap_years: 8.3
+  rank_at_generation: 2
+  score: 0.8352
+  source_universe: C:\Users\MorphKyan\tm-strategy\configs\risk_parity_etf_universe.yaml
+strategy:
+  name: risk_parity
+  params:
+    commission: 0.0002
+    init_calc_days: 30
+    init_mode: calculate
+    initial_weights:
+    - 0.15
+    - 0.25
+    - 0.6
+    rebalance_threshold: 0.05
+    rolling_window: 120

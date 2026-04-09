@@ -48,7 +48,7 @@ class DataHandler:
                 print(f"[{code}] 获取数据时发生错误: {e}")
 
     def load_etf_data(self, codes: List[str], auto_fetch: bool = True) -> pd.DataFrame:
-        """加载数据，如果缺失则自动获取"""
+        """加载多资产数据，并限制在共同有效的交易区间内。"""
         merged_df = pd.DataFrame()
 
         for code in codes:
@@ -81,7 +81,10 @@ class DataHandler:
             if merged_df.empty:
                 merged_df = df_final
             else:
-                merged_df = pd.merge(merged_df, df_final, left_index=True, right_index=True, how='outer')
+                # Use an inner merge so backtests only run on dates where every
+                # asset has an observed adjusted price instead of extending stale
+                # prices beyond the true common history window.
+                merged_df = pd.merge(merged_df, df_final, left_index=True, right_index=True, how='inner')
 
-        merged_df = merged_df.sort_index().ffill().dropna()
+        merged_df = merged_df.sort_index().dropna()
         return merged_df

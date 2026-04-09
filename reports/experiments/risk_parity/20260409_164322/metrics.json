@@ -1,0 +1,72 @@
+{
+  "strategy": "risk_parity",
+  "config": "C:\\Users\\MorphKyan\\tm-strategy\\configs\\generated\\risk_parity_basket_3_510300_510880_511260_518880.yaml",
+  "assets": [
+    {
+      "code": "510300",
+      "name": "沪深300ETF"
+    },
+    {
+      "code": "510880",
+      "name": "红利ETF"
+    },
+    {
+      "code": "511260",
+      "name": "十年国债ETF"
+    },
+    {
+      "code": "518880",
+      "name": "黄金ETF"
+    }
+  ],
+  "baseline_config": "C:\\Users\\MorphKyan\\tm-strategy\\configs\\risk_parity.yaml",
+  "baseline_assets": [
+    {
+      "code": "510300",
+      "name": "沪深300ETF"
+    },
+    {
+      "code": "518880",
+      "name": "黄金ETF"
+    },
+    {
+      "code": "511260",
+      "name": "十年国债ETF"
+    }
+  ],
+  "candidate": {
+    "results_dir": "C:\\Users\\MorphKyan\\tm-strategy\\results\\risk_parity\\20260409_164323",
+    "backtest_results_csv": "C:\\Users\\MorphKyan\\tm-strategy\\results\\risk_parity\\20260409_164323\\backtest_results.csv",
+    "trade_history_csv": "C:\\Users\\MorphKyan\\tm-strategy\\results\\risk_parity\\20260409_164323\\trade_history.csv",
+    "start_date": "2017-08-24",
+    "end_date": "2026-04-07",
+    "observations": 2089,
+    "total_return": 0.5967612189194214,
+    "annualized_return": 0.058105477595309596,
+    "annualized_volatility": 0.03909911717797798,
+    "max_drawdown": -0.06794350062905874,
+    "sharpe_ratio": 1.4861071499598122,
+    "turnover_total": 3.682227583367255,
+    "annualized_turnover": 0.4441940406934171,
+    "trade_count": 56,
+    "oos_metrics_available": false
+  },
+  "baseline": {
+    "results_dir": "C:\\Users\\MorphKyan\\tm-strategy\\results\\risk_parity\\20260409_164326",
+    "backtest_results_csv": "C:\\Users\\MorphKyan\\tm-strategy\\results\\risk_parity\\20260409_164326\\backtest_results.csv",
+    "trade_history_csv": "C:\\Users\\MorphKyan\\tm-strategy\\results\\risk_parity\\20260409_164326\\trade_history.csv",
+    "start_date": "2017-08-24",
+    "end_date": "2026-03-16",
+    "observations": 2074,
+    "total_return": 0.6212187881977715,
+    "annualized_return": 0.06049583649490575,
+    "annualized_volatility": 0.03504254645064073,
+    "max_drawdown": -0.04406601887767214,
+    "sharpe_ratio": 1.726353893262789,
+    "turnover_total": 3.9085038454857624,
+    "annualized_turnover": 0.47490017794716116,
+    "trade_count": 48,
+    "oos_metrics_available": false
+  },
+  "generated_at": "2026-04-09T16:43:27"
+}

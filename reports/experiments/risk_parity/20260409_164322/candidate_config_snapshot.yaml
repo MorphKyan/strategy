@@ -1,0 +1,38 @@
+backtest:
+  assets:
+  - code: '510300'
+    name: 沪深300ETF
+  - code: '510880'
+    name: 红利ETF
+  - code: '511260'
+    name: 十年国债ETF
+  - code: '518880'
+    name: 黄金ETF
+  end_date: null
+  start_date: '2017-08-24'
+output:
+  results_dir: results
+  save_csv: true
+  save_plots: true
+selection_metadata:
+  avg_abs_corr: 0.2226
+  inverse_vol_weights:
+    '510300': 0.10063504640100909
+    '510880': 0.14017071239816345
+    '511260': 0.6422823974877301
+    '518880': 0.1169118437130974
+  overlap_years: 8.29
+  score: 0.7973
+  source_universe: C:\Users\MorphKyan\tm-strategy\configs\risk_parity_etf_universe.yaml
+strategy:
+  name: risk_parity
+  params:
+    commission: 0.0002
+    init_calc_days: 30
+    init_mode: calculate
+    initial_weights:
+    - 0.15
+    - 0.25
+    - 0.6
+    rebalance_threshold: 0.05
+    rolling_window: 120
