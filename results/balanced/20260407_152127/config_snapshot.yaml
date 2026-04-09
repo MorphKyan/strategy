@@ -1,0 +1,23 @@
+backtest:
+  assets:
+  - code: '510300'
+    name: 沪深300ETF
+  - code: '518880'
+    name: 黄金ETF
+  - code: '511260'
+    name: 十年国债ETF
+  end_date: null
+  start_date: '2010-01-01'
+output:
+  results_dir: results
+  save_csv: true
+  save_plots: true
+strategy:
+  name: balanced
+  params:
+    commission: 0.0002
+    initial_weights:
+    - 0.3333
+    - 0.3333
+    - 0.3334
+    rebalance_threshold: 0.05

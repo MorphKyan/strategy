@@ -1,0 +1,24 @@
+backtest:
+  assets:
+  - code: '510300'
+    name: 沪深300ETF
+  - code: '518880'
+    name: 黄金ETF
+  - code: '510880'
+    name: 华泰柏瑞红利ETF
+  - code: '160520'
+    name: 博时抗通胀LOF
+  end_date: null
+  start_date: '2010-01-01'
+output:
+  results_dir: results
+  save_csv: true
+  save_plots: true
+strategy:
+  name: risk_parity
+  params:
+    commission: 0.0002
+    init_calc_days: 30
+    init_mode: calculate
+    rebalance_threshold: 0.05
+    rolling_window: 120

@@ -1,0 +1,26 @@
+# 风险平价策略配置
+strategy:
+  name: "risk_parity"
+  params:
+    rolling_window: 120
+    rebalance_threshold: 0.05
+    commission: 0.0002
+    initial_weights: [0.15, 0.25, 0.60]
+    init_mode: "calculate"        # 支持 "manual" (手动指派) 或 "calculate" (计算后建仓)
+    init_calc_days: 30        # "calculate" 模式下建仓前的观察期
+
+backtest:
+  assets:
+    - code: "510300"
+      name: "沪深300ETF"
+    - code: "518880"
+      name: "黄金ETF"
+    - code: "511260"
+      name: "十年国债ETF"
+  start_date: "2010-01-01"
+  end_date: null
+
+output:
+  results_dir: "results"
+  save_plots: true
+  save_csv: true
