@@ -1,0 +1,26 @@
+{
+  "spec": {
+    "name": "Gold ETF Screening",
+    "slug": "gold_etfs",
+    "description": "Find gold ETFs with at least 5 years of history from finshare.",
+    "min_history_years": 5.0,
+    "max_management_fee": null
+  },
+  "selected": [],
+  "rejected": [
+    {
+      "code": "516580",
+      "name": "新能源ETF博时",
+      "history_years": 4.7365,
+      "nav_observations": 1147,
+      "start_date": "2021-07-15",
+      "end_date": "2026-04-10",
+      "fund_type": null,
+      "tracking_index": null,
+      "management_fee_pct": null,
+      "duration_years": null,
+      "decision": "rejected",
+      "reason": "history_below_threshold"
+    }
+  ]
+}
