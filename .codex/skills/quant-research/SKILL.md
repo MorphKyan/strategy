@@ -5,7 +5,7 @@ description: Run one disciplined research cycle for this repository's risk-parit
 
 # Quant Research
 
-Read `AGENTS.md` and `README_codex.md` before making changes.
+Read `AGENTS.md` and `README.md` before making changes.
 
 Use this workflow:
 1. Inspect the current baseline strategy, config, and backtest entrypoint.

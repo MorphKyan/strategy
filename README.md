@@ -49,6 +49,37 @@ python main.py --config configs/risk_parity.yaml
 python main.py --strategy risk_parity
 ```
 
+### 4. 运行标准化研究实验
+风险平价研究建议使用标准实验入口。该脚本会运行候选策略，并在可用时运行 baseline 对照，随后写入稳定的报告和指标文件：
+
+```bash
+.\env\python.exe scripts/run_experiment.py --strategy risk_parity --config configs/risk_parity.yaml
+```
+
+常见输出：
+- `results/<strategy>/<timestamp>/`: 原始回测结果。
+- `reports/experiments/<strategy>/<timestamp>/metrics.json`: 标准化指标。
+- `reports/experiments/<strategy>/<timestamp>/report.md`: 实验报告。
+
+### 5. 筛选风险平价 ETF 组合
+ETF 组合研究使用固定候选池 `configs/risk_parity_etf_universe.yaml`。生成的候选配置会写入 `configs/generated/`，不会覆盖默认配置。
+
+```bash
+.\env\python.exe scripts/select_risk_parity_universe.py --write-configs
+```
+
+如果本地缺少候选 ETF 数据，可允许脚本先尝试补齐数据：
+
+```bash
+.\env\python.exe scripts/select_risk_parity_universe.py --fetch-missing --write-configs
+```
+
+比较候选组合与默认风险平价组合：
+
+```bash
+.\env\python.exe scripts/run_experiment.py --strategy risk_parity --config configs/generated/<candidate-config>.yaml --baseline-config configs/risk_parity.yaml
+```
+
 ## 配置说明
 配置文件采用 YAML 格式，位于 `configs/` 目录。
 
@@ -70,6 +101,11 @@ python main.py --strategy risk_parity
 - `backtest_results.csv`: 每日净值及持仓细节。
 - `trade_history.csv`: 交易明细。
 - `config_snapshot.yaml`: 本次运行的配置副本，方便复现。
+
+标准化研究实验还会在 `reports/experiments/策略名/时间戳/` 下保存：
+- `metrics.json`: 从原始 CSV 重新计算的核心指标、换手和交易次数。
+- `report.md`: 候选策略与 baseline 的对比报告。
+- `latest_raw_results_path.txt`: 对应原始结果目录。
 
 ---
 *注：原始重构前的脚本已移至 `backup/` 目录归档。*
