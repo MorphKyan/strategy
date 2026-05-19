@@ -1,0 +1,7 @@
+pandas
+PyYAML
+pytest
+matplotlib
+seaborn
+tqdm
+finshare

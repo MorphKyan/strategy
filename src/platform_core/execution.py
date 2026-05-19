@@ -1,0 +1,217 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+from itertools import count
+
+from src.platform_core.models import Asset, Bar, Order, PendingIntent, PortfolioState, TargetPortfolio, Trade
+
+
+@dataclass(frozen=True)
+class FeeProfile:
+    rate: float = 0.0002
+    min_fee: float = 0.0
+
+    def calculate(self, trade_value: float) -> float:
+        if trade_value <= 0:
+            return 0.0
+        return max(abs(trade_value) * self.rate, self.min_fee)
+
+
+@dataclass(frozen=True)
+class ExecutionConfig:
+    fee_profile: FeeProfile
+    price_field: str = "close"
+    weight_tolerance: float = 0.0005
+    unfilled_policy: str = "retry_next_day"
+
+
+class ExecutionEngine:
+    def __init__(self, config: ExecutionConfig):
+        self.config = config
+        self._order_ids = count(1)
+        self._trade_ids = count(1)
+
+    def apply_target(
+        self,
+        current_date: date,
+        state: PortfolioState,
+        assets: dict[str, Asset],
+        bars: dict[str, Bar],
+        target: TargetPortfolio,
+        cooldown_days: int = 0,
+        close_absent_positions: bool = True,
+    ) -> tuple[list[Order], list[Trade]]:
+        prices = {asset_id: getattr(bar, self.config.price_field) for asset_id, bar in bars.items()}
+        state_value = state.total_value(prices)
+        orders: list[Order] = []
+        trades: list[Trade] = []
+        if state_value <= 0:
+            return orders, trades
+
+        for asset_id, target_weight in target.weights.items():
+            if asset_id not in assets:
+                raise ValueError(f"Unknown asset in target portfolio: {asset_id}")
+
+        target_asset_ids = set(target.weights)
+        if close_absent_positions:
+            target_asset_ids.update(state.positions)
+        for asset_id in sorted(target_asset_ids):
+            if asset_id not in bars:
+                continue
+            asset = assets[asset_id]
+            bar = bars[asset_id]
+            price = prices[asset_id]
+            position = state.position(asset_id)
+            current_value = position.quantity * price
+            target_value = target.weights.get(asset_id, 0.0) * state_value
+            diff_value = target_value - current_value
+            if abs(diff_value / state_value) <= self.config.weight_tolerance:
+                state.pending_intents.pop(asset_id, None)
+                continue
+
+            side = "BUY" if diff_value > 0 else "SELL"
+            quantity = self._round_quantity(abs(diff_value) / price, asset.lot_size)
+            if side == "SELL":
+                quantity = min(quantity, self._round_quantity(position.quantity, asset.lot_size))
+            order = Order(
+                order_id=f"O{next(self._order_ids):08d}",
+                date=current_date,
+                asset_id=asset_id,
+                side=side,
+                quantity=quantity,
+                price=price,
+                target_weight=target.weights.get(asset_id, 0.0),
+            )
+
+            failure = self._validate_order(order, bar)
+            if failure:
+                order.status = "REJECTED"
+                order.reason = failure
+                orders.append(order)
+                self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, failure)
+                continue
+
+            if side == "BUY":
+                quantity = self._cap_buy_quantity(quantity, price, state.cash, asset.lot_size)
+                order.quantity = quantity
+            if quantity <= 0:
+                order.status = "REJECTED"
+                order.reason = "insufficient_cash_or_lot"
+                orders.append(order)
+                self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, order.reason)
+                continue
+
+            trade_value = quantity * price
+            fee = self.config.fee_profile.calculate(trade_value)
+            if side == "BUY":
+                total_cost = trade_value + fee
+                if total_cost > state.cash + 1e-9:
+                    order.status = "REJECTED"
+                    order.reason = "insufficient_cash"
+                    orders.append(order)
+                    self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, order.reason)
+                    continue
+                old_value = position.quantity * position.cost_basis
+                state.cash -= total_cost
+                position.quantity += quantity
+                position.cost_basis = (old_value + trade_value) / position.quantity if position.quantity else 0.0
+            else:
+                if quantity > position.quantity + 1e-9:
+                    order.status = "REJECTED"
+                    order.reason = "insufficient_position"
+                    orders.append(order)
+                    self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, order.reason)
+                    continue
+                state.cash += trade_value - fee
+                position.quantity -= quantity
+                if position.quantity <= 1e-9:
+                    position.quantity = 0.0
+                    position.cost_basis = 0.0
+                    if target.weights.get(asset_id, 0.0) <= self.config.weight_tolerance and cooldown_days > 0:
+                        state.cooldown_pool[asset_id] = cooldown_days
+
+            order.status = "FILLED"
+            orders.append(order)
+            trade = Trade(
+                trade_id=f"T{next(self._trade_ids):08d}",
+                order_id=order.order_id,
+                date=current_date,
+                asset_id=asset_id,
+                side=side,
+                quantity=quantity,
+                price=price,
+                trade_value=trade_value,
+                fee=fee,
+                cash_after=state.cash,
+            )
+            trades.append(trade)
+
+            post_prices = {item_id: getattr(item_bar, self.config.price_field) for item_id, item_bar in bars.items()}
+            post_value = state.total_value(post_prices)
+            post_weight = position.quantity * price / post_value if post_value > 0 else 0.0
+            if abs(post_weight - target.weights.get(asset_id, 0.0)) <= self.config.weight_tolerance:
+                state.pending_intents.pop(asset_id, None)
+            else:
+                self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, "partial_fill")
+
+        return orders, trades
+
+    @staticmethod
+    def _round_quantity(quantity: float, lot_size: int) -> float:
+        lot = max(1, int(lot_size))
+        return float(int(quantity // lot) * lot)
+
+    def _cap_buy_quantity(self, quantity: float, price: float, cash: float, lot_size: int) -> float:
+        if quantity <= 0:
+            return 0.0
+        lot = max(1, int(lot_size))
+        max_qty = int((cash / (price * (1 + self.config.fee_profile.rate))) // lot) * lot
+        while max_qty > 0:
+            value = max_qty * price
+            if value + self.config.fee_profile.calculate(value) <= cash + 1e-9:
+                break
+            max_qty -= lot
+        return float(min(quantity, max_qty))
+
+    @staticmethod
+    def _validate_order(order: Order, bar: Bar) -> str | None:
+        if bar.is_suspended:
+            return "suspended"
+        if order.side == "BUY" and bar.limit_up is not None and order.price >= bar.limit_up * (1 - 1e-9):
+            return "limit_up"
+        if order.side == "SELL" and bar.limit_down is not None and order.price <= bar.limit_down * (1 + 1e-9):
+            return "limit_down"
+        return None
+
+    def _handle_unfilled(self, state: PortfolioState, asset_id: str, target_weight: float, current_date: date, reason: str) -> None:
+        policy = self.config.unfilled_policy
+        if policy == "retry_next_day":
+            self._keep_pending(state, asset_id, target_weight, current_date, reason)
+            return
+        state.pending_intents.pop(asset_id, None)
+        if policy == "mark_failed":
+            failures = state.strategy_state.setdefault("_execution_failed_intents", [])
+            failures.append(
+                {
+                    "asset_id": asset_id,
+                    "target_weight": target_weight,
+                    "date": current_date.isoformat(),
+                    "reason": reason,
+                }
+            )
+            return
+        if policy == "cancel":
+            return
+        raise ValueError(f"Unknown unfilled_policy: {policy}")
+
+    @staticmethod
+    def _keep_pending(state: PortfolioState, asset_id: str, target_weight: float, current_date: date, reason: str) -> None:
+        intent = state.pending_intents.get(asset_id)
+        if intent is None:
+            intent = PendingIntent(asset_id=asset_id, target_weight=target_weight, created_date=current_date)
+            state.pending_intents[asset_id] = intent
+        intent.target_weight = target_weight
+        intent.last_attempt_date = current_date
+        intent.attempts += 1
+        intent.reason = reason

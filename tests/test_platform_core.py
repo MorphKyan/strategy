@@ -1,0 +1,403 @@
+from __future__ import annotations
+
+import json
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+from src.platform_core.data_store import FundamentalStore, MarketDataStore, PointInTimeFundamentals
+from src.platform_core.engine import PlatformBacktestEngine, load_checkpoint
+from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
+from src.platform_core.models import Asset, Bar, PortfolioState, TargetPortfolio
+from src.platform_core.sim import SimPortfolio
+from src.platform_core.storage import SQLiteStore
+from src.platform_core.strategy import FundamentalValueEqualWeightStrategy, MonthlyEqualWeightStrategy
+
+
+def test_target_portfolio_rejects_invalid_weights():
+    with pytest.raises(ValueError):
+        TargetPortfolio({"A": -0.1})
+    with pytest.raises(ValueError):
+        TargetPortfolio({"A": 0.7, "B": 0.4})
+
+
+def test_fee_profile_applies_minimum_fee():
+    fee = FeeProfile(rate=0.001, min_fee=5)
+    assert fee.calculate(1000) == 5
+    assert fee.calculate(10000) == 10
+
+
+def test_execution_rejects_price_limits_and_suspension():
+    asset = Asset(asset_id="A", code="A", name="A", lot_size=1)
+    state = PortfolioState(cash=1000)
+    engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0)))
+
+    suspended = Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10, is_suspended=True)
+    orders, trades = engine.apply_target(date(2024, 1, 1), state, {"A": asset}, {"A": suspended}, TargetPortfolio({"A": 1.0}))
+    assert orders[0].status == "REJECTED"
+    assert orders[0].reason == "suspended"
+    assert not trades
+
+    limit_up = Bar(date=date(2024, 1, 2), asset_id="A", open=11, high=11, low=11, close=11, limit_up=11, is_suspended=False)
+    orders, trades = engine.apply_target(date(2024, 1, 2), state, {"A": asset}, {"A": limit_up}, TargetPortfolio({"A": 1.0}))
+    assert orders[-1].reason == "limit_up"
+    assert not trades
+
+    state.position("A").quantity = 10
+    state.cash = 0
+    limit_down = Bar(date=date(2024, 1, 3), asset_id="A", open=9, high=9, low=9, close=9, limit_down=9, is_suspended=False)
+    orders, trades = engine.apply_target(date(2024, 1, 3), state, {"A": asset}, {"A": limit_down}, TargetPortfolio({"A": 0.0}))
+    assert orders[-1].reason == "limit_down"
+    assert not trades
+
+
+def test_pending_retry_does_not_liquidate_filled_positions():
+    assets = {
+        "A": Asset(asset_id="A", code="A", name="A", lot_size=1),
+        "B": Asset(asset_id="B", code="B", name="B", lot_size=1),
+    }
+    state = PortfolioState(cash=1000)
+    engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), weight_tolerance=0.0001))
+
+    day1_bars = {
+        "A": Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10),
+        "B": Bar(date=date(2024, 1, 1), asset_id="B", open=10, high=10, low=10, close=10, is_suspended=True),
+    }
+    orders, trades = engine.apply_target(
+        date(2024, 1, 1),
+        state,
+        assets,
+        day1_bars,
+        TargetPortfolio({"A": 0.5, "B": 0.5}),
+    )
+    assert [(order.asset_id, order.status) for order in orders] == [("A", "FILLED"), ("B", "REJECTED")]
+    assert len(trades) == 1
+    assert state.position("A").quantity == 50
+    assert state.pending_intents["B"].target_weight == 0.5
+
+    pending_target = TargetPortfolio({asset_id: intent.target_weight for asset_id, intent in state.pending_intents.items()})
+    day2_bars = {
+        "A": Bar(date=date(2024, 1, 2), asset_id="A", open=10, high=10, low=10, close=10),
+        "B": Bar(date=date(2024, 1, 2), asset_id="B", open=10, high=10, low=10, close=10),
+    }
+    orders, trades = engine.apply_target(
+        date(2024, 1, 2),
+        state,
+        assets,
+        day2_bars,
+        pending_target,
+        close_absent_positions=False,
+    )
+
+    assert [(order.asset_id, order.side, order.status) for order in orders] == [("B", "BUY", "FILLED")]
+    assert len(trades) == 1
+    assert state.position("A").quantity == 50
+    assert state.position("B").quantity == 50
+    assert state.pending_intents == {}
+
+
+def test_unfilled_policy_cancel_and_mark_failed():
+    asset = Asset(asset_id="A", code="A", name="A", lot_size=1)
+    suspended = Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10, is_suspended=True)
+
+    cancel_state = PortfolioState(cash=1000)
+    cancel_engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), unfilled_policy="cancel"))
+    orders, trades = cancel_engine.apply_target(date(2024, 1, 1), cancel_state, {"A": asset}, {"A": suspended}, TargetPortfolio({"A": 1.0}))
+    assert orders[0].status == "REJECTED"
+    assert not trades
+    assert cancel_state.pending_intents == {}
+    assert "_execution_failed_intents" not in cancel_state.strategy_state
+
+    failed_state = PortfolioState(cash=1000)
+    failed_engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), unfilled_policy="mark_failed"))
+    orders, trades = failed_engine.apply_target(date(2024, 1, 1), failed_state, {"A": asset}, {"A": suspended}, TargetPortfolio({"A": 1.0}))
+    assert orders[0].status == "REJECTED"
+    assert not trades
+    assert failed_state.pending_intents == {}
+    assert failed_state.strategy_state["_execution_failed_intents"] == [
+        {"asset_id": "A", "target_weight": 1.0, "date": "2024-01-01", "reason": "suspended"}
+    ]
+
+
+def test_strategy_version_delete_is_blocked_when_referenced(tmp_path: Path):
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        version_id = store.ensure_builtin_version(MonthlyEqualWeightStrategy, {"x": 1})
+        store.record_backtest("run_1", {"x": 1}, tmp_path / "out")
+        store.add_strategy_reference(version_id, "backtest", "1")
+        with pytest.raises(ValueError):
+            store.delete_strategy_version(version_id)
+    finally:
+        store.close()
+
+
+def test_platform_backtest_outputs_and_checkpoint_resume(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor",
+                "AAA,2024-01-29,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-30,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-31,10,10,10,10,1000,10000,1",
+                "AAA,2024-02-01,10,10,10,10,1000,10000,1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config = {
+        "platform": {"run_name": "test"},
+        "data": {"data_dir": str(data_dir)},
+        "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": 0.1}],
+        "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
+        "backtest": {"start_date": "2024-01-29", "end_date": "2024-02-01"},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "strategies": {
+            "segments": [
+                {
+                    "start_date": "2024-01-29",
+                    "end_date": None,
+                    "strategy_name": "monthly_equal_weight",
+                    "strategy_version_id": None,
+                    "params": {"universe": ["A"], "rebalance_on_start": True},
+                }
+            ]
+        },
+        "output": {"results_dir": str(tmp_path / "results")},
+    }
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+        reference_count = store.conn.execute("SELECT COUNT(*) AS count FROM strategy_references").fetchone()["count"]
+    finally:
+        store.close()
+
+    expected_files = ["manifest.json", "config_snapshot.yaml", "nav.csv", "positions.csv", "orders.csv", "trades.csv", "report.md"]
+    for name in expected_files:
+        assert (result.output_dir / name).exists()
+    checkpoint_path = result.output_dir / "checkpoints" / "2024-01-31.json"
+    assert checkpoint_path.exists()
+    checkpoint = load_checkpoint(checkpoint_path)
+    assert checkpoint.last_date == date(2024, 1, 31)
+    assert checkpoint.position("A").quantity > 0
+
+    manifest = json.loads((result.output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["engine"] == "platform_core.daily_event"
+    assert reference_count == 1
+
+
+class DummySource:
+    def fetch_bars(self, code, start=None, end=None, adjust=None):
+        return __import__("pandas").DataFrame(
+            [
+                {
+                    "trade_date": "2024-01-01",
+                    "open_price": 10,
+                    "high_price": 11,
+                    "low_price": 9,
+                    "close_price": 10,
+                    "volume": 100,
+                    "amount": 1000,
+                    "adjust_factor": 1,
+                }
+            ]
+        )
+
+    def fetch_financial_indicators(self, code, ann_date=None):
+        return __import__("pandas").DataFrame(
+            [
+                {
+                    "report_period": "2023-12-31",
+                    "announcement_date": "2024-01-10",
+                    "pe": 12,
+                    "pb": 1.2,
+                    "roe": 0.12,
+                    "debt_to_asset": 0.4,
+                    "dividend_yield": 0.03,
+                }
+            ]
+        )
+
+
+def test_market_and_fundamental_stores_sync_with_mock_source(tmp_path: Path):
+    asset = Asset(asset_id="A", code="AAA", name="AAA", lot_size=1)
+    market = MarketDataStore(tmp_path / "market", source=DummySource())
+    market.sync_assets([asset], "2024-01-01", "2024-01-01", fetch=True)
+    market_csv = tmp_path / "market" / "AAA.csv"
+    assert market_csv.exists()
+    assert "close" in market_csv.read_text(encoding="utf-8")
+
+    fundamentals = FundamentalStore(tmp_path / "fundamentals", source=DummySource())
+    fundamentals.sync_financial_indicators([asset], fetch=True)
+    fundamental_csv = tmp_path / "fundamentals" / "AAA.csv"
+    assert fundamental_csv.exists()
+    point_in_time = PointInTimeFundamentals(tmp_path / "fundamentals")
+    assert point_in_time.get("A", "2024-01-09") == {}
+    assert point_in_time.get("A", "2024-01-10")["pe"] == 12
+
+
+def test_fundamental_filter_rules_are_point_in_time(tmp_path: Path):
+    fund_dir = tmp_path / "fundamentals"
+    fund_dir.mkdir()
+    (fund_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "asset_id,report_period,announcement_date,asof_date,field,value,source,updated_at",
+                "A,2023-12-31,2024-01-10,2024-01-10,pe,10,csv,now",
+                "A,2023-12-31,2024-01-10,2024-01-10,pb,1,csv,now",
+                "B,2023-12-31,2024-01-20,2024-01-20,pe,8,csv,now",
+                "B,2023-12-31,2024-01-20,2024-01-20,pb,0.8,csv,now",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    pit = PointInTimeFundamentals(fund_dir)
+    rules = {"required": ["pe", "pb"], "max": {"pe": 12, "pb": 2}, "sort_by": "pe"}
+    assert pit.filter(["A", "B"], "2024-01-15", rules) == ["A"]
+    assert pit.filter(["A", "B"], "2024-01-25", rules) == ["B", "A"]
+
+
+def test_fundamental_strategy_backtest_and_sim_portfolio(tmp_path: Path):
+    market_dir = tmp_path / "market"
+    fund_dir = tmp_path / "fundamentals"
+    market_dir.mkdir()
+    fund_dir.mkdir()
+    for code in ["AAA", "BBB"]:
+        (market_dir / f"{code}.csv").write_text(
+            "\n".join(
+                [
+                    "trade_date,open,high,low,close,volume,amount,adjust_factor,source,updated_at",
+                    "2024-01-29,10,10,10,10,1000,10000,1,csv,now",
+                    "2024-01-30,10,10,10,10,1000,10000,1,csv,now",
+                    "2024-01-31,10,10,10,10,1000,10000,1,csv,now",
+                    "2024-02-01,10,10,10,10,1000,10000,1,csv,now",
+                    "2024-02-02,10,10,10,10,1000,10000,1,csv,now",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    (fund_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "asset_id,report_period,announcement_date,asof_date,field,value,source,updated_at",
+                "A,2023-12-31,2024-01-01,2024-01-01,pe,10,csv,now",
+                "A,2023-12-31,2024-01-01,2024-01-01,pb,1,csv,now",
+                "A,2023-12-31,2024-01-01,2024-01-01,roe,0.1,csv,now",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (fund_dir / "BBB.csv").write_text(
+        "\n".join(
+            [
+                "asset_id,report_period,announcement_date,asof_date,field,value,source,updated_at",
+                "B,2023-12-31,2024-01-01,2024-01-01,pe,40,csv,now",
+                "B,2023-12-31,2024-01-01,2024-01-01,pb,8,csv,now",
+                "B,2023-12-31,2024-01-01,2024-01-01,roe,0.1,csv,now",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config = {
+        "platform": {"run_name": "fundamental"},
+        "data": {"market_store_dir": str(market_dir), "fundamentals_dir": str(fund_dir), "fetch": False},
+        "assets": [
+            {"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": 0.1},
+            {"asset_id": "B", "code": "BBB", "name": "BBB", "lot_size": 1, "price_limit_pct": 0.1},
+        ],
+        "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
+        "backtest": {"start_date": "2024-01-29", "end_date": "2024-02-02"},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "strategies": {
+            "segments": [
+                {
+                    "start_date": "2024-01-29",
+                    "end_date": None,
+                    "strategy_name": "fundamental_value_equal_weight",
+                    "strategy_version_id": None,
+                    "params": {
+                        "universe": ["A", "B"],
+                        "fundamental_rules": {"required": ["pe", "pb"], "max": {"pe": 20, "pb": 2}},
+                    },
+                }
+            ]
+        },
+        "output": {"results_dir": str(tmp_path / "results"), "sim_dir": str(tmp_path / "sim")},
+    }
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+        checkpoint = result.output_dir / "checkpoints" / "2024-01-31.json"
+        portfolio = SimPortfolio.create_from_checkpoint(checkpoint, config, store, portfolio_id="sim_test")
+        sim_result = portfolio.advance("2024-02-02")
+        version_id = config["strategies"]["segments"][0]["strategy_version_id"]
+        with pytest.raises(ValueError):
+            store.delete_strategy_version(version_id)
+    finally:
+        store.close()
+
+    assert checkpoint.exists()
+    assert (sim_result.output_dir / "portfolio_state.json").exists()
+    assert (sim_result.output_dir / "suggested_orders.csv").exists()
+    assert (sim_result.output_dir / "trades.csv").exists()
+    assert (sim_result.output_dir / "nav.csv").exists()
+    assert (sim_result.output_dir / "manifest.json").exists()
+
+
+def test_platform_risk_parity_strategy_runs(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    rows = {
+        "AAA": [10, 10.1, 10.2, 10.4, 10.3],
+        "BBB": [20, 19.9, 20.1, 20.0, 20.2],
+        "CCC": [30, 30.3, 30.2, 30.1, 30.4],
+    }
+    dates = ["2024-03-27", "2024-03-28", "2024-03-29", "2024-04-01", "2024-04-02"]
+    for code, closes in rows.items():
+        lines = ["trade_date,open,high,low,close,volume,amount,adjust_factor,source,updated_at"]
+        for date_value, close in zip(dates, closes):
+            lines.append(f"{date_value},{close},{close},{close},{close},1000,{close * 1000},1,csv,now")
+        (data_dir / f"{code}.csv").write_text("\n".join(lines), encoding="utf-8")
+
+    config = {
+        "platform": {"run_name": "risk_parity"},
+        "data": {"data_dir": str(data_dir)},
+        "assets": [
+            {"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": 0.1},
+            {"asset_id": "B", "code": "BBB", "name": "BBB", "lot_size": 1, "price_limit_pct": 0.1},
+            {"asset_id": "C", "code": "CCC", "name": "CCC", "lot_size": 1, "price_limit_pct": 0.1},
+        ],
+        "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
+        "backtest": {"start_date": "2024-03-27", "end_date": "2024-04-02"},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "strategies": {
+            "segments": [
+                {
+                    "start_date": "2024-03-27",
+                    "end_date": None,
+                    "strategy_name": "risk_parity",
+                    "strategy_version_id": None,
+                    "params": {
+                        "universe": ["A", "B", "C"],
+                        "rolling_window": 3,
+                        "min_periods": 2,
+                        "init_mode": "calculate",
+                        "init_calc_days": 2,
+                        "rebalance_threshold": 0.05,
+                    },
+                }
+            ]
+        },
+        "output": {"results_dir": str(tmp_path / "results")},
+    }
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+    finally:
+        store.close()
+
+    trades = (result.output_dir / "trades.csv").read_text(encoding="utf-8")
+    assert "trade_id" in trades
+    assert result.metrics["trade_count"] > 0
