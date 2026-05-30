@@ -74,7 +74,31 @@ candidates:
     subtype: "long_duration_bond"
     include: true
 
-  # Add mainland broad commodity ETFs here when local data is available.
-  # Use sleeve: commodity and subtype: broad.
-  # If no broad commodity ETF passes the 3-year history filter, the selector
-  # can combine several single-commodity ETFs with subtype single_*.
+  # Mainland commodity futures ETFs. No broad commodity ETF is included here,
+  # so the selector can combine several single-commodity ETFs.
+  - asset_id: "CN_ETF:159985.SZ"
+    code: "159985"
+    name: "豆粕ETF"
+    exchange: "SZ"
+    asset_type: "etf"
+    sleeve: "commodity"
+    subtype: "single_agriculture"
+    include: true
+
+  - asset_id: "CN_ETF:159980.SZ"
+    code: "159980"
+    name: "有色期货ETF"
+    exchange: "SZ"
+    asset_type: "etf"
+    sleeve: "commodity"
+    subtype: "single_metals"
+    include: true
+
+  - asset_id: "CN_ETF:159981.SZ"
+    code: "159981"
+    name: "能源化工ETF"
+    exchange: "SZ"
+    asset_type: "etf"
+    sleeve: "commodity"
+    subtype: "single_energy_chemical"
+    include: true

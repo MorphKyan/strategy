@@ -1,0 +1,86 @@
+{
+  "experiment_name": "etf_selection_20260531_000612",
+  "candidate_config": "D:\\strategy\\etf_selection\\generated_configs\\20260531_000612\\platform_basket_518880_510310_159980_159981_511260.yaml",
+  "baseline_config": "D:\\strategy\\platform\\configs\\platform_risk_parity.yaml",
+  "candidate": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_basket_518880_510310_159980_159981_511260_candidate_20260531_001241",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_basket_518880_510310_159980_159981_511260_candidate_20260531_001241\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_basket_518880_510310_159980_159981_511260_candidate_20260531_001241\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_basket_518880_510310_159980_159981_511260_candidate_20260531_001241\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_basket_518880_510310_159980_159981_511260_candidate_20260531_001241\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2022-04-13",
+    "end_date": "2026-05-19",
+    "observations": 992,
+    "total_return": 0.2838481936390722,
+    "annualized_return": 0.06559896512931918,
+    "annualized_volatility": 0.0418997173737764,
+    "max_drawdown": -0.03542073971387094,
+    "sharpe_ratio": 1.5656183201458853,
+    "turnover_total": 2769298.3781070765,
+    "annualized_turnover": 703491.1202449428,
+    "trade_count": 71,
+    "order_count": 622,
+    "filled_order_count": 71,
+    "rejected_order_count": 551,
+    "order_status_counts": {
+      "REJECTED": 551,
+      "FILLED": 71
+    },
+    "rejection_reason_counts": {
+      "insufficient_cash_or_lot": 519,
+      "suspended": 32
+    },
+    "pending_intent_count": 2,
+    "max_pending_intent_count": 4,
+    "average_cash_weight": 0.035896679620624865,
+    "max_position_count": 5
+  },
+  "baseline": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_risk_parity_baseline_20260531_001252",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_risk_parity_baseline_20260531_001252\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_risk_parity_baseline_20260531_001252\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_risk_parity_baseline_20260531_001252\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\etf_selection_20260531_000612\\20260531_001241\\risk_parity\\platform_risk_parity_baseline_20260531_001252\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2017-08-24",
+    "end_date": "2026-05-19",
+    "observations": 2116,
+    "total_return": 0.6083592957241684,
+    "annualized_return": 0.058254986742826365,
+    "annualized_volatility": 0.03529092555294236,
+    "max_drawdown": -0.04370852979709783,
+    "sharpe_ratio": 1.6507072520791224,
+    "turnover_total": 3816965.4957152605,
+    "annualized_turnover": 454572.4503403807,
+    "trade_count": 57,
+    "order_count": 1196,
+    "filled_order_count": 57,
+    "rejected_order_count": 1139,
+    "order_status_counts": {
+      "REJECTED": 1139,
+      "FILLED": 57
+    },
+    "rejection_reason_counts": {
+      "insufficient_cash_or_lot": 1139
+    },
+    "pending_intent_count": 1,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.01863067351503727,
+    "max_position_count": 3
+  },
+  "comparison": {
+    "total_return_delta": -0.32451110208509615,
+    "annualized_return_delta": 0.007343978386492811,
+    "annualized_volatility_delta": 0.006608791820834042,
+    "max_drawdown_delta": 0.008287790083226887,
+    "sharpe_ratio_delta": -0.08508893193323708,
+    "annualized_turnover_delta": 248918.66990456212,
+    "trade_count_delta": 14.0,
+    "order_count_delta": -574.0,
+    "rejected_order_count_delta": -588.0,
+    "max_pending_intent_count_delta": 2.0,
+    "average_cash_weight_delta": 0.017266006105587595
+  },
+  "generated_at": "2026-05-31T00:13:16"
+}
