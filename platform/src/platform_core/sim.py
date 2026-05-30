@@ -50,6 +50,9 @@ class SimPortfolio:
                 price_field=config.get("execution", {}).get("price_field", "close"),
                 weight_tolerance=float(config.get("execution", {}).get("weight_tolerance", 0.0005)),
                 unfilled_policy=config.get("execution", {}).get("unfilled_policy", "retry_next_day"),
+                cash_buffer_pct=float(config.get("execution", {}).get("cash_buffer_pct", 0.0)),
+                skip_below_lot=bool(config.get("execution", {}).get("skip_below_lot", True)),
+                order_priority=config.get("execution", {}).get("order_priority", "asset_id"),
             )
         )
 

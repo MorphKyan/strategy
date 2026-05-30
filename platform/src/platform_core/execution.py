@@ -24,6 +24,9 @@ class ExecutionConfig:
     price_field: str = "close"
     weight_tolerance: float = 0.0005
     unfilled_policy: str = "retry_next_day"
+    cash_buffer_pct: float = 0.0
+    skip_below_lot: bool = True
+    order_priority: str = "asset_id"
 
 
 class ExecutionEngine:
@@ -49,14 +52,28 @@ class ExecutionEngine:
         if state_value <= 0:
             return orders, trades
 
-        for asset_id, target_weight in target.weights.items():
+        buffer_scale = max(0.0, min(1.0, 1.0 - float(self.config.cash_buffer_pct)))
+        effective_weights = {asset_id: weight * buffer_scale for asset_id, weight in target.weights.items()}
+
+        for asset_id, target_weight in effective_weights.items():
             if asset_id not in assets:
                 raise ValueError(f"Unknown asset in target portfolio: {asset_id}")
 
-        target_asset_ids = set(target.weights)
+        target_asset_ids = set(effective_weights)
         if close_absent_positions:
             target_asset_ids.update(state.positions)
-        for asset_id in sorted(target_asset_ids):
+        trade_plan: list[tuple[str, float, float]] = []
+        for asset_id in target_asset_ids:
+            if asset_id not in bars:
+                continue
+            price = prices[asset_id]
+            position = state.position(asset_id)
+            current_value = position.quantity * price
+            target_value = effective_weights.get(asset_id, 0.0) * state_value
+            diff_value = target_value - current_value
+            trade_plan.append((asset_id, diff_value, price))
+
+        for asset_id, _, _ in self._sort_trade_plan(trade_plan):
             if asset_id not in bars:
                 continue
             asset = assets[asset_id]
@@ -64,7 +81,8 @@ class ExecutionEngine:
             price = prices[asset_id]
             position = state.position(asset_id)
             current_value = position.quantity * price
-            target_value = target.weights.get(asset_id, 0.0) * state_value
+            target_weight = effective_weights.get(asset_id, 0.0)
+            target_value = target_weight * state_value
             diff_value = target_value - current_value
             if abs(diff_value / state_value) <= self.config.weight_tolerance:
                 state.pending_intents.pop(asset_id, None)
@@ -74,6 +92,10 @@ class ExecutionEngine:
             quantity = self._round_quantity(abs(diff_value) / price, asset.lot_size)
             if side == "SELL":
                 quantity = min(quantity, self._round_quantity(position.quantity, asset.lot_size))
+            one_lot_value = price * max(1, int(asset.lot_size))
+            if self.config.skip_below_lot and quantity <= 0 and abs(diff_value) < one_lot_value:
+                state.pending_intents.pop(asset_id, None)
+                continue
             order = Order(
                 order_id=f"O{next(self._order_ids):08d}",
                 date=current_date,
@@ -81,7 +103,7 @@ class ExecutionEngine:
                 side=side,
                 quantity=quantity,
                 price=price,
-                target_weight=target.weights.get(asset_id, 0.0),
+                target_weight=target_weight,
             )
 
             failure = self._validate_order(order, bar)
@@ -89,17 +111,21 @@ class ExecutionEngine:
                 order.status = "REJECTED"
                 order.reason = failure
                 orders.append(order)
-                self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, failure)
+                self._handle_unfilled(state, asset_id, target_weight, current_date, failure)
                 continue
 
             if side == "BUY":
-                quantity = self._cap_buy_quantity(quantity, price, state.cash, asset.lot_size)
+                buy_cash = self._available_buy_cash(state.cash, state_value)
+                quantity = self._cap_buy_quantity(quantity, price, buy_cash, asset.lot_size)
                 order.quantity = quantity
             if quantity <= 0:
+                if self.config.skip_below_lot and side == "BUY" and self._available_buy_cash(state.cash, state_value) < one_lot_value:
+                    state.pending_intents.pop(asset_id, None)
+                    continue
                 order.status = "REJECTED"
                 order.reason = "insufficient_cash_or_lot"
                 orders.append(order)
-                self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, order.reason)
+                self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason)
                 continue
 
             trade_value = quantity * price
@@ -110,7 +136,7 @@ class ExecutionEngine:
                     order.status = "REJECTED"
                     order.reason = "insufficient_cash"
                     orders.append(order)
-                    self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, order.reason)
+                    self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason)
                     continue
                 old_value = position.quantity * position.cost_basis
                 state.cash -= total_cost
@@ -121,14 +147,14 @@ class ExecutionEngine:
                     order.status = "REJECTED"
                     order.reason = "insufficient_position"
                     orders.append(order)
-                    self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, order.reason)
+                    self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason)
                     continue
                 state.cash += trade_value - fee
                 position.quantity -= quantity
                 if position.quantity <= 1e-9:
                     position.quantity = 0.0
                     position.cost_basis = 0.0
-                    if target.weights.get(asset_id, 0.0) <= self.config.weight_tolerance and cooldown_days > 0:
+                    if target_weight <= self.config.weight_tolerance and cooldown_days > 0:
                         state.cooldown_pool[asset_id] = cooldown_days
 
             order.status = "FILLED"
@@ -150,12 +176,23 @@ class ExecutionEngine:
             post_prices = {item_id: getattr(item_bar, self.config.price_field) for item_id, item_bar in bars.items()}
             post_value = state.total_value(post_prices)
             post_weight = position.quantity * price / post_value if post_value > 0 else 0.0
-            if abs(post_weight - target.weights.get(asset_id, 0.0)) <= self.config.weight_tolerance:
+            if abs(post_weight - target_weight) <= self.config.weight_tolerance:
                 state.pending_intents.pop(asset_id, None)
             else:
-                self._handle_unfilled(state, asset_id, target.weights.get(asset_id, 0.0), current_date, "partial_fill")
+                self._handle_unfilled(state, asset_id, target_weight, current_date, "partial_fill")
 
         return orders, trades
+
+    def _available_buy_cash(self, cash: float, state_value: float) -> float:
+        reserve = max(0.0, min(1.0, float(self.config.cash_buffer_pct))) * state_value
+        return max(0.0, cash - reserve)
+
+    def _sort_trade_plan(self, trade_plan: list[tuple[str, float, float]]) -> list[tuple[str, float, float]]:
+        if self.config.order_priority == "target_gap_desc":
+            return sorted(trade_plan, key=lambda item: (item[1] > 0, -abs(item[1]), -item[2], item[0]))
+        if self.config.order_priority == "price_desc":
+            return sorted(trade_plan, key=lambda item: (item[1] > 0, -item[2], -abs(item[1]), item[0]))
+        return sorted(trade_plan, key=lambda item: item[0])
 
     @staticmethod
     def _round_quantity(quantity: float, lot_size: int) -> float:

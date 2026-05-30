@@ -125,6 +125,64 @@ def test_unfilled_policy_cancel_and_mark_failed():
     ]
 
 
+def test_execution_skips_below_lot_residual_without_pending():
+    asset = Asset(asset_id="A", code="A", name="A", lot_size=100)
+    state = PortfolioState(cash=50)
+    state.position("A").quantity = 100
+    bar = Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10)
+    engine = ExecutionEngine(
+        ExecutionConfig(
+            fee_profile=FeeProfile(rate=0.0),
+            weight_tolerance=0.0001,
+            skip_below_lot=True,
+        )
+    )
+
+    orders, trades = engine.apply_target(
+        date(2024, 1, 1),
+        state,
+        {"A": asset},
+        {"A": bar},
+        TargetPortfolio({"A": 1.0}),
+    )
+
+    assert orders == []
+    assert trades == []
+    assert state.pending_intents == {}
+
+
+def test_execution_cash_buffer_and_gap_priority():
+    assets = {
+        "BOND": Asset(asset_id="BOND", code="BOND", name="Bond", lot_size=100),
+        "ETF": Asset(asset_id="ETF", code="ETF", name="ETF", lot_size=100),
+    }
+    bars = {
+        "BOND": Bar(date=date(2024, 1, 1), asset_id="BOND", open=100, high=100, low=100, close=100),
+        "ETF": Bar(date=date(2024, 1, 1), asset_id="ETF", open=10, high=10, low=10, close=10),
+    }
+    state = PortfolioState(cash=100000)
+    engine = ExecutionEngine(
+        ExecutionConfig(
+            fee_profile=FeeProfile(rate=0.0),
+            cash_buffer_pct=0.01,
+            order_priority="target_gap_desc",
+        )
+    )
+
+    orders, trades = engine.apply_target(
+        date(2024, 1, 1),
+        state,
+        assets,
+        bars,
+        TargetPortfolio({"ETF": 0.1, "BOND": 0.9}),
+    )
+
+    assert [order.asset_id for order in orders] == ["BOND", "ETF"]
+    assert all(order.status == "FILLED" for order in orders)
+    assert state.cash >= 1000
+    assert sum(trade.trade_value for trade in trades) <= 99000
+
+
 def test_strategy_version_delete_is_blocked_when_referenced(tmp_path: Path):
     store = SQLiteStore(tmp_path / "platform.sqlite3")
     try:
