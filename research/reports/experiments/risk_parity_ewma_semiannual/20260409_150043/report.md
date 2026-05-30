@@ -1,35 +1,35 @@
-# Experiment Report: risk_parity_ewma_semiannual
+# 实验报告： risk_parity_ewma_semiannual
 
-## Goal
-Run a standardized experiment for `risk_parity_ewma_semiannual` and compare it against `risk_parity` when baseline metrics are available.
+## 目标
+运行 `risk_parity_ewma_semiannual` 的标准化实验，并在 baseline 指标可用时与 `risk_parity` 对比。
 
-## Hypothesis
-This run evaluates whether the candidate strategy improves risk-adjusted performance without an unreasonable turnover increase.
+## 假设
+本次运行评估候选策略是否在不显著增加换手的前提下改善风险调整后表现。
 
-## Commands
-- Candidate: `C:\Users\MorphKyan\tm-strategy\env\python.exe main.py --config C:\Users\MorphKyan\tm-strategy\configs\risk_parity.yaml --strategy risk_parity_ewma_semiannual`
-- Baseline: `C:\Users\MorphKyan\tm-strategy\env\python.exe main.py --config C:\Users\MorphKyan\tm-strategy\configs\risk_parity.yaml --strategy risk_parity`
+## 命令
+- 候选： `C:\Users\MorphKyan\tm-strategy\env\python.exe main.py --config C:\Users\MorphKyan\tm-strategy\configs\risk_parity.yaml --strategy risk_parity_ewma_semiannual`
+- Baseline： `C:\Users\MorphKyan\tm-strategy\env\python.exe main.py --config C:\Users\MorphKyan\tm-strategy\configs\risk_parity.yaml --strategy risk_parity`
 
-## Candidate Metrics
-- Total return: 68.76%
-- Annualized return: 6.57%
-- Annualized volatility: 3.59%
-- Max drawdown: -3.39%
-- Sharpe ratio: 1.8297
-- Annualized turnover: 0.5335
-- Trade count: 42
-- Out-of-sample metrics available: False
+## 候选指标
+- 累计收益率： 68.76%
+- 年化收益率： 6.57%
+- 年化波动率： 3.59%
+- 最大回撤： -3.39%
+- 夏普比率： 1.8297
+- 年化换手： 0.5335
+- 成交笔数： 42
+- 是否有样本外指标：否
 
-## Baseline Comparison
-- Sharpe delta: +0.1033
-- Annualized return delta: +0.0052
-- Annualized volatility delta: +0.0009
-- Max drawdown delta: +0.0101
-- Annualized turnover delta: +0.0586
+## Baseline 对比
+- 夏普差值： +0.1033
+- 年化收益率差值： +0.0052
+- 年化波动率差值： +0.0009
+- 最大回撤差值： +0.0101
+- 年化换手差值： +0.0586
 
-## Recommendation
-- Accept
+## 建议
+- 接受
 
-## Notes
-- Metrics are computed from generated CSV artifacts, not inferred from memory.
-- Out-of-sample metrics are marked unavailable unless the repository explicitly generates them.
+## 说明
+- 指标根据生成的 CSV 产物计算，而不是凭记忆推断。
+- 除非仓库明确生成样本外指标，否则样本外指标标记为不可用。

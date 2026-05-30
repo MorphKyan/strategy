@@ -32,6 +32,8 @@ Run from the repository root:
 
 The research entrypoints resolve relative paths from `research/`, so `configs/risk_parity.yaml` means `research/configs/risk_parity.yaml`.
 
+All generated markdown reports and summaries should be written in Chinese. Keep exact commands, paths, and metric keys unchanged when needed for reproducibility.
+
 ## Outputs
 
 - Raw backtests: `research/results/<strategy>/<timestamp>/`

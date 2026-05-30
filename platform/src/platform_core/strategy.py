@@ -196,10 +196,42 @@ class RiskParityStrategy(Strategy):
         return current.year != next_date.year or current_quarter != next_quarter
 
 
+class RiskParityEWMAStrategy(RiskParityStrategy):
+    name = "risk_parity_ewma"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        ewma_span = int(context.params.get("ewma_span", 60))
+        ewma_min_periods = int(context.params.get("ewma_min_periods", 20))
+        min_history = max(ewma_min_periods + 1, 2)
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            history = frame[frame.index <= context.date]["close"]
+            if len(history) < min_history:
+                return None
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if len(price_frame) < min_history:
+            return None
+        returns = price_frame.pct_change()
+        volatility = returns.ewm(span=ewma_span, min_periods=ewma_min_periods, adjust=False).std().iloc[-1]
+        volatility = volatility[volatility > 0]
+        if len(volatility) != len(universe):
+            return None
+        inv_vol = 1.0 / volatility
+        weights = inv_vol / inv_vol.sum()
+        return TargetPortfolio({asset_id: float(weights[asset_id]) for asset_id in universe})
+
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
     RiskParityStrategy.name: RiskParityStrategy,
+    RiskParityEWMAStrategy.name: RiskParityEWMAStrategy,
 }
 
 

@@ -1,45 +1,45 @@
-# Experiment Report: risk_parity
+# 实验报告： risk_parity
 
-## Goal
-Run a standardized experiment for `risk_parity` and compare it against `risk_parity` when baseline metrics are available.
+## 目标
+运行 `risk_parity` 的标准化实验，并在 baseline 指标可用时与 `risk_parity` 对比。
 
-## Hypothesis
-This run evaluates whether the candidate strategy improves risk-adjusted performance without an unreasonable turnover increase.
+## 假设
+本次运行评估候选策略是否在不显著增加换手的前提下改善风险调整后表现。
 
-## Commands
-- Candidate: `C:\Users\MorphKyan\tm-strategy\env\python.exe main.py --config C:\Users\MorphKyan\tm-strategy\configs\generated\risk_parity_basket_510050_511260_518880.yaml --strategy risk_parity`
-- Baseline: `C:\Users\MorphKyan\tm-strategy\env\python.exe main.py --config C:\Users\MorphKyan\tm-strategy\configs\risk_parity.yaml --strategy risk_parity`
+## 命令
+- 候选： `C:\Users\MorphKyan\tm-strategy\env\python.exe main.py --config C:\Users\MorphKyan\tm-strategy\configs\generated\risk_parity_basket_510050_511260_518880.yaml --strategy risk_parity`
+- Baseline： `C:\Users\MorphKyan\tm-strategy\env\python.exe main.py --config C:\Users\MorphKyan\tm-strategy\configs\risk_parity.yaml --strategy risk_parity`
 
-## Candidate Basket
+## 候选篮子
 - `510050` 上证50ETF
 - `511260` 十年国债ETF
 - `518880` 黄金ETF
 
-## Baseline Basket
+## Baseline 篮子
 - `510300` 沪深300ETF
 - `518880` 黄金ETF
 - `511260` 十年国债ETF
 
-## Candidate Metrics
-- Total return: 59.79%
-- Annualized return: 5.81%
-- Annualized volatility: 3.47%
-- Max drawdown: -4.09%
-- Sharpe ratio: 1.6750
-- Annualized turnover: 0.4760
-- Trade count: 48
-- Out-of-sample metrics available: False
+## 候选指标
+- 累计收益率： 59.79%
+- 年化收益率： 5.81%
+- 年化波动率： 3.47%
+- 最大回撤： -4.09%
+- 夏普比率： 1.6750
+- 年化换手： 0.4760
+- 成交笔数： 48
+- 是否有样本外指标：否
 
-## Baseline Comparison
-- Sharpe delta: -0.0514
-- Annualized return delta: -0.0024
-- Annualized volatility delta: -0.0003
-- Max drawdown delta: +0.0032
-- Annualized turnover delta: +0.0011
+## Baseline 对比
+- 夏普差值： -0.0514
+- 年化收益率差值： -0.0024
+- 年化波动率差值： -0.0003
+- 最大回撤差值： +0.0032
+- 年化换手差值： +0.0011
 
-## Recommendation
-- Refine
+## 建议
+- 继续改进
 
-## Notes
-- Metrics are computed from generated CSV artifacts, not inferred from memory.
-- Out-of-sample metrics are marked unavailable unless the repository explicitly generates them.
+## 说明
+- 指标根据生成的 CSV 产物计算，而不是凭记忆推断。
+- 除非仓库明确生成样本外指标，否则样本外指标标记为不可用。

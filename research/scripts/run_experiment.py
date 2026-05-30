@@ -141,6 +141,10 @@ def num_or_na(value) -> str:
     return "N/A" if value is None else f"{value:.4f}"
 
 
+def bool_zh(value) -> str:
+    return "是" if bool(value) else "否"
+
+
 def delta(candidate, baseline) -> str:
     if candidate is None or baseline is None:
         return "N/A"
@@ -174,50 +178,50 @@ def build_report(
 ) -> str:
     recommendation = "Refine"
     if baseline_metrics is None:
-        recommendation = "Review"
+        recommendation = "复核"
     else:
         sharpe_up = (strategy_metrics["sharpe_ratio"] or 0) > (baseline_metrics["sharpe_ratio"] or 0)
         drawdown_ok = (strategy_metrics["max_drawdown"] or 0) >= (baseline_metrics["max_drawdown"] or 0)
         turnover_ok = (strategy_metrics["annualized_turnover"] or 0) <= (baseline_metrics["annualized_turnover"] or 0) * 1.2
-        recommendation = "Accept" if sharpe_up and drawdown_ok and turnover_ok else "Refine"
+        recommendation = "接受" if sharpe_up and drawdown_ok and turnover_ok else "继续改进"
 
     lines = [
-        f"# Experiment Report: {strategy}",
+        f"# 实验报告：{strategy}",
         "",
-        "## Goal",
-        f"Run a standardized experiment for `{strategy}` and compare it against `{baseline_strategy}` when baseline metrics are available.",
+        "## 目标",
+        f"运行 `{strategy}` 的标准化实验，并在 baseline 指标可用时与 `{baseline_strategy}` 对比。",
         "",
-        "## Hypothesis",
-        "This run evaluates whether the candidate strategy improves risk-adjusted performance without an unreasonable turnover increase.",
+        "## 假设",
+        "本次运行评估候选策略是否在不显著增加换手的前提下改善风险调整后表现。",
         "",
-        "## Commands",
-        f"- Candidate: `{' '.join(command)}`",
+        "## 命令",
+        f"- 候选：`{' '.join(command)}`",
     ]
 
     if baseline_command is not None:
-        lines.append(f"- Baseline: `{' '.join(baseline_command)}`")
+        lines.append(f"- Baseline：`{' '.join(baseline_command)}`")
 
-    lines.extend(["", "## Candidate Basket"])
+    lines.extend(["", "## 候选篮子"])
     for asset in candidate_assets:
         lines.append(f"- `{asset['code']}` {asset.get('name', '')}".rstrip())
 
     if baseline_assets is not None:
-        lines.extend(["", "## Baseline Basket"])
+        lines.extend(["", "## Baseline 篮子"])
         for asset in baseline_assets:
             lines.append(f"- `{asset['code']}` {asset.get('name', '')}".rstrip())
 
     lines.extend(
         [
             "",
-            "## Candidate Metrics",
-            f"- Total return: {pct_or_na(strategy_metrics['total_return'])}",
-            f"- Annualized return: {pct_or_na(strategy_metrics['annualized_return'])}",
-            f"- Annualized volatility: {pct_or_na(strategy_metrics['annualized_volatility'])}",
-            f"- Max drawdown: {pct_or_na(strategy_metrics['max_drawdown'])}",
-            f"- Sharpe ratio: {num_or_na(strategy_metrics['sharpe_ratio'])}",
-            f"- Annualized turnover: {num_or_na(strategy_metrics['annualized_turnover'])}",
-            f"- Trade count: {strategy_metrics['trade_count']}",
-            f"- Out-of-sample metrics available: {strategy_metrics['oos_metrics_available']}",
+            "## 候选指标",
+            f"- 累计收益率：{pct_or_na(strategy_metrics['total_return'])}",
+            f"- 年化收益率：{pct_or_na(strategy_metrics['annualized_return'])}",
+            f"- 年化波动率：{pct_or_na(strategy_metrics['annualized_volatility'])}",
+            f"- 最大回撤：{pct_or_na(strategy_metrics['max_drawdown'])}",
+            f"- 夏普比率：{num_or_na(strategy_metrics['sharpe_ratio'])}",
+            f"- 年化换手：{num_or_na(strategy_metrics['annualized_turnover'])}",
+            f"- 交易笔数：{strategy_metrics['trade_count']}",
+            f"- 是否有样本外指标：{bool_zh(strategy_metrics['oos_metrics_available'])}",
         ]
     )
 
@@ -225,32 +229,32 @@ def build_report(
         lines.extend(
             [
                 "",
-                "## Baseline Comparison",
-                f"- Sharpe delta: {delta(strategy_metrics['sharpe_ratio'], baseline_metrics['sharpe_ratio'])}",
-                f"- Annualized return delta: {delta(strategy_metrics['annualized_return'], baseline_metrics['annualized_return'])}",
-                f"- Annualized volatility delta: {delta(strategy_metrics['annualized_volatility'], baseline_metrics['annualized_volatility'])}",
-                f"- Max drawdown delta: {delta(strategy_metrics['max_drawdown'], baseline_metrics['max_drawdown'])}",
-                f"- Annualized turnover delta: {delta(strategy_metrics['annualized_turnover'], baseline_metrics['annualized_turnover'])}",
+                "## Baseline 对比",
+                f"- 夏普差值：{delta(strategy_metrics['sharpe_ratio'], baseline_metrics['sharpe_ratio'])}",
+                f"- 年化收益率差值：{delta(strategy_metrics['annualized_return'], baseline_metrics['annualized_return'])}",
+                f"- 年化波动率差值：{delta(strategy_metrics['annualized_volatility'], baseline_metrics['annualized_volatility'])}",
+                f"- 最大回撤差值：{delta(strategy_metrics['max_drawdown'], baseline_metrics['max_drawdown'])}",
+                f"- 年化换手差值：{delta(strategy_metrics['annualized_turnover'], baseline_metrics['annualized_turnover'])}",
             ]
         )
     else:
         lines.extend(
             [
                 "",
-                "## Baseline Comparison",
-                "- No baseline comparison was written because baseline metrics were not available.",
+                "## Baseline 对比",
+                "- 未写入 baseline 对比，因为 baseline 指标不可用。",
             ]
         )
 
     lines.extend(
         [
             "",
-            "## Recommendation",
+            "## 建议",
             f"- {recommendation}",
             "",
-            "## Notes",
-            "- Metrics are computed from generated CSV artifacts, not inferred from memory.",
-            "- Out-of-sample metrics are marked unavailable unless the repository explicitly generates them.",
+            "## 说明",
+            "- 指标根据生成的 CSV 产物计算，而不是凭记忆推断。",
+            "- 除非仓库明确生成样本外指标，否则样本外指标标记为不可用。",
         ]
     )
 

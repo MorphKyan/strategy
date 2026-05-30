@@ -1,6 +1,6 @@
 # Platform Risk Parity Run
 
-## Hypothesis
+## 假设
 
 The existing inverse-volatility risk parity logic can be represented as a new platform target-weight strategy while letting the platform execution layer handle fees, lots, price limits, suspended assets, pending intents, checkpoints, and run artifacts.
 
@@ -13,7 +13,7 @@ The existing inverse-volatility risk parity logic can be represented as a new pl
 - `configs/platform_risk_parity.yaml`
 - `tests/test_platform_core.py`
 
-## Commands
+## 命令
 
 ```powershell
 .\env\python.exe -m pytest tests\test_platform_core.py
@@ -26,12 +26,12 @@ The existing inverse-volatility risk parity logic can be represented as a new pl
 - Each ETF added 42 rows from `2026-03-17` through `2026-05-19`.
 - Platform run used the common-history period from `2017-08-24` through `2026-05-19`.
 
-## Artifacts
+## 产物
 
-- Raw platform result path: `results/platform/platform_risk_parity_20260519_154349/`
-- Standardized report path: `reports/experiments/platform_risk_parity/20260519_154349/report.md`
+- 平台原始结果路径： `results/platform/platform_risk_parity_20260519_154349/`
+- 标准化报告路径： `reports/experiments/platform_risk_parity/20260519_154349/report.md`
 
-## Metrics
+## 指标
 
 | Metric | Value |
 | --- | ---: |
@@ -69,12 +69,12 @@ Legacy standardized report path: `reports/experiments/risk_parity/20260519_15515
 
 The results are not identical. The platform has one extra observation (`2018-08-17`) because it uses a union trading calendar with suspended carry-forward bars, while the legacy research path effectively uses common aligned price dates. The platform also applies cash, round-lot execution, minimum fees, rejected orders, and pending-intent retries; the legacy strategy simulates fractional portfolio-value trades inside the strategy.
 
-Out-of-sample metrics are not available in the repository output for this run.
+本次运行的仓库输出中没有样本外指标。
 
-## Notes
+## 说明
 
 The final pending intent is `CN_ETF:511260.SH`, created on `2026-03-31` and retried through `2026-05-19`. It remains pending because the account cash is insufficient to buy another full lot.
 
-## Recommendation
+## 建议
 
 Refine. The strategy runs end-to-end on the new platform and produces complete artifacts, but the adapter should be reviewed against the legacy research implementation before treating platform results as directly comparable.

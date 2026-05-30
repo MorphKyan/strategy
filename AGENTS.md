@@ -92,6 +92,7 @@ Avoid:
 ## Implementation Guidelines
 
 - Read `README.md` plus the relevant subsystem README before making changes.
+- All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when clarity requires exact names.
 - Reuse the current config schema unless a separate config is genuinely needed.
 - Keep the research baseline config as the reference unless the experiment is explicitly a basket/config experiment.
 - Use adjusted local ETF data as loaded by `research/src/data_handler.py`; do not silently change price adjustment or common-history handling.

@@ -16,6 +16,7 @@ from src.platform_core.models import Asset, Bar, PortfolioState, TargetPortfolio
 from src.platform_core.sim import SimPortfolio
 from src.platform_core.storage import SQLiteStore
 from src.platform_core.strategy import FundamentalValueEqualWeightStrategy, MonthlyEqualWeightStrategy
+from src.platform_core.strategy import get_strategy_class
 from src.platform_core.visualization import render_platform_charts
 
 
@@ -404,6 +405,62 @@ def test_platform_risk_parity_strategy_runs(tmp_path: Path):
 
     trades = (result.output_dir / "trades.csv").read_text(encoding="utf-8")
     assert "trade_id" in trades
+    assert result.metrics["trade_count"] > 0
+
+
+def test_platform_risk_parity_ewma_strategy_runs(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    rows = {
+        "AAA": [10, 10.1, 10.2, 10.4, 10.3],
+        "BBB": [20, 19.9, 20.1, 20.0, 20.2],
+        "CCC": [30, 30.3, 30.2, 30.1, 30.4],
+    }
+    dates = ["2024-03-27", "2024-03-28", "2024-03-29", "2024-04-01", "2024-04-02"]
+    for code, closes in rows.items():
+        lines = ["trade_date,open,high,low,close,volume,amount,adjust_factor,source,updated_at"]
+        for date_value, close in zip(dates, closes):
+            lines.append(f"{date_value},{close},{close},{close},{close},1000,{close * 1000},1,csv,now")
+        (data_dir / f"{code}.csv").write_text("\n".join(lines), encoding="utf-8")
+
+    config = {
+        "platform": {"run_name": "risk_parity_ewma"},
+        "data": {"data_dir": str(data_dir)},
+        "assets": [
+            {"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": 0.1},
+            {"asset_id": "B", "code": "BBB", "name": "BBB", "lot_size": 1, "price_limit_pct": 0.1},
+            {"asset_id": "C", "code": "CCC", "name": "CCC", "lot_size": 1, "price_limit_pct": 0.1},
+        ],
+        "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
+        "backtest": {"start_date": "2024-03-27", "end_date": "2024-04-02"},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "strategies": {
+            "segments": [
+                {
+                    "start_date": "2024-03-27",
+                    "end_date": None,
+                    "strategy_name": "risk_parity_ewma",
+                    "strategy_version_id": None,
+                    "params": {
+                        "universe": ["A", "B", "C"],
+                        "ewma_span": 3,
+                        "ewma_min_periods": 2,
+                        "init_mode": "calculate",
+                        "init_calc_days": 2,
+                        "rebalance_threshold": 0.05,
+                    },
+                }
+            ]
+        },
+        "output": {"results_dir": str(tmp_path / "results")},
+    }
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+    finally:
+        store.close()
+
+    assert get_strategy_class("risk_parity_ewma").name == "risk_parity_ewma"
     assert result.metrics["trade_count"] > 0
 
 

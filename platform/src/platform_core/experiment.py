@@ -89,14 +89,18 @@ def num_or_na(value: Any) -> str:
     return "N/A" if value is None else f"{float(value):.4f}"
 
 
+def bool_zh(value: Any) -> str:
+    return "是" if bool(value) else "否"
+
+
 def recommendation(candidate: dict[str, Any], baseline: dict[str, Any] | None) -> str:
     if baseline is None:
-        return "Review"
+        return "复核"
     sharpe_up = (candidate.get("sharpe_ratio") or 0) > (baseline.get("sharpe_ratio") or 0)
     drawdown_ok = (candidate.get("max_drawdown") or 0) >= (baseline.get("max_drawdown") or 0)
     turnover_ok = (candidate.get("annualized_turnover") or 0) <= (baseline.get("annualized_turnover") or 0) * 1.2
     execution_ok = (candidate.get("rejected_order_count") or 0) <= (baseline.get("rejected_order_count") or 0)
-    return "Accept" if sharpe_up and drawdown_ok and turnover_ok and execution_ok else "Refine"
+    return "接受" if sharpe_up and drawdown_ok and turnover_ok and execution_ok else "继续改进"
 
 
 def build_report(
@@ -108,59 +112,72 @@ def build_report(
     comparison: dict[str, Any],
 ) -> str:
     lines = [
-        f"# Platform Experiment Report: {experiment_name}",
+        f"# 平台实验报告：{experiment_name}",
         "",
-        "## Goal",
-        "Run a standardized platform experiment and compare it with a platform baseline when available.",
+        "## 目标",
+        "运行标准化平台实验，并在 baseline 可用时进行对比。",
         "",
-        "## Artifacts",
-        f"- Candidate raw path: `{candidate.output_dir}`",
-        f"- Candidate config: `{candidate_config_path}`",
+        "## 产物",
+        f"- 候选原始结果路径：`{candidate.output_dir}`",
+        f"- 候选配置：`{candidate_config_path}`",
     ]
     if baseline is not None:
-        lines.extend([f"- Baseline raw path: `{baseline.output_dir}`", f"- Baseline config: `{baseline_config_path}`"])
+        lines.extend([f"- Baseline 原始结果路径：`{baseline.output_dir}`", f"- Baseline 配置：`{baseline_config_path}`"])
 
     c = candidate.metrics
     lines.extend(
         [
             "",
-            "## Candidate Metrics",
-            f"- Total return: {pct_or_na(c.get('total_return'))}",
-            f"- Annualized return: {pct_or_na(c.get('annualized_return'))}",
-            f"- Annualized volatility: {pct_or_na(c.get('annualized_volatility'))}",
-            f"- Max drawdown: {pct_or_na(c.get('max_drawdown'))}",
-            f"- Sharpe ratio: {num_or_na(c.get('sharpe_ratio'))}",
-            f"- Annualized turnover: {num_or_na(c.get('annualized_turnover'))}",
-            f"- Trade count: {c.get('trade_count')}",
-            f"- Order count: {c.get('order_count')}",
-            f"- Rejected order count: {c.get('rejected_order_count')}",
-            f"- Max pending intents: {c.get('max_pending_intent_count')}",
-            f"- Average cash weight: {pct_or_na(c.get('average_cash_weight'))}",
-            f"- Out-of-sample metrics available: {c.get('oos_metrics_available')}",
+            "## 候选指标",
+            f"- 累计收益率：{pct_or_na(c.get('total_return'))}",
+            f"- 年化收益率：{pct_or_na(c.get('annualized_return'))}",
+            f"- 年化波动率：{pct_or_na(c.get('annualized_volatility'))}",
+            f"- 最大回撤：{pct_or_na(c.get('max_drawdown'))}",
+            f"- 夏普比率：{num_or_na(c.get('sharpe_ratio'))}",
+            f"- 年化换手：{num_or_na(c.get('annualized_turnover'))}",
+            f"- 成交笔数：{c.get('trade_count')}",
+            f"- 订单数：{c.get('order_count')}",
+            f"- 拒单数：{c.get('rejected_order_count')}",
+            f"- 最大待执行意图数：{c.get('max_pending_intent_count')}",
+            f"- 平均现金权重：{pct_or_na(c.get('average_cash_weight'))}",
+            f"- 是否有样本外指标：{bool_zh(c.get('oos_metrics_available'))}",
         ]
     )
 
     if c.get("rejection_reason_counts"):
-        lines.extend(["", "## Candidate Execution Rejections"])
+        lines.extend(["", "## 候选执行拒单"])
         for reason, count in c["rejection_reason_counts"].items():
             lines.append(f"- `{reason}`: {count}")
 
     if baseline is not None:
-        lines.extend(["", "## Baseline Comparison"])
+        lines.extend(["", "## Baseline 对比"])
+        comparison_labels = {
+            "total_return_delta": "累计收益率差值",
+            "annualized_return_delta": "年化收益率差值",
+            "annualized_volatility_delta": "年化波动率差值",
+            "max_drawdown_delta": "最大回撤差值",
+            "sharpe_ratio_delta": "夏普比率差值",
+            "annualized_turnover_delta": "年化换手差值",
+            "trade_count_delta": "成交笔数差值",
+            "order_count_delta": "订单数差值",
+            "rejected_order_count_delta": "拒单数差值",
+            "max_pending_intent_count_delta": "最大待执行意图数差值",
+            "average_cash_weight_delta": "平均现金权重差值",
+        }
         for key, value in comparison.items():
-            lines.append(f"- {key}: {num_or_na(value)}")
+            lines.append(f"- {comparison_labels.get(key, key)}：{num_or_na(value)}")
     else:
-        lines.extend(["", "## Baseline Comparison", "- No baseline comparison was requested."])
+        lines.extend(["", "## Baseline 对比", "- 本次未请求 baseline 对比。"])
 
     lines.extend(
         [
             "",
-            "## Recommendation",
+            "## 建议",
             f"- {recommendation(c, baseline.metrics if baseline else None)}",
             "",
-            "## Notes",
-            "- Metrics are computed from generated platform CSV artifacts.",
-            "- Execution constraints are summarized from `orders.csv`, `trades.csv`, and pending-intent state in `nav.csv`.",
+            "## 说明",
+            "- 指标根据平台生成的 CSV 产物计算。",
+            "- 执行约束影响来自 `orders.csv`、`trades.csv` 和 `nav.csv` 中的待执行意图状态。",
         ]
     )
     return "\n".join(lines) + "\n"

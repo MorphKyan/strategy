@@ -114,15 +114,15 @@ def main() -> int:
     (report_dir / "report.md").write_text(
         "\n".join(
             [
-                f"# Platform Start-Date Sensitivity: {name}",
+                f"# 平台起始日敏感度分析：{name}",
                 "",
-                f"- Config: `{config_path}`",
-                f"- Step: `{args.step}` trading days",
-                f"- Sample count: `{len(rows)}`",
-                f"- Summary CSV: `{report_dir / 'sensitivity_summary.csv'}`",
-                f"- Raw root: `{raw_dir}`",
+                f"- 配置：`{config_path}`",
+                f"- 步长：`{args.step}` 个交易日",
+                f"- 样本数量：`{len(rows)}`",
+                f"- 汇总 CSV：`{report_dir / 'sensitivity_summary.csv'}`",
+                f"- 原始结果根目录：`{raw_dir}`",
                 "",
-                "This analysis does not impose a sample cap; every `step`-th trading day in the configured backtest calendar is evaluated.",
+                "本分析不限制样本数，会对配置回测日历中每隔 `step` 个交易日的起始日期逐一评估。",
             ]
         )
         + "\n",

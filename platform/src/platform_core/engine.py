@@ -290,23 +290,23 @@ class PlatformBacktestEngine:
 
     def _write_report(self, metrics: dict[str, Any]) -> None:
         lines = [
-            f"# Platform Backtest Report: {self.run_id}",
+            f"# 平台回测报告：{self.run_id}",
             "",
-            "## Summary",
-            f"- Start date: {metrics.get('start_date')}",
-            f"- End date: {metrics.get('end_date')}",
-            f"- Total return: {metrics.get('total_return', 0.0) * 100:.2f}%",
-            f"- Max drawdown: {metrics.get('max_drawdown', 0.0) * 100:.2f}%",
-            f"- Trade count: {metrics.get('trade_count', 0)}",
-            f"- Pending intents at end: {metrics.get('pending_intent_count', 0)}",
+            "## 摘要",
+            f"- 开始日期：{metrics.get('start_date')}",
+            f"- 结束日期：{metrics.get('end_date')}",
+            f"- 累计收益率：{metrics.get('total_return', 0.0) * 100:.2f}%",
+            f"- 最大回撤：{metrics.get('max_drawdown', 0.0) * 100:.2f}%",
+            f"- 成交笔数：{metrics.get('trade_count', 0)}",
+            f"- 期末待执行意图数：{metrics.get('pending_intent_count', 0)}",
             "",
-            "## Notes",
-            "- This M0-M2 engine uses daily bars and target-weight strategies.",
-            "- Unfilled rebalance intents are retried on later trading days.",
+            "## 说明",
+            "- 该 M0-M2 引擎使用日频 K 线和目标权重策略。",
+            "- 未成交的再平衡意图会在后续交易日继续重试。",
         ]
         quality_notes = self.data.quality.notes + self.data_quality_notes
         if quality_notes:
-            lines.extend(["", "## Data Quality"])
+            lines.extend(["", "## 数据质量"])
             lines.extend(f"- {note}" for note in quality_notes)
         (self.output_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 

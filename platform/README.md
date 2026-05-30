@@ -36,6 +36,7 @@ Run from the repository root:
 ```powershell
 .\env\python.exe platform\scripts\run_platform_backtest.py --config configs\platform_mvp.yaml
 .\env\python.exe platform\scripts\run_platform_backtest.py --config configs\platform_risk_parity.yaml
+.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\platform_risk_parity_ewma.yaml
 .\env\python.exe platform\scripts\run_platform_experiment.py --config configs\platform_risk_parity.yaml
 .\env\python.exe platform\scripts\run_sensitivity.py --config configs\platform_risk_parity.yaml
 .\env\python.exe platform\scripts\validate_hfq_data.py --codes 510300 518880 511260
@@ -45,6 +46,8 @@ Run from the repository root:
 
 The platform scripts change their working directory to `platform/`, so relative paths such as `configs/platform_mvp.yaml`, `data/`, and `results/platform/` are platform-local.
 
+All generated markdown reports should be written in Chinese. Keep exact config paths, commands, CSV column names, and metric keys unchanged when they are used as machine-readable identifiers.
+
 ## Implemented Capabilities
 
 - Daily event loop with per-day checkpoints.
@@ -52,7 +55,7 @@ The platform scripts change their working directory to `platform/`, so relative 
 - Cash, position, cost-basis, pending-intent, and cooldown state.
 - Fee, lot-size, suspension, limit-up, and limit-down execution checks.
 - Retry, cancel, or mark-failed handling for unfilled intents.
-- Built-in equal-weight, fundamental-filtered equal-weight, and risk-parity strategies.
+- Built-in equal-weight, fundamental-filtered equal-weight, risk-parity, and EWMA risk-parity strategies.
 - Point-in-time fundamental filtering where local fundamental data exists.
 - SQLite metadata for strategy versions, backtests, checkpoints, simulated portfolios, and references.
 - Standardized experiment reports with optional baseline comparison under `reports/experiments/`.

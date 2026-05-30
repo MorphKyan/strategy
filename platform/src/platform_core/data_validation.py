@@ -96,17 +96,17 @@ def write_hfq_validation(output_dir: str | Path, detail: pd.DataFrame, summary: 
     detail.to_csv(output_dir / "hfq_detail.csv", index=False)
     (output_dir / "hfq_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = [
-        "# HFQ Data Chain Validation",
+        "# HFQ 数据链路校验",
         "",
-        f"- Research data dir: `{summary['research_data_dir']}`",
-        f"- Platform data dir: `{summary['platform_data_dir']}`",
-        f"- Start: `{summary.get('start')}`",
-        f"- End: `{summary.get('end')}`",
+        f"- 旧研究系统数据目录：`{summary['research_data_dir']}`",
+        f"- 新平台数据目录：`{summary['platform_data_dir']}`",
+        f"- 开始日期：`{summary.get('start')}`",
+        f"- 结束日期：`{summary.get('end')}`",
         "",
-        "## Summary",
+        "## 摘要",
     ]
     for row in summary["rows"]:
         lines.append(
-            f"- `{row['code']}` common={row['common_observations']} max_abs_diff={row['max_abs_diff']} max_rel_diff={row['max_rel_diff']}"
+            f"- `{row['code']}` 共同样本数={row['common_observations']} 最大绝对差={row['max_abs_diff']} 最大相对差={row['max_rel_diff']}"
         )
     (output_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
