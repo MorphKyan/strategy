@@ -6,6 +6,7 @@ This repository now keeps the two backtest systems in separate top-level directo
 
 - `research/`: the original risk-parity research backtest system.
 - `platform/`: the newer daily event-driven retail backtest and simulated-portfolio platform.
+- `etf_selection/`: standalone ETF sleeve screening and basket construction workflow.
 - `backup/`: archived pre-refactor scripts.
 - `env/`: local Python environment shared by the workspace.
 
@@ -43,3 +44,15 @@ Common commands:
 ```
 
 Relative paths in platform commands are resolved from `platform/`.
+
+## ETF Selection
+
+See `etf_selection/README.md`.
+
+Common command:
+
+```powershell
+.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
+```
+
+ETF selection is intentionally independent from the platform engine. It can generate platform configs and optionally call platform experiments, but it owns its own agent instructions, config, reports, and generated configs.

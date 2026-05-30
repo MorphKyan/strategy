@@ -1,0 +1,80 @@
+selection:
+  min_history_years: 3
+  top_k_per_sleeve: 3
+  max_baskets: 20
+  required_sleeves: ["gold", "hs300", "commodity", "bond"]
+  commodity:
+    prefer_broad: true
+    min_single_commodity_count: 2
+    max_single_commodity_count: 3
+  scoring:
+    sleeve:
+      history: 0.25
+      liquidity: 0.25
+      representative_corr: 0.20
+      data_quality: 0.15
+      volatility_sanity: 0.15
+    basket:
+      common_history: 0.30
+      cross_correlation: 0.30
+      concentration: 0.20
+      liquidity: 0.10
+      sleeve_coverage: 0.10
+
+paths:
+  data_dir: "platform/data"
+  platform_base_config: "platform/configs/platform_risk_parity.yaml"
+  generated_config_dir: "etf_selection/generated_configs"
+  report_dir: "etf_selection/reports"
+  platform_experiment_script: "platform/scripts/run_platform_experiment.py"
+
+candidates:
+  - asset_id: "CN_ETF:518880.SH"
+    code: "518880"
+    name: "黄金ETF"
+    exchange: "SH"
+    asset_type: "etf"
+    sleeve: "gold"
+    subtype: "gold"
+    include: true
+
+  - asset_id: "CN_ETF:510300.SH"
+    code: "510300"
+    name: "沪深300ETF"
+    exchange: "SH"
+    asset_type: "etf"
+    sleeve: "hs300"
+    subtype: "hs300"
+    include: true
+
+  - asset_id: "CN_ETF:510310.SH"
+    code: "510310"
+    name: "沪深300ETF易方达"
+    exchange: "SH"
+    asset_type: "etf"
+    sleeve: "hs300"
+    subtype: "hs300"
+    include: true
+
+  - asset_id: "CN_ETF:511260.SH"
+    code: "511260"
+    name: "十年国债ETF"
+    exchange: "SH"
+    asset_type: "etf"
+    sleeve: "bond"
+    subtype: "government_bond"
+    include: true
+
+  - asset_id: "CN_ETF:511130.SH"
+    code: "511130"
+    name: "30年国债ETF"
+    exchange: "SH"
+    asset_type: "etf"
+    sleeve: "bond"
+    subtype: "long_duration_bond"
+    include: true
+
+  # Add mainland broad commodity ETFs here when local data is available.
+  # Use sleeve: commodity and subtype: broad.
+  # If no broad commodity ETF passes the 3-year history filter, the selector
+  # can combine several single-commodity ETFs with subtype single_*.

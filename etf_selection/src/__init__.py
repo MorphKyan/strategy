@@ -1,0 +1,1 @@
+"""Standalone ETF selection utilities."""

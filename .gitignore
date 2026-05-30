@@ -119,3 +119,7 @@ data_manifest.json
 /platform/results/**/manifest.json
 /platform/results/**/report.md
 /platform/results/**/checkpoints/
+
+# Standalone ETF selection generated artifacts.
+/etf_selection/reports/
+/etf_selection/generated_configs/

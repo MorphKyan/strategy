@@ -6,6 +6,7 @@ The repository has two separate systems:
 
 - `research/`: original risk-parity research backtest system.
 - `platform/`: daily event-driven retail backtest and simulated-portfolio platform.
+- `etf_selection/`: standalone ETF sleeve screening and basket construction workflow.
 
 Do not mix their source, configs, scripts, reports, or results. Shared workspace-level files are limited to root documentation, dependency files, `env/`, and archived `backup/` content.
 
@@ -40,6 +41,17 @@ Research entrypoints resolve relative paths from `research/`.
 - Platform metadata/data: `platform/data/`
 
 Platform entrypoints resolve relative paths from `platform/`.
+
+## ETF Selection Facts
+
+- ETF selection source: `etf_selection/src/`
+- ETF selection config: `etf_selection/config/etf_universe.yaml`
+- ETF selection entry: `.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml`
+- ETF selection agent rules: `etf_selection/AGENTS.md`
+- Generated platform configs: `etf_selection/generated_configs/<timestamp>/`
+- ETF selection reports: `etf_selection/reports/<timestamp>/`
+
+ETF selection is independent from `platform/`; it may generate platform configs and call platform CLI commands, but platform internals should not depend on ETF selection.
 
 ## Hard Rules
 

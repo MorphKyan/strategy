@@ -83,22 +83,18 @@ See `docs/research_feature_parity.md` for which research-system features are alr
 
 ### ETF Basket Screening
 
-Build a platform-native basket screening workflow instead of reusing the research script directly.
+ETF basket screening is owned by the standalone `../etf_selection/` workflow, not by platform internals.
 
 What to build:
-- Add `configs/platform_etf_universe.yaml` using the platform asset schema: `asset_id`, `code`, `name`, `asset_type`, `exchange`, `currency`, `lot_size`, and `price_limit_pct`.
-- Add `scripts/select_platform_universe.py`.
-- Read platform-local data through `MarketDataStore` or `LocalCsvBarData`; do not depend on `research/src/data_handler.py`.
-- Score candidate baskets with risk-parity-aligned criteria: sleeve coverage, common history length, average absolute correlation, inverse-volatility concentration, and defensive sleeve inclusion.
-- Write generated configs to `configs/generated/platform_basket_*.yaml`.
-- Write reports to `reports/literature/etf_screening/<timestamp>/`.
-- Add a follow-up command that can immediately run `scripts/run_platform_experiment.py` on each generated candidate against `configs/platform_risk_parity.yaml`.
+- Keep ETF candidate universe and screening code under `../etf_selection/`.
+- Let `etf_selection/` generate platform-compatible configs.
+- Keep platform responsible only for executing generated configs and reporting strategy results.
+- Maintain the platform config schema so generated basket configs remain valid.
 
 How to do it:
-- Start by porting the scoring math from `research/scripts/select_risk_parity_universe.py`.
-- Replace research config writing with platform config writing.
-- Keep the default platform risk-parity config unchanged.
-- Add tests using a temporary three-ETF data directory with known correlations and history overlap.
+- Run `..\env\python.exe ..\etf_selection\scripts\screen_etf_sleeves.py --config ..\etf_selection\config\etf_universe.yaml` from `platform/`, or use the root command documented in `../etf_selection/README.md`.
+- Use generated configs as inputs to `scripts/run_platform_experiment.py`.
+- Do not add ETF selection logic to `src/platform_core/`.
 
 ### Literature And Research Notes
 
