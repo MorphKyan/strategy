@@ -1,0 +1,130 @@
+[
+  {
+    "slug": "refine_add_dividend_to_baseline",
+    "name": "默认篮子加入红利",
+    "codes": [
+      "510300",
+      "510880",
+      "518880",
+      "511260"
+    ],
+    "question": "不替代沪深300，只加入红利 ETF，测试红利作为第二权益袖的边际贡献。",
+    "common_start": "2017-08-24",
+    "common_end": "2026-05-19",
+    "common_observations": 2115,
+    "common_history_years": 8.392857142857142,
+    "avg_abs_corr": 0.21512123144061482,
+    "max_abs_corr": 0.654099866097112,
+    "inverse_vol_hhi": 0.48693563967284526,
+    "inverse_vol_weights": {
+      "510300": 0.10455386445070845,
+      "510880": 0.10768357886564499,
+      "518880": 0.11628133860157683,
+      "511260": 0.6714812180820696
+    },
+    "annualized_volatility": {
+      "510300": 0.17358441810003233,
+      "510880": 0.16853936237975514,
+      "518880": 0.1560776814151654,
+      "511260": 0.027028189667946435
+    },
+    "candidate_config": "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_013145_style_cross_market_refine_platform\\platform_refine_add_dividend_to_baseline.yaml",
+    "baseline_config": "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_013145_style_cross_market_refine_platform\\baseline_for_refine_add_dividend_to_baseline.yaml"
+  },
+  {
+    "slug": "refine_dividend_sp500",
+    "name": "红利加标普500",
+    "codes": [
+      "510880",
+      "513500",
+      "518880",
+      "511260"
+    ],
+    "question": "用红利权益搭配单一美股宽基，避免纳指和标普重复暴露。",
+    "common_start": "2017-08-24",
+    "common_end": "2026-05-19",
+    "common_observations": 2114,
+    "common_history_years": 8.38888888888889,
+    "avg_abs_corr": 0.09887030762806413,
+    "max_abs_corr": 0.18125198270470158,
+    "inverse_vol_hhi": 0.5135594772499275,
+    "inverse_vol_weights": {
+      "510880": 0.11123291549232582,
+      "513500": 0.07501677025667011,
+      "518880": 0.12011357238178265,
+      "511260": 0.6936367418692213
+    },
+    "annualized_volatility": {
+      "510880": 0.16859102060087514,
+      "513500": 0.24998237971455045,
+      "518880": 0.15612615939567465,
+      "511260": 0.027035578733512044
+    },
+    "candidate_config": "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_013145_style_cross_market_refine_platform\\platform_refine_dividend_sp500.yaml",
+    "baseline_config": "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_013145_style_cross_market_refine_platform\\baseline_for_refine_dividend_sp500.yaml"
+  },
+  {
+    "slug": "refine_dividend_nasdaq",
+    "name": "红利加纳指",
+    "codes": [
+      "510880",
+      "513100",
+      "518880",
+      "511260"
+    ],
+    "question": "用红利权益搭配单一美股成长袖，测试收益弹性与回撤代价。",
+    "common_start": "2017-08-24",
+    "common_end": "2026-05-19",
+    "common_observations": 2114,
+    "common_history_years": 8.38888888888889,
+    "avg_abs_corr": 0.09842644613676123,
+    "max_abs_corr": 0.18181274558574836,
+    "inverse_vol_hhi": 0.5353435052975688,
+    "inverse_vol_weights": {
+      "510880": 0.11392395819174152,
+      "513100": 0.05281193438101489,
+      "518880": 0.12302415168170269,
+      "511260": 0.7102399557455409
+    },
+    "annualized_volatility": {
+      "510880": 0.16858284171974305,
+      "513100": 0.36366069217167557,
+      "518880": 0.15611263601000247,
+      "511260": 0.027041036563149684
+    },
+    "candidate_config": "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_013145_style_cross_market_refine_platform\\platform_refine_dividend_nasdaq.yaml",
+    "baseline_config": "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_013145_style_cross_market_refine_platform\\baseline_for_refine_dividend_nasdaq.yaml"
+  },
+  {
+    "slug": "refine_dividend_dax",
+    "name": "红利加德国DAX",
+    "codes": [
+      "510880",
+      "513030",
+      "518880",
+      "511260"
+    ],
+    "question": "用红利权益搭配欧洲权益，测试非美跨市场权益的分散效果。",
+    "common_start": "2017-08-24",
+    "common_end": "2026-05-19",
+    "common_observations": 2114,
+    "common_history_years": 8.38888888888889,
+    "avg_abs_corr": 0.13178276427380325,
+    "max_abs_corr": 0.2590074437311204,
+    "inverse_vol_hhi": 0.500346717336086,
+    "inverse_vol_weights": {
+      "510880": 0.10949143051561956,
+      "513030": 0.0893062125583621,
+      "518880": 0.11827146340780424,
+      "511260": 0.6829308935182141
+    },
+    "annualized_volatility": {
+      "510880": 0.1686372080680618,
+      "513030": 0.2067530199812888,
+      "518880": 0.156118209900444,
+      "511260": 0.02703689249495024
+    },
+    "candidate_config": "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_013145_style_cross_market_refine_platform\\platform_refine_dividend_dax.yaml",
+    "baseline_config": "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_013145_style_cross_market_refine_platform\\baseline_for_refine_dividend_dax.yaml"
+  }
+]

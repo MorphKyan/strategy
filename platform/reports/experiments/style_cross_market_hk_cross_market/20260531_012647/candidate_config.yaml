@@ -1,0 +1,98 @@
+platform:
+  run_name: platform_hk_cross_market
+data:
+  data_dir: data
+assets:
+- asset_id: CN_ETF:510300.SH
+  code: '510300'
+  name: 沪深300ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:159920.SZ
+  code: '159920'
+  name: 恒生ETF
+  asset_type: etf
+  exchange: SZ
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:518880.SH
+  code: '518880'
+  name: 黄金ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511260.SH
+  code: '511260'
+  name: 十年国债ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+backtest:
+  start_date: '2017-08-24'
+  end_date: '2026-05-19'
+execution:
+  price_field: close
+  weight_tolerance: 0.0005
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+strategies:
+  segments:
+  - start_date: '2017-08-24'
+    end_date: null
+    strategy_name: risk_parity
+    strategy_version_id: null
+    cancel_pending_on_start: false
+    params:
+      rolling_window: 120
+      min_periods: 20
+      rebalance_threshold: 0.05
+      init_mode: calculate
+      init_calc_days: 30
+      universe:
+      - CN_ETF:510300.SH
+      - CN_ETF:159920.SZ
+      - CN_ETF:518880.SH
+      - CN_ETF:511260.SH
+output:
+  results_dir: results/backtests
+selection_metadata:
+  source_universe: C:\Users\morph\.codex\worktrees\b6cc\strategy\etf_selection\config\etf_universe_style_cross_market.yaml
+  slug: hk_cross_market
+  name: 加入港股恒生
+  codes:
+  - '510300'
+  - '159920'
+  - '518880'
+  - '511260'
+  question: 加入恒生 ETF，测试跨市场权益与A股、黄金、国债的相关性和组合影响。
+  common_start: '2017-08-24'
+  common_end: '2026-05-19'
+  common_observations: 2115
+  common_history_years: 8.392857142857142
+  avg_abs_corr: 0.22186759997571948
+  max_abs_corr: 0.6836848680354669
+  inverse_vol_hhi: 0.5027220499317187
+  inverse_vol_weights:
+    '510300': 0.10665885155490146
+    '159920': 0.08971853693041368
+    '518880': 0.11862243540847693
+    '511260': 0.6850001761062079
+  annualized_volatility:
+    '510300': 0.17358441810003233
+    '159920': 0.20635997103625453
+    '518880': 0.1560776814151654
+    '511260': 0.027028189667946435
