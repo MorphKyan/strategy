@@ -1,0 +1,53 @@
+# ETF selection candidate: all available single-commodity sleeves.
+strategy:
+  name: "risk_parity"
+  params:
+    rolling_window: 120
+    rebalance_threshold: 0.05
+    commission: 0.0002
+    initial_weights: [0.15, 0.25, 0.60]
+    init_mode: "calculate"
+    init_calc_days: 30
+
+backtest:
+  assets:
+    - code: "518880"
+      name: "黄金ETF"
+    - code: "510300"
+      name: "沪深300ETF"
+    - code: "159980"
+      name: "有色期货ETF"
+    - code: "159985"
+      name: "豆粕ETF"
+    - code: "159981"
+      name: "能源化工ETF"
+    - code: "511260"
+      name: "十年国债ETF"
+  start_date: "2020-01-17"
+  end_date: null
+
+output:
+  results_dir: "results"
+  save_plots: true
+  save_csv: true
+
+selection_metadata:
+  source: "etf_selection"
+  source_universe: "etf_selection/config/etf_universe.yaml"
+  source_report: "etf_selection/reports/20260531_010055"
+  source_basket_id: "basket_4"
+  structure: "gold + hs300 + metals commodity + agriculture commodity + energy chemical commodity + government bond"
+  common_start_etf_selection: "2022-04-13"
+  common_end_etf_selection: "2026-05-19"
+  common_history_years_etf_selection: 3.9365
+  avg_abs_corr_etf_selection: 0.1886
+  max_abs_corr_etf_selection: 0.4380
+  inverse_vol_hhi_etf_selection: 0.4196
+  inverse_vol_weights_etf_selection:
+    "518880": 0.07591234015327752
+    "510300": 0.08928076164307326
+    "159980": 0.07703518455815336
+    "159985": 0.07230513827441395
+    "159981": 0.06005616072599506
+    "511260": 0.6254104146450868
+  selection_reason: "Broadest commodity coverage among eligible current universe names; retained despite higher correlation because inverse-vol concentration is the lowest among same-hs300 candidates."
