@@ -1,0 +1,57 @@
+backtest:
+  assets:
+  - code: '510300'
+    name: 沪深300ETF
+  - code: '518880'
+    name: 黄金ETF
+  - code: '159980'
+    name: 有色期货ETF
+  - code: '159981'
+    name: 能源化工ETF
+  end_date: null
+  start_date: '2022-04-13'
+output:
+  results_dir: results
+  save_csv: true
+  save_plots: true
+selection_metadata:
+  avg_abs_corr: 0.274159
+  codes:
+  - '510300'
+  - '518880'
+  - '159980'
+  - '159981'
+  common_end: '2026-05-19'
+  common_history_years: 3.9365
+  common_start: '2022-04-13'
+  exclusions:
+  - bond
+  - government_bond
+  - policy_bank_bond
+  - credit_bond
+  - convertible_bond
+  - cash_like
+  experiment: no_bond_etf_selection_current_universe
+  inverse_vol_hhi: 0.254716
+  inverse_vol_weights:
+    '159980': 0.254843361284938
+    '159981': 0.19867433242439345
+    '510300': 0.2953534742040418
+    '518880': 0.2511288320866269
+  max_abs_corr: 0.437971
+  name: 无债券-周期商品篮子
+  rank_from_no_bond_screen: basket_2
+  rationale: 用有色和能源化工代表更强周期商品暴露，作为高相关高弹性压力测试候选。
+  source_universe: C:\Users\morph\.codex\worktrees\b6cc\strategy\etf_selection\config\etf_universe.yaml
+strategy:
+  name: risk_parity
+  params:
+    commission: 0.0002
+    init_calc_days: 30
+    init_mode: calculate
+    initial_weights:
+    - 0.15
+    - 0.25
+    - 0.6
+    rebalance_threshold: 0.05
+    rolling_window: 120

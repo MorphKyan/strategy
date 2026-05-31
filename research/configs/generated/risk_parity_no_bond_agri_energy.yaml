@@ -1,0 +1,57 @@
+strategy:
+  name: risk_parity
+  params:
+    rolling_window: 120
+    rebalance_threshold: 0.05
+    commission: 0.0002
+    initial_weights:
+    - 0.15
+    - 0.25
+    - 0.6
+    init_mode: calculate
+    init_calc_days: 30
+backtest:
+  assets:
+  - code: '510300'
+    name: 沪深300ETF
+  - code: '518880'
+    name: 黄金ETF
+  - code: '159985'
+    name: 豆粕ETF
+  - code: '159981'
+    name: 能源化工ETF
+  start_date: '2022-04-13'
+  end_date: null
+output:
+  results_dir: results
+  save_plots: true
+  save_csv: true
+selection_metadata:
+  experiment: no_bond_etf_selection_current_universe
+  source_universe: C:\Users\morph\.codex\worktrees\b6cc\strategy\etf_selection\config\etf_universe.yaml
+  name: 无债券-农业能源商品篮子
+  rationale: 保留默认权益与黄金，商品袖集中在豆粕和能源化工，减少有色金属与权益同涨同跌的暴露。
+  codes:
+  - '510300'
+  - '518880'
+  - '159985'
+  - '159981'
+  exclusions:
+  - bond
+  - government_bond
+  - policy_bank_bond
+  - credit_bond
+  - convertible_bond
+  - cash_like
+  common_start: '2022-04-13'
+  common_end: '2026-05-19'
+  common_history_years: 3.9365
+  avg_abs_corr: 0.123133
+  max_abs_corr: 0.230339
+  inverse_vol_hhi: 0.2549
+  inverse_vol_weights:
+    '518880': 0.2551208785687843
+    '510300': 0.3000485336597498
+    '159985': 0.2429980470152782
+    '159981': 0.2018325407561878
+  rank_from_no_bond_screen: basket_3

@@ -1,0 +1,106 @@
+{
+  "runs": [
+    {
+      "slug": "dividend_replace_hs300",
+      "command": [
+        "C:\\ProgramData\\miniconda3\\python.exe",
+        "platform/scripts/run_platform_experiment.py",
+        "--config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\platform_dividend_replace_hs300.yaml",
+        "--baseline-config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\baseline_for_dividend_replace_hs300.yaml",
+        "--experiment-name",
+        "style_cross_market_dividend_replace_hs300",
+        "--no-charts"
+      ],
+      "returncode": 0,
+      "stdout": "Standardized platform report written to: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\reports\\experiments\\style_cross_market_dividend_replace_hs300\\20260531_012443\nCandidate raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_dividend_replace_hs300\\20260531_012443\\risk_parity\\platform_dividend_replace_hs300_candidate_20260531_012443\nBaseline raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_dividend_replace_hs300\\20260531_012443\\risk_parity\\platform_baseline_for_dividend_replace_hs300_baseline_20260531_012505\n",
+      "stderr": ""
+    },
+    {
+      "slug": "low_vol_replace_hs300",
+      "command": [
+        "C:\\ProgramData\\miniconda3\\python.exe",
+        "platform/scripts/run_platform_experiment.py",
+        "--config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\platform_low_vol_replace_hs300.yaml",
+        "--baseline-config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\baseline_for_low_vol_replace_hs300.yaml",
+        "--experiment-name",
+        "style_cross_market_low_vol_replace_hs300",
+        "--no-charts"
+      ],
+      "returncode": 0,
+      "stdout": "Standardized platform report written to: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\reports\\experiments\\style_cross_market_low_vol_replace_hs300\\20260531_012529\nCandidate raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_low_vol_replace_hs300\\20260531_012529\\risk_parity\\platform_low_vol_replace_hs300_candidate_20260531_012529\nBaseline raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_low_vol_replace_hs300\\20260531_012529\\risk_parity\\platform_baseline_for_low_vol_replace_hs300_baseline_20260531_012548\n",
+      "stderr": ""
+    },
+    {
+      "slug": "dividend_low_vol_core",
+      "command": [
+        "C:\\ProgramData\\miniconda3\\python.exe",
+        "platform/scripts/run_platform_experiment.py",
+        "--config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\platform_dividend_low_vol_core.yaml",
+        "--baseline-config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\baseline_for_dividend_low_vol_core.yaml",
+        "--experiment-name",
+        "style_cross_market_dividend_low_vol_core",
+        "--no-charts"
+      ],
+      "returncode": 0,
+      "stdout": "Standardized platform report written to: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\reports\\experiments\\style_cross_market_dividend_low_vol_core\\20260531_012608\nCandidate raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_dividend_low_vol_core\\20260531_012608\\risk_parity\\platform_dividend_low_vol_core_candidate_20260531_012608\nBaseline raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_dividend_low_vol_core\\20260531_012608\\risk_parity\\platform_baseline_for_dividend_low_vol_core_baseline_20260531_012627\n",
+      "stderr": ""
+    },
+    {
+      "slug": "hk_cross_market",
+      "command": [
+        "C:\\ProgramData\\miniconda3\\python.exe",
+        "platform/scripts/run_platform_experiment.py",
+        "--config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\platform_hk_cross_market.yaml",
+        "--baseline-config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\baseline_for_hk_cross_market.yaml",
+        "--experiment-name",
+        "style_cross_market_hk_cross_market",
+        "--no-charts"
+      ],
+      "returncode": 0,
+      "stdout": "Standardized platform report written to: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\reports\\experiments\\style_cross_market_hk_cross_market\\20260531_012647\nCandidate raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_hk_cross_market\\20260531_012647\\risk_parity\\platform_hk_cross_market_candidate_20260531_012647\nBaseline raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_hk_cross_market\\20260531_012647\\risk_parity\\platform_baseline_for_hk_cross_market_baseline_20260531_012709\n",
+      "stderr": ""
+    },
+    {
+      "slug": "us_cross_market",
+      "command": [
+        "C:\\ProgramData\\miniconda3\\python.exe",
+        "platform/scripts/run_platform_experiment.py",
+        "--config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\platform_us_cross_market.yaml",
+        "--baseline-config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\baseline_for_us_cross_market.yaml",
+        "--experiment-name",
+        "style_cross_market_us_cross_market",
+        "--no-charts"
+      ],
+      "returncode": 0,
+      "stdout": "Standardized platform report written to: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\reports\\experiments\\style_cross_market_us_cross_market\\20260531_012732\nCandidate raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_us_cross_market\\20260531_012732\\risk_parity\\platform_us_cross_market_candidate_20260531_012733\nBaseline raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_us_cross_market\\20260531_012732\\risk_parity\\platform_baseline_for_us_cross_market_baseline_20260531_012755\n",
+      "stderr": ""
+    },
+    {
+      "slug": "style_global_mix",
+      "command": [
+        "C:\\ProgramData\\miniconda3\\python.exe",
+        "platform/scripts/run_platform_experiment.py",
+        "--config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\platform_style_global_mix.yaml",
+        "--baseline-config",
+        "C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\etf_selection\\generated_configs\\20260531_012414_style_cross_market_platform\\baseline_for_style_global_mix.yaml",
+        "--experiment-name",
+        "style_cross_market_style_global_mix",
+        "--no-charts"
+      ],
+      "returncode": 0,
+      "stdout": "Standardized platform report written to: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\reports\\experiments\\style_cross_market_style_global_mix\\20260531_012818\nCandidate raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_style_global_mix\\20260531_012818\\risk_parity\\platform_style_global_mix_candidate_20260531_012818\nBaseline raw artifacts: C:\\Users\\morph\\.codex\\worktrees\\b6cc\\strategy\\platform\\results\\backtests\\style_cross_market_style_global_mix\\20260531_012818\\risk_parity\\platform_baseline_for_style_global_mix_baseline_20260531_012838\n",
+      "stderr": ""
+    }
+  ]
+}
