@@ -25,7 +25,7 @@ output:
   save_plots: true
   save_csv: true
 selection_metadata:
-  source_universe: C:\Users\MorphKyan\tm-strategy\configs\risk_parity_etf_universe.yaml
+  source_universe: D:\strategy\research\configs\risk_parity_etf_universe.yaml
   score: 0.8265
   avg_abs_corr: 0.1303
   overlap_years: 8.23

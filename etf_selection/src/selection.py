@@ -25,6 +25,7 @@ class CandidateData:
     amount: pd.Series
     volume: pd.Series
     factor_source: str
+    raw_df: pd.DataFrame = None
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -104,7 +105,7 @@ def load_adjusted_price(data_dir: str | Path, candidate: dict[str, Any], allow_r
     adjusted = pd.Series(adjusted_values, index=raw["trade_date"], name=code).sort_index().dropna()
     amount = pd.Series(amount.to_numpy(), index=raw["trade_date"], name=code).sort_index().reindex(adjusted.index).fillna(0.0)
     volume = pd.Series(volume.to_numpy(), index=raw["trade_date"], name=code).sort_index().reindex(adjusted.index).fillna(0.0)
-    return CandidateData(meta=dict(candidate), price=adjusted, amount=amount, volume=volume, factor_source=factor_source)
+    return CandidateData(meta=dict(candidate), price=adjusted, amount=amount, volume=volume, factor_source=factor_source, raw_df=raw)
 
 
 def normalize(values: pd.Series) -> pd.Series:
@@ -157,6 +158,28 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
             volatility = float(returns.std() * math.sqrt(252)) if len(returns) > 1 else 0.0
             eligible = history_years >= min_history_years
             reason = "" if eligible else f"history_years<{min_history_years}"
+
+            import numpy as np
+            premium_std = np.nan
+            holding_cost = np.nan
+            if item["sleeve"] == "qdii":
+                df = data.raw_df
+                if df is not None and "nav" in df.columns and "acc_nav" in df.columns:
+                    df = df.copy()
+                    df['premium'] = df['close'] / df['nav'] - 1
+                    premium_std = float(df['premium'].std())
+                    ter = float(item.get("ter", 0.006))
+                    if "index_close" in df.columns and "fx_rate" in df.columns:
+                        r_nav = np.log(df['acc_nav'] / df['acc_nav'].shift(1))
+                        r_idx_rmb = np.log((df['index_close'] * df['fx_rate']) / (df['index_close'].shift(1) * df['fx_rate'].shift(1)))
+                        td = float((r_nav - r_idx_rmb).dropna().mean() * 252)
+                        holding_cost = ter + abs(td)
+                    else:
+                        holding_cost = ter
+                else:
+                    premium_std = 0.02
+                    holding_cost = float(item.get("ter", 0.006))
+
             rows.append(
                 {
                     "code": code,
@@ -174,6 +197,8 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
                     "factor_source": data.factor_source,
                     "eligible": eligible,
                     "reject_reason": reason,
+                    "premium_std": premium_std,
+                    "holding_cost": holding_cost,
                 }
             )
         except Exception as exc:
@@ -230,6 +255,30 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
         + float(weights.get("data_quality", 0.15)) * frame["data_quality_score"]
         + float(weights.get("volatility_sanity", 0.15)) * frame["volatility_sanity_score"]
     )
+    
+    qdii_mask = frame["sleeve"] == "qdii"
+    if qdii_mask.any():
+        qdii_group = frame[qdii_mask].copy()
+        import numpy as np
+        cost_score = 1.0 - normalize(qdii_group["holding_cost"])
+        premium_std_score = 1.0 - normalize(qdii_group["premium_std"])
+        liquidity_score = normalize(qdii_group["avg_amount_252d"].fillna(0).map(lambda x: math.log1p(float(x))))
+        history_score = qdii_group["history_years"].fillna(0).clip(upper=10) / 10.0
+        
+        qdii_weights = selection.get("scoring", {}).get("sleeve_qdii", {})
+        w_cost = float(qdii_weights.get("holding_cost", 0.30))
+        w_premium = float(qdii_weights.get("premium_std", 0.30))
+        w_liquidity = float(qdii_weights.get("liquidity", 0.30))
+        w_history = float(qdii_weights.get("history", 0.10))
+        
+        sleeve_score = (
+            w_cost * cost_score
+            + w_premium * premium_std_score
+            + w_liquidity * liquidity_score
+            + w_history * history_score
+        )
+        frame.loc[qdii_mask, "sleeve_score"] = sleeve_score
+
     frame.loc[frame["eligible"] != True, "sleeve_score"] = 0.0
     return frame.sort_values(["sleeve", "sleeve_score"], ascending=[True, False]), sleeve_corrs, candidates
 
@@ -433,9 +482,14 @@ def write_report(
             lines.append(f"### {sleeve}")
             for _, row in group.sort_values("sleeve_score", ascending=False).iterrows():
                 status = "eligible" if row.get("eligible") else f"rejected: {row.get('reject_reason')}"
-                lines.append(
-                    f"- `{row['code']}` {row.get('name', '')} | score={float(row.get('sleeve_score', 0)):.4f} | history={float(row.get('history_years', 0)):.2f}y | peer_corr={float(row.get('peer_representative_corr', 0)):.4f} | {status}"
-                )
+                if sleeve == "qdii":
+                    lines.append(
+                        f"- `{row['code']}` {row.get('name', '')} | score={float(row.get('sleeve_score', 0)):.4f} | history={float(row.get('history_years', 0)):.2f}y | cost={float(row.get('holding_cost', 0.0)):.4f} | premium_std={float(row.get('premium_std', 0.0)):.4f} | {status}"
+                    )
+                else:
+                    lines.append(
+                        f"- `{row['code']}` {row.get('name', '')} | score={float(row.get('sleeve_score', 0)):.4f} | history={float(row.get('history_years', 0)):.2f}y | peer_corr={float(row.get('peer_representative_corr', 0)):.4f} | {status}"
+                    )
     lines.extend(["", "## 候选篮子"])
     if basket_frame.empty:
         lines.append("- 未生成候选篮子。通常原因是某个必需袖子没有合格 ETF，尤其是商品袖子缺少宽基或单商品候选。")

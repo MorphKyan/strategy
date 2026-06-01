@@ -2,7 +2,12 @@ selection:
   min_history_years: 3
   top_k_per_sleeve: 3
   max_baskets: 20
-  required_sleeves: ["gold", "hs300", "commodity", "bond"]
+  required_sleeves:
+  - gold
+  - hs300
+  - commodity
+  - bond
+  - qdii
   commodity:
     prefer_broad: true
     min_single_commodity_count: 2
@@ -11,94 +16,124 @@ selection:
     sleeve:
       history: 0.25
       liquidity: 0.25
-      representative_corr: 0.20
+      representative_corr: 0.2
       data_quality: 0.15
       volatility_sanity: 0.15
     basket:
-      common_history: 0.30
-      cross_correlation: 0.30
-      concentration: 0.20
-      liquidity: 0.10
-      sleeve_coverage: 0.10
-
+      common_history: 0.3
+      cross_correlation: 0.3
+      concentration: 0.2
+      liquidity: 0.1
+      sleeve_coverage: 0.1
+    sleeve_qdii:
+      holding_cost: 0.3
+      premium_std: 0.3
+      liquidity: 0.3
+      history: 0.1
 paths:
-  data_dir: "platform/data"
-  platform_base_config: "platform/configs/platform_risk_parity.yaml"
-  generated_config_dir: "etf_selection/generated_configs"
-  report_dir: "etf_selection/reports"
-  platform_experiment_script: "platform/scripts/run_platform_experiment.py"
-
+  data_dir: platform/data
+  platform_base_config: platform/configs/platform_risk_parity.yaml
+  generated_config_dir: etf_selection/generated_configs
+  report_dir: etf_selection/reports
+  platform_experiment_script: platform/scripts/run_platform_experiment.py
 candidates:
-  - asset_id: "CN_ETF:518880.SH"
-    code: "518880"
-    name: "黄金ETF"
-    exchange: "SH"
-    asset_type: "etf"
-    sleeve: "gold"
-    subtype: "gold"
-    include: true
-
-  - asset_id: "CN_ETF:510300.SH"
-    code: "510300"
-    name: "沪深300ETF"
-    exchange: "SH"
-    asset_type: "etf"
-    sleeve: "hs300"
-    subtype: "hs300"
-    include: true
-
-  - asset_id: "CN_ETF:510310.SH"
-    code: "510310"
-    name: "沪深300ETF易方达"
-    exchange: "SH"
-    asset_type: "etf"
-    sleeve: "hs300"
-    subtype: "hs300"
-    include: true
-
-  - asset_id: "CN_ETF:511260.SH"
-    code: "511260"
-    name: "十年国债ETF"
-    exchange: "SH"
-    asset_type: "etf"
-    sleeve: "bond"
-    subtype: "government_bond"
-    include: true
-
-  - asset_id: "CN_ETF:511130.SH"
-    code: "511130"
-    name: "30年国债ETF"
-    exchange: "SH"
-    asset_type: "etf"
-    sleeve: "bond"
-    subtype: "long_duration_bond"
-    include: true
-
-  # Mainland commodity futures ETFs. No broad commodity ETF is included here,
-  # so the selector can combine several single-commodity ETFs.
-  - asset_id: "CN_ETF:159985.SZ"
-    code: "159985"
-    name: "豆粕ETF"
-    exchange: "SZ"
-    asset_type: "etf"
-    sleeve: "commodity"
-    subtype: "single_agriculture"
-    include: true
-
-  - asset_id: "CN_ETF:159980.SZ"
-    code: "159980"
-    name: "有色期货ETF"
-    exchange: "SZ"
-    asset_type: "etf"
-    sleeve: "commodity"
-    subtype: "single_metals"
-    include: true
-
-  - asset_id: "CN_ETF:159981.SZ"
-    code: "159981"
-    name: "能源化工ETF"
-    exchange: "SZ"
-    asset_type: "etf"
-    sleeve: "commodity"
-    subtype: "single_energy_chemical"
-    include: true
+- asset_id: CN_ETF:518880.SH
+  code: '518880'
+  name: 黄金ETF
+  exchange: SH
+  asset_type: etf
+  sleeve: gold
+  subtype: gold
+  include: true
+- asset_id: CN_ETF:510300.SH
+  code: '510300'
+  name: 沪深300ETF
+  exchange: SH
+  asset_type: etf
+  sleeve: hs300
+  subtype: hs300
+  include: true
+- asset_id: CN_ETF:510310.SH
+  code: '510310'
+  name: 沪深300ETF易方达
+  exchange: SH
+  asset_type: etf
+  sleeve: hs300
+  subtype: hs300
+  include: true
+- asset_id: CN_ETF:511260.SH
+  code: '511260'
+  name: 十年国债ETF
+  exchange: SH
+  asset_type: etf
+  sleeve: bond
+  subtype: government_bond
+  include: true
+- asset_id: CN_ETF:511130.SH
+  code: '511130'
+  name: 30年国债ETF
+  exchange: SH
+  asset_type: etf
+  sleeve: bond
+  subtype: long_duration_bond
+  include: true
+- asset_id: CN_ETF:159985.SZ
+  code: '159985'
+  name: 豆粕ETF
+  exchange: SZ
+  asset_type: etf
+  sleeve: commodity
+  subtype: single_agriculture
+  include: true
+- asset_id: CN_ETF:159980.SZ
+  code: '159980'
+  name: 有色期货ETF
+  exchange: SZ
+  asset_type: etf
+  sleeve: commodity
+  subtype: single_metals
+  include: true
+- asset_id: CN_ETF:159981.SZ
+  code: '159981'
+  name: 能源化工ETF
+  exchange: SZ
+  asset_type: etf
+  sleeve: commodity
+  subtype: single_energy_chemical
+  include: true
+- asset_id: CN_ETF:513500.SH
+  code: '513500'
+  name: 标普500ETF
+  exchange: SH
+  asset_type: etf
+  sleeve: qdii
+  subtype: us_equity
+  ter: 0.006
+  include: true
+- asset_id: CN_ETF:513100.SH
+  code: '513100'
+  name: 纳指100ETF
+  exchange: SH
+  asset_type: etf
+  sleeve: qdii
+  subtype: us_equity
+  ter: 0.006
+  include: true
+- asset_id: CN_ETF:159920.SZ
+  code: '159920'
+  name: 恒生ETF
+  exchange: SZ
+  asset_type: etf
+  sleeve: qdii
+  subtype: hk_equity
+  ter: 0.006
+  include: true
+- asset_id: CN_ETF:513030.SH
+  code: '513030'
+  name: 德国DAXETF
+  exchange: SH
+  asset_type: etf
+  sleeve: qdii
+  subtype: europe_equity
+  ter: 0.01
+  include: true

@@ -1,0 +1,301 @@
+[
+  {
+    "name": "baseline",
+    "codes": [
+      "510300",
+      "518880",
+      "511260"
+    ],
+    "is_ewma": false,
+    "start_date": "2017-08-24",
+    "total_return": 0.6120212646395289,
+    "annualized_return": 0.05854178530865961,
+    "annualized_volatility": 0.03508038945805344,
+    "max_drawdown": -0.04370852979709783,
+    "sharpe_ratio": 1.6687894921651196,
+    "trade_count": 58,
+    "stability": {
+      "mean_ann_return": 0.07555587126290894,
+      "median_ann_return": 0.06905222540824896,
+      "std_ann_return": 0.014363365437519586,
+      "min_ann_return": 0.05070559045671286,
+      "max_ann_return": 0.11076120776838572,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 1.0,
+      "prob_gt_6pct": 0.9452789699570815
+    }
+  },
+  {
+    "name": "dividend",
+    "codes": [
+      "510880",
+      "518880",
+      "511260"
+    ],
+    "is_ewma": false,
+    "start_date": "2017-08-24",
+    "total_return": 0.5428104763203401,
+    "annualized_return": 0.05302151219145457,
+    "annualized_volatility": 0.032852730969651515,
+    "max_drawdown": -0.041059294832316406,
+    "sharpe_ratio": 1.6139149052915704,
+    "trade_count": 50,
+    "stability": {
+      "mean_ann_return": 0.06454863661073358,
+      "median_ann_return": 0.0634357879798958,
+      "std_ann_return": 0.007596567536247567,
+      "min_ann_return": 0.030789892263311858,
+      "max_ann_return": 0.08258915531766675,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 0.9973175965665236,
+      "prob_gt_6pct": 0.6657725321888412
+    }
+  },
+  {
+    "name": "dividend_low_vol",
+    "codes": [
+      "512890",
+      "518880",
+      "511260"
+    ],
+    "is_ewma": false,
+    "start_date": "2019-02-28",
+    "total_return": 0.594483781581854,
+    "annualized_return": 0.06953247905629945,
+    "annualized_volatility": 0.034996946274285755,
+    "max_drawdown": -0.03458568048211208,
+    "sharpe_ratio": 1.9868156070345175,
+    "trade_count": 42,
+    "stability": {
+      "mean_ann_return": 0.07649966067101499,
+      "median_ann_return": 0.07559946342257806,
+      "std_ann_return": 0.009822424383222455,
+      "min_ann_return": 0.02164242768689184,
+      "max_ann_return": 0.09716950018341608,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 0.992656875834446,
+      "prob_gt_6pct": 0.9766355140186916
+    }
+  },
+  {
+    "name": "global",
+    "codes": [
+      "510300",
+      "513500",
+      "518880",
+      "511260"
+    ],
+    "is_ewma": false,
+    "start_date": "2017-08-24",
+    "total_return": 0.6803001613067108,
+    "annualized_return": 0.06378682107349753,
+    "annualized_volatility": 0.039838802750914976,
+    "max_drawdown": -0.04773534995767015,
+    "sharpe_ratio": 1.6011229421805993,
+    "trade_count": 69,
+    "stability": {
+      "mean_ann_return": 0.08038331180029598,
+      "median_ann_return": 0.07335912797029631,
+      "std_ann_return": 0.01392869197024168,
+      "min_ann_return": 0.06347257815054763,
+      "max_ann_return": 0.11430087139180523,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 1.0,
+      "prob_gt_6pct": 1.0
+    }
+  },
+  {
+    "name": "global_dividend",
+    "codes": [
+      "512890",
+      "513500",
+      "518880",
+      "511260"
+    ],
+    "is_ewma": false,
+    "start_date": "2019-02-28",
+    "total_return": 0.6777816871599396,
+    "annualized_return": 0.07740852569657419,
+    "annualized_volatility": 0.03827813512171549,
+    "max_drawdown": -0.04234200328948823,
+    "sharpe_ratio": 2.022264811241019,
+    "trade_count": 51,
+    "stability": {
+      "mean_ann_return": 0.08432689296486794,
+      "median_ann_return": 0.08167612358034548,
+      "std_ann_return": 0.010751730905857454,
+      "min_ann_return": 0.048606855491751144,
+      "max_ann_return": 0.10814923339688853,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 1.0,
+      "prob_gt_6pct": 0.9819759679572764
+    }
+  },
+  {
+    "name": "all_weather_commodity",
+    "codes": [
+      "510300",
+      "518880",
+      "511260",
+      "159985",
+      "159981"
+    ],
+    "is_ewma": false,
+    "start_date": "2022-05-31",
+    "total_return": 0.3042129879709985,
+    "annualized_return": 0.07220786034852855,
+    "annualized_volatility": 0.03531188219836985,
+    "max_drawdown": -0.025806789070402125,
+    "sharpe_ratio": 2.0448601392270724,
+    "trade_count": 49,
+    "stability": {
+      "mean_ann_return": 0.0831352057163659,
+      "median_ann_return": 0.08084017531532628,
+      "std_ann_return": 0.007987119769426707,
+      "min_ann_return": 0.07181181023380812,
+      "max_ann_return": 0.10578737325003806,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 1.0,
+      "prob_gt_6pct": 1.0
+    }
+  },
+  {
+    "name": "global_all_weather_commodity",
+    "codes": [
+      "512890",
+      "513500",
+      "518880",
+      "511260",
+      "159985",
+      "159981"
+    ],
+    "is_ewma": false,
+    "start_date": "2022-05-31",
+    "total_return": 0.36528058895433446,
+    "annualized_return": 0.08516493730264463,
+    "annualized_volatility": 0.037560748934639517,
+    "max_drawdown": -0.029529432614718187,
+    "sharpe_ratio": 2.2673918843003493,
+    "trade_count": 56,
+    "stability": {
+      "mean_ann_return": 0.0841833792833755,
+      "median_ann_return": 0.0858545429649955,
+      "std_ann_return": 0.006811353864719908,
+      "min_ann_return": 0.06238534604191326,
+      "max_ann_return": 0.10202066006246269,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 1.0,
+      "prob_gt_6pct": 1.0
+    }
+  },
+  {
+    "name": "dividend_low_vol_ewma",
+    "codes": [
+      "512890",
+      "518880",
+      "511260"
+    ],
+    "is_ewma": true,
+    "start_date": "2019-02-28",
+    "total_return": 0.6288779510164917,
+    "annualized_return": 0.07282626102999346,
+    "annualized_volatility": 0.03484269323789719,
+    "max_drawdown": -0.03858322925798996,
+    "sharpe_ratio": 2.0901444251956636,
+    "trade_count": 59,
+    "stability": {
+      "mean_ann_return": 0.08027323286112084,
+      "median_ann_return": 0.07856581967811604,
+      "std_ann_return": 0.009348767985569585,
+      "min_ann_return": 0.03116989993841135,
+      "max_ann_return": 0.1005366035832096,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 0.9986648865153538,
+      "prob_gt_6pct": 0.986648865153538
+    }
+  },
+  {
+    "name": "global_dividend_ewma",
+    "codes": [
+      "512890",
+      "513500",
+      "518880",
+      "511260"
+    ],
+    "is_ewma": true,
+    "start_date": "2019-02-28",
+    "total_return": 0.676114017011358,
+    "annualized_return": 0.07725416004917252,
+    "annualized_volatility": 0.03763132030742388,
+    "max_drawdown": -0.044255750008720396,
+    "sharpe_ratio": 2.0529218591868506,
+    "trade_count": 80,
+    "stability": {
+      "mean_ann_return": 0.08363929915057235,
+      "median_ann_return": 0.08092696463795235,
+      "std_ann_return": 0.009266215026901737,
+      "min_ann_return": 0.050762521197870614,
+      "max_ann_return": 0.10477428587812732,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 1.0,
+      "prob_gt_6pct": 0.9853137516688919
+    }
+  },
+  {
+    "name": "all_weather_commodity_ewma",
+    "codes": [
+      "510300",
+      "518880",
+      "511260",
+      "159985",
+      "159981"
+    ],
+    "is_ewma": true,
+    "start_date": "2022-05-31",
+    "total_return": 0.3110317360713275,
+    "annualized_return": 0.07367654602784435,
+    "annualized_volatility": 0.03538164763952969,
+    "max_drawdown": -0.029452882900070865,
+    "sharpe_ratio": 2.0823379051893043,
+    "trade_count": 55,
+    "stability": {
+      "mean_ann_return": 0.0826441176416486,
+      "median_ann_return": 0.08082486080249018,
+      "std_ann_return": 0.007079412489546385,
+      "min_ann_return": 0.068937233381827,
+      "max_ann_return": 0.11077639194321942,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 1.0,
+      "prob_gt_6pct": 1.0
+    }
+  },
+  {
+    "name": "global_all_weather_commodity_ewma",
+    "codes": [
+      "512890",
+      "513500",
+      "518880",
+      "511260",
+      "159985",
+      "159981"
+    ],
+    "is_ewma": true,
+    "start_date": "2022-05-31",
+    "total_return": 0.36286763484738405,
+    "annualized_return": 0.08466116365972542,
+    "annualized_volatility": 0.03996517082416284,
+    "max_drawdown": -0.027913010428161966,
+    "sharpe_ratio": 2.1183736216770903,
+    "trade_count": 64,
+    "stability": {
+      "mean_ann_return": 0.08716834755709112,
+      "median_ann_return": 0.08782065189047317,
+      "std_ann_return": 0.0053424623382995005,
+      "min_ann_return": 0.06586594137969137,
+      "max_ann_return": 0.10441890365784823,
+      "prob_positive": 1.0,
+      "prob_gt_4pct": 1.0,
+      "prob_gt_6pct": 1.0
+    }
+  }
+]

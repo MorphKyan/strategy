@@ -154,20 +154,43 @@ class RiskParityStrategy(Strategy):
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         rolling_window = int(context.params.get("rolling_window", 120))
         min_periods = int(context.params.get("min_periods", 20))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        
         closes = {}
         for asset_id in universe:
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            history = frame[frame.index <= context.date]["close"].tail(rolling_window + 1)
-            if len(history) < min_periods + 1:
-                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
         price_frame = pd.DataFrame(closes).dropna()
-        if len(price_frame) < min_periods + 1:
+        if price_frame.empty:
             return None
-        volatility = price_frame.pct_change().dropna().tail(rolling_window).std()
+            
+        # Convert index to DatetimeIndex for resampling
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+        volatility = price_frame.pct_change().dropna().tail(window).std()
         volatility = volatility[volatility > 0]
         if len(volatility) != len(universe):
             return None
@@ -203,22 +226,44 @@ class RiskParityEWMAStrategy(RiskParityStrategy):
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         ewma_span = int(context.params.get("ewma_span", 60))
         ewma_min_periods = int(context.params.get("ewma_min_periods", 20))
-        min_history = max(ewma_min_periods + 1, 2)
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        
         closes = {}
         for asset_id in universe:
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            history = frame[frame.index <= context.date]["close"]
-            if len(history) < min_history:
-                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
         price_frame = pd.DataFrame(closes).dropna()
-        if len(price_frame) < min_history:
+        if price_frame.empty:
+            return None
+            
+        # Convert index to DatetimeIndex for resampling
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            span = max(2, int(ewma_span / 5))
+            min_p = max(2, int(ewma_min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            span = max(2, int(ewma_span / 20))
+            min_p = max(2, int(ewma_min_periods / 20))
+        else:
+            span = ewma_span
+            min_p = ewma_min_periods
+
+        if len(price_frame) < min_p + 1:
             return None
         returns = price_frame.pct_change()
-        volatility = returns.ewm(span=ewma_span, min_periods=ewma_min_periods, adjust=False).std().iloc[-1]
+        volatility = returns.ewm(span=span, min_periods=min_p, adjust=False).std().iloc[-1]
         volatility = volatility[volatility > 0]
         if len(volatility) != len(universe):
             return None

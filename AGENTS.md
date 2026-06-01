@@ -124,3 +124,8 @@ Before claiming success:
 6. Confirm the report includes hypothesis, files changed, exact command, metrics delta, turnover, trade count, and recommendation.
 
 If the run fails, still report the exact command, the failure artifact path, and the likely next fix. Do not present a failed run as a completed experiment.
+
+## Research Summary History
+
+- 非基线研究价值成果汇总：[non_baseline_research_history_summary.md](file:///D:/strategy/research/reports/experiments/non_baseline_research_history_summary.md)
+

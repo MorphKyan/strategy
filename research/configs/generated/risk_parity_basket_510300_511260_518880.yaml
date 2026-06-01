@@ -25,12 +25,12 @@ output:
   save_plots: true
   save_csv: true
 selection_metadata:
-  source_universe: C:\Users\MorphKyan\tm-strategy\configs\risk_parity_etf_universe.yaml
-  score: 0.8295
-  avg_abs_corr: 0.126
-  overlap_years: 8.23
+  source_universe: D:\strategy\research\configs\risk_parity_etf_universe.yaml
+  score: 0.8333
+  avg_abs_corr: 0.1323
+  overlap_years: 8.39
   inverse_vol_weights:
-    '510300': 0.11709435090099939
-    '511260': 0.7469346469129315
-    '518880': 0.13597100218606914
-  rank_at_generation: 4
+    '510300': 0.11717128809284336
+    '511260': 0.7525146934183402
+    '518880': 0.1303140184888164
+  rank_at_generation: 2

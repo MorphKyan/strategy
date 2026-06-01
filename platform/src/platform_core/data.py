@@ -81,6 +81,11 @@ class LocalCsvBarData:
                 else:
                     normalized[field_name] = pd.to_numeric(raw[source], errors="coerce") * factor
             normalized["close"] = close
+            if "nav" in raw.columns:
+                normalized["nav"] = pd.to_numeric(raw["nav"], errors="coerce")
+            if "acc_nav" in raw.columns:
+                normalized["acc_nav"] = pd.to_numeric(raw["acc_nav"], errors="coerce")
+
 
             for field_name in ["volume", "amount"]:
                 source = _first_column(raw, PRICE_COLUMNS[field_name])
