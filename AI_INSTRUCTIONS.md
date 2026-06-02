@@ -3,27 +3,24 @@
 本文档旨在为后续接手或参与本系统开发的 AI 助手提供指导。
 
 ## 项目进展
-1. **研究系统**：位于 `research/`，支持 `finshare` 获取 ETF 原始 K 线及复权因子，存储为 CSV，并实现模块化、向量化驱动的动态再平衡系统。
-2. **平台系统**：位于 `platform/`，实现日频事件驱动回测、执行撮合、checkpoint 和模拟组合推进。
+1. **平台系统**：位于 `platform/`，实现日频事件驱动回测、执行撮合、checkpoint 和模拟组合推进。
+2. **ETF 筛选系统**：位于 `etf_selection/`，独立的 ETF 标的筛选与组合篮子构建流程，负责根据历史数据及板块轮动规则，为 `platform/` 自动生成对应的资产配置 YAML 文件。
 
-## 研究回测框架架构 (AI 开发指南)
-- `research/src/data_handler.py`：负责多标的数据对齐（trade_date 为准）及**后复权（HFQ）**价格计算。
-- `research/src/engine.py`：核心逻辑。使用状态机遍历交易日，计算每日净值。
-  - **动态平衡逻辑**：每季度末检查一次。
-  - **触发条件**：任一资产偏离目标权重（33.33%）绝对值 > 5% 则触发全局再平衡。
-  - **损耗计算**：换手额 * 0.02% 手续费。
-- `research/src/metrics.py`：包含 `annualized_return`, `max_drawdown`, `sharpe_ratio` 等标准指标计算逻辑。
-- `platform/src/platform_core/`：平台系统的日频事件引擎、执行模型、数据层、模拟组合和 SQLite 元数据存储。
+## 系统框架架构 (AI 开发指南)
+- **回测引擎** ([engine.py](file:///D:/strategy/platform/src/platform_core/engine.py))：核心事件驱动回测类 `PlatformBacktestEngine`。使用状态机遍历交易日，通过策略生成的目标权重进行每日撮合模拟、净值计算及状态备份。
+- **策略模块** ([strategy.py](file:///D:/strategy/platform/src/platform_core/strategy.py))：定义了统一的 `Strategy` 接口。内置有经典风险平价 (`"risk_parity"`)、EWMA 协方差估计 (`"risk_parity_ewma"`) 以及结合非线性阈值和大跌惩罚机制的自适应回撤恢复算法 (`"risk_parity_ewma_dd_recovery"`)。策略通过 `generate_targets(context)` 返回 `TargetPortfolio`。
+- **数据与存储** ([data.py](file:///D:/strategy/platform/src/platform_core/data.py) & [data_store.py](file:///D:/strategy/platform/src/platform_core/data_store.py))：负责本地 ETF 复权价格数据的加载与基础财务信息的对齐。
+- **表现评价** ([metrics.py](file:///D:/strategy/platform/src/platform_core/metrics.py))：在回测结束后解析输出的 CSV，计算年化收益、最大回撤、夏普比率、交易笔数及换手率等指标并输出成标准 `metrics.json`。
 
 ## 执行环境要求 (Execution Environment)
 - **Conda 环境**：必须使用项目根目录下的 `./env` 环境进行所有代码执行。
-- **Python 路径**：在执行命令时，优先使用 `./env/Scripts/python.exe` (Windows) 或 `./env/bin/python` (Unix)。
-- **包管理**：默认使用阿里云镜像源 (`https://mirrors.aliyun.com/pypi/simple/`) 进行依赖安装。
-- **路径边界**：研究系统命令从 `research/` 解析相对路径；平台系统命令从 `platform/` 解析相对路径。
+- **Python 路径**：在执行命令时，优先使用 `.\env\python.exe` (Windows) 或 `./env/bin/python` (Unix)。
+- **路径边界**：
+  * 运行平台回测或实验时，解析的相对路径起点为 `platform/`。
+  * 运行 ETF 筛选任务时，解析的相对路径起点为 `etf_selection/`。
 
 ## 后续开发要求
-- **环境一致性**：Antigravity 在执行任何 Python 代码前，必须确保使用的是该项目特有的 `./env` 环境。
-- **向量化优化**：在不改变逻辑的前提下，尽可能利用 Pandas 向量化操作提升回测速度。
-- **绘图支持**：敏感度分析必须包含可视化输出 (`matplotlib`)，确保环境可用。
-- **代码注释**：所有策略逻辑必须包含详细的中文注释，解释调仓触发机制。
-- **系统隔离**：研究功能放在 `research/`，平台功能放在 `platform/`，不要跨目录混放源码、配置、报告或结果。
+- **环境一致性**：执行任何 Python 脚本前，必须确保调用的是该项目特有的 `./env` 虚拟环境。
+- **图表渲染**：在执行可视化绘图（如 `matplotlib`、`seaborn`）时，需确保使用 Agg 无界面后端渲染，以避免在无图形界面服务器上抛出 X11/Windows 窗口错误。
+- **代码注释**：所有策略逻辑或核心改动必须包含详细的中文注释，以解释参数设定（如 $\alpha, \beta, \tau$ 等参数）和重平衡触发逻辑。
+- **目录纯净**：绝对禁止混淆各系统的源码、配置文件、实验结果或分析报告。保证平台专有代码归入 `platform/`，筛选专有代码归入 `etf_selection/`。
