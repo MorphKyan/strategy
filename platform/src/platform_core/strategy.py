@@ -102,13 +102,49 @@ class FundamentalValueEqualWeightStrategy(Strategy):
         return TargetPortfolio.equal_weight(universe)
 
 
+
+class DriftRebalanceFixedWeightStrategy(Strategy):
+    name = "balanced"
+    version = "0.1.0"
+
+    def initialize(self, context: StrategyContext) -> None:
+        context.set_cooldown(int(context.params.get("cooldown_days", 0)))
+        context.runtime["initial_weights"] = context.params.get("initial_weights", [])
+        context.runtime["rebalance_threshold"] = float(context.params.get("rebalance_threshold", 0.05))
+
+    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+        universe = context.params.get("universe") or context.available_asset_ids()
+        universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
+        if not universe:
+            return None
+
+        initial_weights = context.runtime.get("initial_weights", [])
+        if not initial_weights or len(initial_weights) != len(universe):
+            initial_weights = [1.0 / len(universe)] * len(universe)
+            context.runtime["initial_weights"] = initial_weights
+
+        target_weights = {asset_id: float(w) for asset_id, w in zip(universe, initial_weights)}
+
+        if context.state.last_date is None:
+            return TargetPortfolio(target_weights)
+
+        prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
+        current_weights = context.state.weights(prices)
+
+        threshold = context.runtime.get("rebalance_threshold", 0.05)
+        for asset_id, target_w in target_weights.items():
+            if abs(current_weights.get(asset_id, 0.0) - target_w) > threshold:
+                return TargetPortfolio(target_weights)
+        return None
+
+
 class RiskParityStrategy(Strategy):
     name = "risk_parity"
     version = "0.1.0"
 
     def initialize(self, context: StrategyContext) -> None:
         context.runtime["opened"] = context.params.get("init_mode", "calculate") == "manual"
-        context.runtime["quarterly"] = True
+        context.runtime["rebalance_frequency"] = context.params.get("rebalance_frequency", "quarterly")
 
     def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         universe = context.params.get("universe") or context.available_asset_ids()
@@ -123,7 +159,7 @@ class RiskParityStrategy(Strategy):
             context.runtime["opened"] = True
             return target
 
-        if not self._is_quarter_end(context):
+        if not self._is_rebalance_day(context):
             return None
 
         target = self._inverse_vol_target(context, universe)
@@ -206,7 +242,7 @@ class RiskParityStrategy(Strategy):
             return -1
 
     @staticmethod
-    def _is_quarter_end(context: StrategyContext) -> bool:
+    def _is_rebalance_day(context: StrategyContext) -> bool:
         idx = RiskParityStrategy._calendar_index(context)
         if idx < 0:
             return False
@@ -214,9 +250,19 @@ class RiskParityStrategy(Strategy):
             return True
         current = context.date
         next_date = context.data.calendar[idx + 1]
-        current_quarter = (current.month - 1) // 3
-        next_quarter = (next_date.month - 1) // 3
-        return current.year != next_date.year or current_quarter != next_quarter
+        
+        freq = context.runtime.get("rebalance_frequency", "quarterly")
+        if freq == "semiannually":
+            # Rebalance at the end of Q1 (March) and Q3 (September) to align with research "2QE" resampling
+            current_q = (current.month - 1) // 3
+            next_q = (next_date.month - 1) // 3
+            return current_q != next_q and current_q in (0, 2)
+        elif freq == "monthly":
+            return current.year != next_date.year or current.month != next_date.month
+        else: # quarterly
+            current_quarter = (current.month - 1) // 3
+            next_quarter = (next_date.month - 1) // 3
+            return current.year != next_date.year or current_quarter != next_quarter
 
 
 class RiskParityEWMAStrategy(RiskParityStrategy):
@@ -272,11 +318,131 @@ class RiskParityEWMAStrategy(RiskParityStrategy):
         return TargetPortfolio({asset_id: float(weights[asset_id]) for asset_id in universe})
 
 
+class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
+    name = "risk_parity_ewma_dd_recovery"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        ewma_span = int(context.params.get("ewma_span", 60))
+        ewma_min_periods = int(context.params.get("ewma_min_periods", 20))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        
+        alpha = float(context.params.get("dd_penalty_alpha", 1.0))
+        beta = float(context.params.get("dd_recovery_beta", 2.0))
+        dd_window = int(context.params.get("dd_window", 30))
+        
+        # New parameters for Nonlinear Threshold and Trend Filter
+        penalty_threshold = float(context.params.get("dd_penalty_threshold", 0.025))
+        rebound_filter_window = int(context.params.get("rebound_filter_window", 0))
+
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        # Convert index to DatetimeIndex for resampling
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            span = max(2, int(ewma_span / 5))
+            min_p = max(2, int(ewma_min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            span = max(2, int(ewma_span / 20))
+            min_p = max(2, int(ewma_min_periods / 20))
+        else:
+            span = ewma_span
+            min_p = ewma_min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+        returns = price_frame.pct_change()
+        volatility = returns.ewm(span=span, min_periods=min_p, adjust=False).std().iloc[-1]
+        volatility = volatility[volatility > 0]
+        if len(volatility) != len(universe):
+            return None
+            
+        # Calculate adjustments for each asset
+        adjusted_vol = {}
+        for asset_id in universe:
+            hist = price_frame[asset_id]
+            if len(hist) < 2:
+                adjusted_vol[asset_id] = volatility[asset_id]
+                continue
+                
+            curr_price = hist.iloc[-1]
+            cum_max = hist.cummax().iloc[-1]
+            current_dd = curr_price / cum_max - 1.0 if cum_max > 0 else 0.0
+            
+            hist_slice = hist.tail(dd_window)
+            if len(hist_slice) > 0:
+                cum_max_slice = hist_slice.cummax()
+                dd_series = hist_slice / cum_max_slice - 1.0
+                min_dd = dd_series.min()
+            else:
+                min_dd = current_dd
+                
+            # Apply nonlinear threshold on penalty
+            # Only apply penalty if the absolute drawdown exceeds penalty_threshold
+            dd_abs = abs(current_dd)
+            if penalty_threshold > 0:
+                # Step function activation
+                penalty_term = alpha * dd_abs if dd_abs >= penalty_threshold else 0.0
+            else:
+                penalty_term = alpha * dd_abs
+                
+            # Apply rebound confirmation filter (Trend-Filtered Rebound)
+            recovery = max(0.0, current_dd - min_dd)
+            if rebound_filter_window > 0 and recovery > 0:
+                # Calculate simple moving average on the raw price history
+                ma_val = hist.tail(rebound_filter_window).mean() if len(hist) >= rebound_filter_window else curr_price
+                if curr_price < ma_val:
+                    # Price is below MA, filter out as a fake rebound (dead cat bounce)
+                    recovery_term = 0.0
+                else:
+                    recovery_term = beta * recovery
+            else:
+                recovery_term = beta * recovery
+                
+            factor = 1.0 + penalty_term - recovery_term
+            factor = max(0.1, factor)
+            
+            adjusted_vol[asset_id] = volatility[asset_id] * factor
+
+        # Recalculate weights based on adjusted volatility
+        inv_vol = {}
+        for asset_id in universe:
+            v = adjusted_vol[asset_id]
+            inv_vol[asset_id] = 1.0 / v if v > 0 else 0.0
+            
+        sum_inv = sum(inv_vol.values())
+        if sum_inv == 0:
+            return None
+            
+        weights = {asset_id: val / sum_inv for asset_id, val in inv_vol.items()}
+        return TargetPortfolio({asset_id: float(weights[asset_id]) for asset_id in universe})
+
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
+    DriftRebalanceFixedWeightStrategy.name: DriftRebalanceFixedWeightStrategy,
     RiskParityStrategy.name: RiskParityStrategy,
     RiskParityEWMAStrategy.name: RiskParityEWMAStrategy,
+    RiskParityEWMADrawdownRecoveryStrategy.name: RiskParityEWMADrawdownRecoveryStrategy,
 }
 
 

@@ -196,9 +196,17 @@ class PlatformBacktestEngine:
                 )
 
             state.last_date = current_date
-            checkpoint_path = self.checkpoint_dir / f"{date_str(current_date)}.json"
+            if self.config.get("backtest", {}).get("enable_checkpoints", True):
+                checkpoint_path = self.checkpoint_dir / f"{date_str(current_date)}.json"
+                self._write_json(checkpoint_path, state.to_dict())
+                self.store.add_checkpoint(self.run_id, date_str(current_date), checkpoint_path)
+
+        if not self.config.get("backtest", {}).get("enable_checkpoints", True) and self.data.calendar:
+            last_date = self.data.calendar[-1]
+            checkpoint_path = self.checkpoint_dir / f"{date_str(last_date)}.json"
             self._write_json(checkpoint_path, state.to_dict())
-            self.store.add_checkpoint(self.run_id, date_str(current_date), checkpoint_path)
+            self.store.add_checkpoint(self.run_id, date_str(last_date), checkpoint_path)
+
 
         self._write_csv("nav.csv", nav_rows)
         self._write_csv("positions.csv", position_rows)

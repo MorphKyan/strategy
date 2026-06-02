@@ -38,6 +38,7 @@ portfolio:
 backtest:
   start_date: "2014-01-01"
   end_date: "2015-12-31"
+  enable_checkpoints: false
 
 execution:
   price_field: "close"

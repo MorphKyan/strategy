@@ -19,6 +19,7 @@ from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import assets_from_config
 from src.platform_core.experiment import run_backtest, strategy_name
 from src.platform_core.storage import SQLiteStore
+from src.platform_core.visualization import render_sensitivity_charts
 
 
 def load_config(path: Path) -> dict:
@@ -128,6 +129,11 @@ def main() -> int:
         + "\n",
         encoding="utf-8",
     )
+    try:
+        render_sensitivity_charts(report_dir / "sensitivity_summary.csv", report_dir)
+        print("Generated sensitivity summary charts.")
+    except Exception as e:
+        print(f"Failed to generate sensitivity charts: {e}")
     print(f"Sensitivity report written to: {report_dir}")
     print(f"Sample count: {len(rows)}")
     return 0

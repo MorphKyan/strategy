@@ -66,6 +66,7 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 9. Prefer low-complexity, literature-supported changes over speculative redesigns.
 10. Keep the default ETF basket in `research/configs/risk_parity.yaml` as the fixed reference basket unless the user explicitly asks to replace it.
 11. Do not overwrite generated historical results, reports, or configs unless the user explicitly asks.
+12. 回测时如果发现数据与当前日期差距有一周以上请先获取数据再进行回测。
 
 ## Preferred Research Scope
 
@@ -127,5 +128,5 @@ If the run fails, still report the exact command, the failure artifact path, and
 
 ## Research Summary History
 
-- 非基线研究价值成果汇总：[non_baseline_research_history_summary.md](file:///D:/strategy/research/reports/experiments/non_baseline_research_history_summary.md)
+- 非基线研究价值成果汇总：[non_baseline_research_history_summary.md](file:///D:/strategy/platform/reports/non_baseline_research_history_summary.md)
 

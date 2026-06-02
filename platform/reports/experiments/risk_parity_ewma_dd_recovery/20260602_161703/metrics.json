@@ -1,0 +1,55 @@
+{
+  "experiment_name": "risk_parity_ewma_dd_recovery",
+  "candidate_config": "D:\\strategy\\platform\\configs\\generated\\platform_overseas_us_blend_ewma_dd_rec.yaml",
+  "baseline_config": null,
+  "candidate": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\risk_parity_ewma_dd_recovery\\20260602_161703\\risk_parity_ewma_dd_recovery\\overseas_us_blend_ewma_dd_rec_candidate_20260602_161703",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\risk_parity_ewma_dd_recovery\\20260602_161703\\risk_parity_ewma_dd_recovery\\overseas_us_blend_ewma_dd_rec_candidate_20260602_161703\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\risk_parity_ewma_dd_recovery\\20260602_161703\\risk_parity_ewma_dd_recovery\\overseas_us_blend_ewma_dd_rec_candidate_20260602_161703\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\risk_parity_ewma_dd_recovery\\20260602_161703\\risk_parity_ewma_dd_recovery\\overseas_us_blend_ewma_dd_rec_candidate_20260602_161703\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\risk_parity_ewma_dd_recovery\\20260602_161703\\risk_parity_ewma_dd_recovery\\overseas_us_blend_ewma_dd_rec_candidate_20260602_161703\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2019-02-28",
+    "end_date": "2026-06-01",
+    "observations": 1759,
+    "total_return": 0.7672522814143057,
+    "annualized_return": 0.08504797067150749,
+    "annualized_volatility": 0.048482970109056965,
+    "max_drawdown": -0.07203357598675164,
+    "sharpe_ratio": 1.7541823547567668,
+    "turnover_total": 5000280.743420277,
+    "annualized_turnover": 716356.3088925013,
+    "trade_count": 124,
+    "order_count": 124,
+    "filled_order_count": 124,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 124
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.038489150030484066,
+    "max_position_count": 6,
+    "chart_paths": [
+      "D:\\strategy\\platform\\results\\backtests\\risk_parity_ewma_dd_recovery\\20260602_161703\\risk_parity_ewma_dd_recovery\\overseas_us_blend_ewma_dd_rec_candidate_20260602_161703\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\risk_parity_ewma_dd_recovery\\20260602_161703\\risk_parity_ewma_dd_recovery\\overseas_us_blend_ewma_dd_rec_candidate_20260602_161703\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\risk_parity_ewma_dd_recovery\\20260602_161703\\risk_parity_ewma_dd_recovery\\overseas_us_blend_ewma_dd_rec_candidate_20260602_161703\\charts\\execution_effects.png"
+    ]
+  },
+  "baseline": null,
+  "comparison": {
+    "total_return_delta": null,
+    "annualized_return_delta": null,
+    "annualized_volatility_delta": null,
+    "max_drawdown_delta": null,
+    "sharpe_ratio_delta": null,
+    "annualized_turnover_delta": null,
+    "trade_count_delta": null,
+    "order_count_delta": null,
+    "rejected_order_count_delta": null,
+    "max_pending_intent_count_delta": null,
+    "average_cash_weight_delta": null
+  },
+  "generated_at": "2026-06-02T16:17:14"
+}
