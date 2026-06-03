@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import os
 import sys
 import json
@@ -17,10 +17,15 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 SYNC_DATETIME = datetime(2026, 6, 3, 14, 55, 0)
 
 configs_to_test = [
-    "platform_mvp",
-    "platform_m3m4",
-    "platform_risk_parity",
-    "platform_risk_parity_ewma"
+    "baseline_mvp_equal_weight",
+    "baseline_m3m4_fundamental",
+    "baseline_r1_domestic_rolling",
+    "baseline_r1_domestic_ewma",
+    "baseline_r2_global_ewma",
+    "baseline_r2_global_dividend_ewma",
+    "baseline_r3_global_nasdaq_all_weather_ewma",
+    "baseline_us_blend_ewma",
+    "baseline_r1_domestic_low_vol_ewma"
 ]
 
 def get_cache(config_name, strategy_type):
