@@ -1,40 +1,40 @@
 {
-  "timestamp": "2026-06-03T15:48:07.040954",
+  "timestamp": "2026-06-03T16:25:07.903406",
   "config_name": "baseline_us_blend_ewma",
   "strategy_type": "baseline",
   "metrics": {
-    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp\\20260603_154723\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_154745",
-    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp\\20260603_154723\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_154745\\nav.csv",
-    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp\\20260603_154723\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_154745\\positions.csv",
-    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp\\20260603_154723\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_154745\\orders.csv",
-    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp\\20260603_154723\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_154745\\trades.csv",
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp_r003\\20260603_162423\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_162446",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp_r003\\20260603_162423\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_162446\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp_r003\\20260603_162423\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_162446\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp_r003\\20260603_162423\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_162446\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp_r003\\20260603_162423\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_162446\\trades.csv",
     "oos_metrics_available": false,
     "start_date": "2019-02-28",
     "end_date": "2026-06-01",
     "observations": 1759,
-    "total_return": 0.334432525499325,
-    "annualized_return": 0.042222890692752646,
-    "annualized_volatility": 0.03173488879106448,
-    "max_drawdown": -0.05345304948004137,
-    "sharpe_ratio": 1.330488062231409,
-    "turnover_total": 2712139.820107697,
-    "annualized_turnover": 388549.87758222834,
-    "trade_count": 51,
-    "order_count": 51,
-    "filled_order_count": 51,
+    "total_return": 0.35850458356605697,
+    "annualized_return": 0.04489729750882332,
+    "annualized_volatility": 0.031686280649957925,
+    "max_drawdown": -0.046807645822103616,
+    "sharpe_ratio": 1.4169317631440892,
+    "turnover_total": 2976273.3997056987,
+    "annualized_turnover": 426390.5041079227,
+    "trade_count": 60,
+    "order_count": 60,
+    "filled_order_count": 60,
     "rejected_order_count": 0,
     "order_status_counts": {
-      "FILLED": 51
+      "FILLED": 60
     },
     "rejection_reason_counts": {},
-    "pending_intent_count": 2,
+    "pending_intent_count": 1,
     "max_pending_intent_count": 3,
-    "average_cash_weight": 0.6516794986593348,
+    "average_cash_weight": 0.6584988924127061,
     "max_position_count": 6,
     "chart_paths": [
-      "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp\\20260603_154723\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_154745\\charts\\nav_drawdown.png",
-      "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp\\20260603_154723\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_154745\\charts\\position_weights.png",
-      "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp\\20260603_154723\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_154745\\charts\\execution_effects.png"
+      "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp_r003\\20260603_162423\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_162446\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp_r003\\20260603_162423\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_162446\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_us_blend_ewma_exp_r003\\20260603_162423\\risk_parity_ewma\\baseline_us_blend_ewma_baseline_20260603_162446\\charts\\execution_effects.png"
     ]
   }
 }

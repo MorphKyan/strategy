@@ -1,40 +1,40 @@
 {
-  "timestamp": "2026-06-03T15:45:06.139410",
+  "timestamp": "2026-06-03T16:21:48.603427",
   "config_name": "baseline_r1_domestic_rolling",
   "strategy_type": "baseline",
   "metrics": {
-    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp\\20260603_154439\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_154452",
-    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp\\20260603_154439\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_154452\\nav.csv",
-    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp\\20260603_154439\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_154452\\positions.csv",
-    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp\\20260603_154439\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_154452\\orders.csv",
-    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp\\20260603_154439\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_154452\\trades.csv",
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp_r003\\20260603_162107\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_162128",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp_r003\\20260603_162107\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_162128\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp_r003\\20260603_162107\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_162128\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp_r003\\20260603_162107\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_162128\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp_r003\\20260603_162107\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_162128\\trades.csv",
     "oos_metrics_available": false,
     "start_date": "2019-02-28",
     "end_date": "2026-06-01",
-    "observations": 1759,
-    "total_return": 0.2485702500002409,
-    "annualized_return": 0.032334142463705806,
-    "annualized_volatility": 0.021823308148408258,
-    "max_drawdown": -0.030532677903606587,
-    "sharpe_ratio": 1.4816334097387607,
-    "turnover_total": 1529394.086530739,
-    "annualized_turnover": 219105.91802486993,
-    "trade_count": 20,
-    "order_count": 20,
-    "filled_order_count": 20,
+    "observations": 1758,
+    "total_return": 0.27586502200628216,
+    "annualized_return": 0.035559794359385055,
+    "annualized_volatility": 0.025329018541514356,
+    "max_drawdown": -0.044884459140872024,
+    "sharpe_ratio": 1.4039152089964488,
+    "turnover_total": 1506125.9298899423,
+    "annualized_turnover": 215895.18448934326,
+    "trade_count": 16,
+    "order_count": 16,
+    "filled_order_count": 16,
     "rejected_order_count": 0,
     "order_status_counts": {
-      "FILLED": 20
+      "FILLED": 16
     },
     "rejection_reason_counts": {},
     "pending_intent_count": 0,
     "max_pending_intent_count": 3,
-    "average_cash_weight": 0.6509603185890558,
+    "average_cash_weight": 0.6505990063745776,
     "max_position_count": 4,
     "chart_paths": [
-      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp\\20260603_154439\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_154452\\charts\\nav_drawdown.png",
-      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp\\20260603_154439\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_154452\\charts\\position_weights.png",
-      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp\\20260603_154439\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_154452\\charts\\execution_effects.png"
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp_r003\\20260603_162107\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_162128\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp_r003\\20260603_162107\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_162128\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_rolling_exp_r003\\20260603_162107\\risk_parity\\baseline_r1_domestic_rolling_baseline_20260603_162128\\charts\\execution_effects.png"
     ]
   }
 }

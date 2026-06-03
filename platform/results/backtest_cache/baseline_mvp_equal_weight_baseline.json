@@ -1,40 +1,40 @@
 {
-  "timestamp": "2026-06-03T15:44:33.087392",
+  "timestamp": "2026-06-03T16:21:04.436604",
   "config_name": "baseline_mvp_equal_weight",
   "strategy_type": "baseline",
   "metrics": {
-    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_154431",
-    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_154431\\nav.csv",
-    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_154431\\positions.csv",
-    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_154431\\orders.csv",
-    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_154431\\trades.csv",
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp_r003\\20260603_162102\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_162103",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp_r003\\20260603_162102\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_162103\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp_r003\\20260603_162102\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_162103\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp_r003\\20260603_162102\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_162103\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp_r003\\20260603_162102\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_162103\\trades.csv",
     "oos_metrics_available": false,
-    "start_date": "2017-08-24",
+    "start_date": "2023-10-11",
     "end_date": "2026-06-01",
-    "observations": 2125,
-    "total_return": 0.9411076614117917,
-    "annualized_return": 0.0818707498433704,
-    "annualized_volatility": 0.065532804621967,
-    "max_drawdown": -0.1113153522829119,
-    "sharpe_ratio": 1.2493094155766806,
-    "turnover_total": 2682813.4298746428,
-    "annualized_turnover": 318150.110272193,
-    "trade_count": 156,
-    "order_count": 156,
-    "filled_order_count": 156,
+    "observations": 639,
+    "total_return": 0.5564903930349385,
+    "annualized_return": 0.1909535789725021,
+    "annualized_volatility": 0.09853109602800705,
+    "max_drawdown": -0.11139659288971626,
+    "sharpe_ratio": 1.9380031956431738,
+    "turnover_total": 1893337.1400958265,
+    "annualized_turnover": 746668.1679251147,
+    "trade_count": 77,
+    "order_count": 77,
+    "filled_order_count": 77,
     "rejected_order_count": 0,
     "order_status_counts": {
-      "FILLED": 156
+      "FILLED": 77
     },
     "rejection_reason_counts": {},
     "pending_intent_count": 1,
     "max_pending_intent_count": 2,
-    "average_cash_weight": 0.23378594838714814,
+    "average_cash_weight": 0.007303673640968586,
     "max_position_count": 3,
     "chart_paths": [
-      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_154431\\charts\\nav_drawdown.png",
-      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_154431\\charts\\position_weights.png",
-      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_154431\\charts\\execution_effects.png"
+      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp_r003\\20260603_162102\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_162103\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp_r003\\20260603_162102\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_162103\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp_r003\\20260603_162102\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260603_162103\\charts\\execution_effects.png"
     ]
   }
 }

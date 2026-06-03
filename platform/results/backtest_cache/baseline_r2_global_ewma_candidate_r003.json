@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-03T16:23:15.278290",
+  "config_name": "baseline_r2_global_ewma",
+  "strategy_type": "candidate_r003",
+  "metrics": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_r2_global_ewma_exp_r003\\20260603_162231\\risk_parity_dynamic_budget\\baseline_r2_global_ewma_candidate_20260603_162231",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r2_global_ewma_exp_r003\\20260603_162231\\risk_parity_dynamic_budget\\baseline_r2_global_ewma_candidate_20260603_162231\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r2_global_ewma_exp_r003\\20260603_162231\\risk_parity_dynamic_budget\\baseline_r2_global_ewma_candidate_20260603_162231\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r2_global_ewma_exp_r003\\20260603_162231\\risk_parity_dynamic_budget\\baseline_r2_global_ewma_candidate_20260603_162231\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r2_global_ewma_exp_r003\\20260603_162231\\risk_parity_dynamic_budget\\baseline_r2_global_ewma_candidate_20260603_162231\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2019-02-28",
+    "end_date": "2026-06-01",
+    "observations": 1759,
+    "total_return": 0.23769548601982216,
+    "annualized_return": 0.031040438960784345,
+    "annualized_volatility": 0.02817507760038154,
+    "max_drawdown": -0.050830597530770794,
+    "sharpe_ratio": 1.101698437216159,
+    "turnover_total": 1556103.4543605135,
+    "annualized_turnover": 222932.38800389392,
+    "trade_count": 18,
+    "order_count": 18,
+    "filled_order_count": 18,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 18
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.70871575698224,
+    "max_position_count": 5,
+    "chart_paths": [
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r2_global_ewma_exp_r003\\20260603_162231\\risk_parity_dynamic_budget\\baseline_r2_global_ewma_candidate_20260603_162231\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r2_global_ewma_exp_r003\\20260603_162231\\risk_parity_dynamic_budget\\baseline_r2_global_ewma_candidate_20260603_162231\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r2_global_ewma_exp_r003\\20260603_162231\\risk_parity_dynamic_budget\\baseline_r2_global_ewma_candidate_20260603_162231\\charts\\execution_effects.png"
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-03T16:24:23.318970",
+  "config_name": "baseline_r3_global_nasdaq_all_weather_ewma",
+  "strategy_type": "candidate_r003",
+  "metrics": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_r003\\20260603_162359\\risk_parity_dynamic_budget\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260603_162359",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_r003\\20260603_162359\\risk_parity_dynamic_budget\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260603_162359\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_r003\\20260603_162359\\risk_parity_dynamic_budget\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260603_162359\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_r003\\20260603_162359\\risk_parity_dynamic_budget\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260603_162359\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_r003\\20260603_162359\\risk_parity_dynamic_budget\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260603_162359\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2022-05-31",
+    "end_date": "2026-06-01",
+    "observations": 970,
+    "total_return": 0.22769303658514994,
+    "annualized_return": 0.0547969430082873,
+    "annualized_volatility": 0.0356647433661336,
+    "max_drawdown": -0.02580222958874301,
+    "sharpe_ratio": 1.5364457398653593,
+    "turnover_total": 1692239.1639661877,
+    "annualized_turnover": 439633.2673396694,
+    "trade_count": 29,
+    "order_count": 29,
+    "filled_order_count": 29,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 29
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 3,
+    "average_cash_weight": 0.4772940247517209,
+    "max_position_count": 7,
+    "chart_paths": [
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_r003\\20260603_162359\\risk_parity_dynamic_budget\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260603_162359\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_r003\\20260603_162359\\risk_parity_dynamic_budget\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260603_162359\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_r003\\20260603_162359\\risk_parity_dynamic_budget\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260603_162359\\charts\\execution_effects.png"
+    ]
+  }
+}
