@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\baseline_r1_domestic_low_vol_ewma_exp\20260603_154309\risk_parity_lw_cov\baseline_r1_domestic_low_vol_ewma_candidate_20260603_154310

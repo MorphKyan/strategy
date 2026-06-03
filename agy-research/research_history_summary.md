@@ -8,7 +8,7 @@
 
 | 实验ID | 研究课题与改进方向 | 实现策略标识 | 核心回测时间段 | 夏普比率 (对照组 vs 实验组) | 最大回撤 (对照组 vs 实验组) | 双边换手率 (对照组 vs 实验组) | 是否合入主干 | 实验报告路径与备注 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| R001 | 基于 Ledoit-Wolf 协方差收缩的风险平价策略 | `risk_parity_lw_cov` | 2017-08-24 至 2026-05-19 | 1.45 (RP) / 1.39 (EWMA) vs **1.48** | -3.33% / -3.88% vs **-3.04%** | 180,282% / 253,778% vs **181,191%** (年化) | 是 | [R001报告](file:///D:/strategy/platform/reports/R001_Ledoit_Wolf_Covariance_Shrinkage_Risk_Parity_Report.md) (数据同步至2026-06-01后重跑验证，夏普提升，回撤收缩，换手大幅优于EWMA) |
+| R001 | 基于 Ledoit-Wolf 协方差收缩的风险平价策略 | `risk_parity_lw_cov` | 2017-08-24 至 2026-06-01 | 1.25(MVP) / 1.40(GlobalEWMA) vs **1.49 / 1.61** | -11.13% / -4.69% vs **-3.04% / -3.45%** | 31,815,011% / 36,338,533% vs **18,042,399% / 22,263,195%** | 是 | [R001报告](file:///D:/strategy/platform/reports/R001_Ledoit_Wolf_Covariance_Shrinkage_Risk_Parity_Report.md) (基线重置后对全9个平台配置重跑，多资产下夏普提升，最大回撤收缩，换手与交易次数暴降30%~50%) |
 | R002 | 基于换手率惩罚的动态再平衡控制策略 | `risk_parity_turnover_constrained` | 2023-10-11 至 2026-06-01 | N/A | -3.98% vs **-4.66%** | 259.8万 vs **179.1万** (EWMA) | 是 | [R002报告](file:///D:/strategy/platform/reports/experiments/risk_parity_turnover_constrained/20260603_130000/experiment_report.md) (EWMA 调仓换手暴降 31%，阻尼调仓极佳) |
 | R003 | 结合趋势动量与波动率靶向的动态风险预算策略 | `risk_parity_dynamic_budget` | 2014-05-28 至 2026-06-01 | 0.51 vs **1.08** (MVP下行) | -23.1% vs **-10.1%** (MVP下行) | 44.9% vs **44.6%** (RP上行) | 是 | [R003报告](file:///D:/strategy/platform/reports/R003_dynamic_risk_budget_report.md) (下行防守极佳，MVP回撤大砍50%，夏普翻倍) |
 

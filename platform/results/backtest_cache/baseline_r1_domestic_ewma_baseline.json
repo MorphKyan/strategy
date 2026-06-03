@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-03T15:45:36.979388",
+  "config_name": "baseline_r1_domestic_ewma",
+  "strategy_type": "baseline",
+  "metrics": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp\\20260603_154506\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_154520",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp\\20260603_154506\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_154520\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp\\20260603_154506\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_154520\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp\\20260603_154506\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_154520\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp\\20260603_154506\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_154520\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2019-02-28",
+    "end_date": "2026-06-01",
+    "observations": 1759,
+    "total_return": 0.2729400481951276,
+    "annualized_return": 0.03519857430050033,
+    "annualized_volatility": 0.024654017419568904,
+    "max_drawdown": -0.03582855642077776,
+    "sharpe_ratio": 1.4277013641014862,
+    "turnover_total": 2355038.198272098,
+    "annualized_turnover": 337390.3501788338,
+    "trade_count": 31,
+    "order_count": 31,
+    "filled_order_count": 31,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 31
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.65205381013479,
+    "max_position_count": 4,
+    "chart_paths": [
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp\\20260603_154506\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_154520\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp\\20260603_154506\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_154520\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp\\20260603_154506\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_154520\\charts\\execution_effects.png"
+    ]
+  }
+}

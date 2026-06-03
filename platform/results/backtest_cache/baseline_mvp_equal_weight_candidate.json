@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-03T15:44:33.087392",
+  "config_name": "baseline_mvp_equal_weight",
+  "strategy_type": "candidate",
+  "metrics": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\risk_parity_lw_cov\\baseline_mvp_equal_weight_candidate_20260603_154427",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\risk_parity_lw_cov\\baseline_mvp_equal_weight_candidate_20260603_154427\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\risk_parity_lw_cov\\baseline_mvp_equal_weight_candidate_20260603_154427\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\risk_parity_lw_cov\\baseline_mvp_equal_weight_candidate_20260603_154427\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\risk_parity_lw_cov\\baseline_mvp_equal_weight_candidate_20260603_154427\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2017-08-24",
+    "end_date": "2026-06-01",
+    "observations": 2125,
+    "total_return": 0.25165174146502167,
+    "annualized_return": 0.026989113503704143,
+    "annualized_volatility": 0.01811874861827175,
+    "max_drawdown": -0.03044112206180316,
+    "sharpe_ratio": 1.489568295930058,
+    "turnover_total": 1521432.5014486325,
+    "annualized_turnover": 180423.99546590843,
+    "trade_count": 15,
+    "order_count": 15,
+    "filled_order_count": 15,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 15
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.7092141866031646,
+    "max_position_count": 3,
+    "chart_paths": [
+      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\risk_parity_lw_cov\\baseline_mvp_equal_weight_candidate_20260603_154427\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\risk_parity_lw_cov\\baseline_mvp_equal_weight_candidate_20260603_154427\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_mvp_equal_weight_exp\\20260603_154427\\risk_parity_lw_cov\\baseline_mvp_equal_weight_candidate_20260603_154427\\charts\\execution_effects.png"
+    ]
+  }
+}

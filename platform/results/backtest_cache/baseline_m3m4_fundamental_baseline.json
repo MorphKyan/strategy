@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-06-03T15:44:38.986048",
+  "config_name": "baseline_m3m4_fundamental",
+  "strategy_type": "baseline",
+  "metrics": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp\\20260603_154433\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260603_154437",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp\\20260603_154433\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260603_154437\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp\\20260603_154433\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260603_154437\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp\\20260603_154433\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260603_154437\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp\\20260603_154433\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260603_154437\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2017-08-24",
+    "end_date": "2026-06-01",
+    "observations": 2125,
+    "total_return": 0.0,
+    "annualized_return": 0.0,
+    "annualized_volatility": 0.0,
+    "max_drawdown": 0.0,
+    "sharpe_ratio": 0.0,
+    "turnover_total": 0.0,
+    "annualized_turnover": 0.0,
+    "trade_count": 0,
+    "order_count": 0,
+    "filled_order_count": 0,
+    "rejected_order_count": 0,
+    "order_status_counts": {},
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 0,
+    "average_cash_weight": 1.0,
+    "max_position_count": 0,
+    "chart_paths": [
+      "D:\\strategy\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp\\20260603_154433\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260603_154437\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp\\20260603_154433\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260603_154437\\charts\\execution_effects.png"
+    ]
+  }
+}

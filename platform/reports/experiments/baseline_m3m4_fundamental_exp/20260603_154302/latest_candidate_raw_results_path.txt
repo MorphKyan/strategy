@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\baseline_m3m4_fundamental_exp\20260603_154302\risk_parity_lw_cov\baseline_m3m4_fundamental_candidate_20260603_154302

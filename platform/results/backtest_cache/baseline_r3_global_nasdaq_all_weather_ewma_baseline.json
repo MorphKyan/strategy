@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-03T15:47:22.812040",
+  "config_name": "baseline_r3_global_nasdaq_all_weather_ewma",
+  "strategy_type": "baseline",
+  "metrics": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp\\20260603_154659\\risk_parity_ewma\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_154711",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp\\20260603_154659\\risk_parity_ewma\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_154711\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp\\20260603_154659\\risk_parity_ewma\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_154711\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp\\20260603_154659\\risk_parity_ewma\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_154711\\orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp\\20260603_154659\\risk_parity_ewma\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_154711\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2022-05-31",
+    "end_date": "2026-06-01",
+    "observations": 970,
+    "total_return": 0.2732434464332263,
+    "annualized_return": 0.0648378329662902,
+    "annualized_volatility": 0.03762805362463259,
+    "max_drawdown": -0.03348075792255689,
+    "sharpe_ratio": 1.7231248156786183,
+    "turnover_total": 2983332.136971697,
+    "annualized_turnover": 775051.2355843997,
+    "trade_count": 70,
+    "order_count": 70,
+    "filled_order_count": 70,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 70
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 3,
+    "max_pending_intent_count": 3,
+    "average_cash_weight": 0.36839273859001326,
+    "max_position_count": 7,
+    "chart_paths": [
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp\\20260603_154659\\risk_parity_ewma\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_154711\\charts\\nav_drawdown.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp\\20260603_154659\\risk_parity_ewma\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_154711\\charts\\position_weights.png",
+      "D:\\strategy\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp\\20260603_154659\\risk_parity_ewma\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_154711\\charts\\execution_effects.png"
+    ]
+  }
+}

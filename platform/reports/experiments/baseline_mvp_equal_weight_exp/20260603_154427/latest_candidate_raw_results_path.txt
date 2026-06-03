@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\baseline_mvp_equal_weight_exp\20260603_154427\risk_parity_lw_cov\baseline_mvp_equal_weight_candidate_20260603_154427

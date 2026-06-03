@@ -13,8 +13,8 @@ os.chdir(ROOT)
 CACHE_DIR = ROOT / "results" / "backtest_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Data was synchronized on 2026-06-03 12:55. Any cache older than this must expire.
-SYNC_DATETIME = datetime(2026, 6, 3, 14, 55, 0)
+# Data was synchronized on 2026-06-03 15:37. Any cache older than this must expire.
+SYNC_DATETIME = datetime(2026, 6, 3, 15, 37, 0)
 
 configs_to_test = [
     "baseline_mvp_equal_weight",

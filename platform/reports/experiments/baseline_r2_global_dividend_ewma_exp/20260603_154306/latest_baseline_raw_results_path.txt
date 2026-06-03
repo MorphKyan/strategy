@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\baseline_r2_global_dividend_ewma_exp\20260603_154306\risk_parity_ewma\baseline_r2_global_dividend_ewma_baseline_20260603_154307
