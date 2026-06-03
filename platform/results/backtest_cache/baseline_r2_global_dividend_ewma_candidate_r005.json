@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-03T23:14:55.882892",
+  "config_name": "baseline_r2_global_dividend_ewma",
+  "strategy_type": "candidate_r005",
+  "metrics": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-2-quant-researcher-f7ac5021\\platform\\results\\backtests\\risk_parity_cvar\\baseline_r2_global_dividend_ewma_candidate_r005_candidate_20260603_231423",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-2-quant-researcher-f7ac5021\\platform\\results\\backtests\\risk_parity_cvar\\baseline_r2_global_dividend_ewma_candidate_r005_candidate_20260603_231423\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-2-quant-researcher-f7ac5021\\platform\\results\\backtests\\risk_parity_cvar\\baseline_r2_global_dividend_ewma_candidate_r005_candidate_20260603_231423\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-2-quant-researcher-f7ac5021\\platform\\results\\backtests\\risk_parity_cvar\\baseline_r2_global_dividend_ewma_candidate_r005_candidate_20260603_231423\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-2-quant-researcher-f7ac5021\\platform\\results\\backtests\\risk_parity_cvar\\baseline_r2_global_dividend_ewma_candidate_r005_candidate_20260603_231423\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2019-02-28",
+    "end_date": "2026-06-01",
+    "observations": 1759,
+    "total_return": 0.23484478965330902,
+    "annualized_return": 0.03069969876243417,
+    "annualized_volatility": 0.024768568909571857,
+    "max_drawdown": -0.04205367483322797,
+    "sharpe_ratio": 1.2394619517387706,
+    "turnover_total": 3528074.5173817906,
+    "annualized_turnover": 505443.3077772662,
+    "trade_count": 42,
+    "order_count": 42,
+    "filled_order_count": 42,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 42
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 2,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.6611911656267753,
+    "max_position_count": 4,
+    "chart_paths": [
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-2-quant-researcher-f7ac5021\\platform\\results\\backtests\\risk_parity_cvar\\baseline_r2_global_dividend_ewma_candidate_r005_candidate_20260603_231423\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-2-quant-researcher-f7ac5021\\platform\\results\\backtests\\risk_parity_cvar\\baseline_r2_global_dividend_ewma_candidate_r005_candidate_20260603_231423\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-2-quant-researcher-f7ac5021\\platform\\results\\backtests\\risk_parity_cvar\\baseline_r2_global_dividend_ewma_candidate_r005_candidate_20260603_231423\\charts\\execution_effects.png"
+    ]
+  }
+}

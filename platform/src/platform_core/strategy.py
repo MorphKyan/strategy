@@ -893,7 +893,133 @@ class RiskParityDynamicBudgetStrategy(RiskParityStrategy):
         return TargetPortfolio(final_weights)
 
 
+
+
+class RiskParityCVaRStrategy(RiskParityStrategy):
+    """
+    基于条件风险价值 (CVaR / Expected Shortfall) 的风险平价策略 (R005)
+    
+    传统风险平价基于正态分布假设（仅使用波动率），忽略了极端的尾部风险和非对称分布特征。
+    本策略使用历史模拟法 (Historical Simulation) 计算投资组合的条件风险价值 (CVaR) 以及
+    各资产对组合边际 CVaR 贡献 (Marginal CVaR Contribution)。
+    通过非线性优化，使各资产的 CVaR 风险贡献均等化，从而在防御极端尾部冲击的同时释放上行潜力。
+    """
+    name = "risk_parity_cvar"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np
+        from scipy.optimize import minimize
+        
+        rolling_window = int(context.params.get("rolling_window", 120))
+        min_periods = int(context.params.get("min_periods", 20))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        confidence_level = float(context.params.get("confidence_level", 0.95))
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        # 转换为 DatetimeIndex
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        # 处理不同的估计频率
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        # 计算收益率
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+            
+        # 求解 CVaR 风险平价权重
+        # 风险预算默认为等预算 b_i = 1/N
+        b = np.ones(N) / N
+        
+        # 定义目标函数
+        def cvar_objective(w):
+            sum_w = np.sum(w)
+            if sum_w <= 0:
+                return 1e5
+            w_norm = w / sum_w
+            r_p = np.dot(X, w_norm)
+            losses = -r_p
+            # 检查是否有 nan
+            if np.isnan(losses).any():
+                return 1e5
+            var_val = np.percentile(losses, confidence_level * 100)
+            mask = losses >= var_val
+            if not np.any(mask):
+                mask = np.zeros(len(losses), dtype=bool)
+                mask[np.argmax(losses)] = True
+            
+            cvar_val = np.mean(losses[mask])
+            if np.isnan(cvar_val) or cvar_val <= 0:
+                cvar_val = 1e-8
+                
+            mrc = -np.mean(X[mask, :], axis=0)
+            rc = w_norm * mrc
+            
+            # 使用 CVaR 进行归一化
+            obj_val = np.sum((rc / cvar_val - b) ** 2)
+            if np.isnan(obj_val):
+                return 1e5
+            return obj_val
+
+        # 初始权重设置为逆波动率
+        vols = np.std(X, axis=0)
+        vols = np.where(vols > 0, vols, 1e-5)
+        inv_vol = 1.0 / vols
+        w0 = inv_vol / np.sum(inv_vol)
+        
+        # 约束条件与边界
+        cons = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1.0})
+        bounds = [(0.0, 1.0) for _ in range(N)]
+        
+        res = minimize(cvar_objective, w0, method='SLSQP', bounds=bounds, constraints=cons, options={'tol': 1e-6})
+        
+        if res.success:
+            weights = res.x
+            weights = np.maximum(0.0, weights)
+            weights = weights / np.sum(weights)
+        else:
+            weights = w0
+
+        return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
+
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
+    RiskParityCVaRStrategy.name: RiskParityCVaRStrategy,
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
     DriftRebalanceFixedWeightStrategy.name: DriftRebalanceFixedWeightStrategy,
