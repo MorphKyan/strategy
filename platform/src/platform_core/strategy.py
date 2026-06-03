@@ -332,9 +332,8 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
         beta = float(context.params.get("dd_recovery_beta", 2.0))
         dd_window = int(context.params.get("dd_window", 30))
         
-        # New parameters for Nonlinear Threshold and Trend Filter
+        # Nonlinear Threshold parameter
         penalty_threshold = float(context.params.get("dd_penalty_threshold", 0.025))
-        rebound_filter_window = int(context.params.get("rebound_filter_window", 0))
 
         closes = {}
         for asset_id in universe:
@@ -404,18 +403,9 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
             else:
                 penalty_term = alpha * dd_abs
                 
-            # Apply rebound confirmation filter (Trend-Filtered Rebound)
+            # Calculate recovery term directly without trend filtering
             recovery = max(0.0, current_dd - min_dd)
-            if rebound_filter_window > 0 and recovery > 0:
-                # Calculate simple moving average on the raw price history
-                ma_val = hist.tail(rebound_filter_window).mean() if len(hist) >= rebound_filter_window else curr_price
-                if curr_price < ma_val:
-                    # Price is below MA, filter out as a fake rebound (dead cat bounce)
-                    recovery_term = 0.0
-                else:
-                    recovery_term = beta * recovery
-            else:
-                recovery_term = beta * recovery
+            recovery_term = beta * recovery
                 
             factor = 1.0 + penalty_term - recovery_term
             factor = max(0.1, factor)

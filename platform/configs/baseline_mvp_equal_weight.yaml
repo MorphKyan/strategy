@@ -1,13 +1,8 @@
 platform:
-  run_name: "platform_m3m4"
+  run_name: "baseline_mvp_equal_weight"
 
 data:
-  source: "finshare"
-  fetch: false
   data_dir: "data"
-  market_store_dir: null
-  fundamentals_dir: "data/platform_fundamentals"
-  fundamental_fields: ["pe", "pb", "roe", "debt_to_asset", "dividend_yield"]
 
 assets:
   - asset_id: "CN_ETF:510300.SH"
@@ -41,8 +36,8 @@ portfolio:
   initial_positions: []
 
 backtest:
-  start_date: "2014-01-01"
-  end_date: "2015-12-31"
+  start_date: "2017-08-24"
+  end_date: "2026-06-01"
   enable_checkpoints: false
 
 execution:
@@ -55,29 +50,18 @@ execution:
 
 strategies:
   segments:
-    - start_date: "2014-01-01"
+    - start_date: "2017-08-24"
       end_date: null
-      strategy_name: "fundamental_value_equal_weight"
+      strategy_name: "monthly_equal_weight"
       strategy_version_id: null
       cancel_pending_on_start: false
       params:
-        rebalance_frequency: "monthly"
+        rebalance_on_start: true
         cooldown_days: 20
         universe:
           - "CN_ETF:510300.SH"
           - "CN_ETF:518880.SH"
           - "CN_ETF:511260.SH"
-        fundamental_rules:
-          required: ["pe", "pb"]
-          max:
-            pe: 30
-            pb: 5
-          min:
-            roe: 0
-          sort_by: "dividend_yield"
-          descending: true
-          limit: 3
 
 output:
   results_dir: "results/backtests"
-  sim_dir: "results/sim_portfolios"

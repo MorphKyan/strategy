@@ -514,7 +514,7 @@ def run_platform_experiments(config_paths: list[Path], platform_script: str | Pa
             "--config",
             str(config_path),
             "--baseline-config",
-            "configs/platform_risk_parity.yaml",
+            "configs/baseline_r1_domestic_rolling.yaml",
         ]
         completed = subprocess.run(command, cwd=repo_root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
         results.append(

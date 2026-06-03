@@ -52,7 +52,7 @@ def calendar_for_config(config: dict) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run platform start-date sensitivity analysis.")
-    parser.add_argument("--config", default="configs/platform_risk_parity.yaml", help="Platform config path.")
+    parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Platform config path.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
     parser.add_argument("--step", type=int, default=3, help="Trading-day step between start dates. Default: 3.")
     parser.add_argument("--raw-root", default="results/sensitivity_raw", help="Root for raw sensitivity run artifacts.")

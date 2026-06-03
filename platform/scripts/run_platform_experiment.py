@@ -14,7 +14,7 @@ from src.platform_core.experiment import run_platform_experiment
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a standardized platform experiment with optional baseline comparison.")
-    parser.add_argument("--config", default="configs/platform_risk_parity.yaml", help="Candidate platform config path.")
+    parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Candidate platform config path.")
     parser.add_argument("--baseline-config", help="Baseline platform config path. Defaults to --config.")
     parser.add_argument("--experiment-name", help="Report grouping name. Defaults to the first strategy name.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")

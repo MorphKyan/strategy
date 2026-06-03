@@ -1,5 +1,5 @@
 platform:
-  run_name: platform_sync_all
+  run_name: baseline_sync_all
 data:
   source: finshare
   fetch: true

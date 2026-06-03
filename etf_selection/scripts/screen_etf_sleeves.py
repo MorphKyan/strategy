@@ -44,7 +44,7 @@ def main() -> int:
     ranking, sleeve_corrs, candidates = screen_sleeves(config, allow_raw_prices=args.allow_raw_prices)
     basket_frame, basket_corrs, _ = build_baskets(config, ranking, candidates)
     generated_configs = generate_platform_configs(
-        base_config_path=resolve_repo_path(paths.get("platform_base_config", "platform/configs/platform_risk_parity.yaml")),
+        base_config_path=resolve_repo_path(paths.get("platform_base_config", "platform/configs/baseline_r1_domestic_rolling.yaml")),
         output_dir=generated_dir,
         basket_frame=basket_frame,
         candidates=candidates,

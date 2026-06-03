@@ -32,7 +32,7 @@ selection:
       history: 0.1
 paths:
   data_dir: platform/data
-  platform_base_config: platform/configs/platform_risk_parity.yaml
+  platform_base_config: platform/configs/baseline_r1_domestic_rolling.yaml
   generated_config_dir: etf_selection/generated_configs
   report_dir: etf_selection/reports
   platform_experiment_script: platform/scripts/run_platform_experiment.py

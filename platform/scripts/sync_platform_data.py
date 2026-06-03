@@ -20,7 +20,7 @@ def load_config(path: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Sync platform market/fundamental data into the local standard store.")
-    parser.add_argument("--config", default="configs/platform_m3m4.yaml", help="Platform YAML config path.")
+    parser.add_argument("--config", default="configs/baseline_m3m4_fundamental.yaml", help="Platform YAML config path.")
     parser.add_argument("--fetch", action="store_true", help="Call Finshare. Without this flag, only validate local standard data.")
     args = parser.parse_args()
 

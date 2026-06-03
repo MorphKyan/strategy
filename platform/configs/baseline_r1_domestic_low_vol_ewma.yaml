@@ -1,18 +1,16 @@
 platform:
-  run_name: "platform_mvp"
-
+  run_name: "baseline_r1_domestic_low_vol_ewma"
 data:
   data_dir: "data"
-
 assets:
-  - asset_id: "CN_ETF:510300.SH"
-    code: "510300"
-    name: "沪深300ETF"
+  - asset_id: "CN_ETF:512890.SH"
+    code: "512890"
+    name: "红利低波ETF"
     asset_type: "etf"
     exchange: "SH"
     currency: "CNY"
     lot_size: 100
-    price_limit_pct: 0.10
+    price_limit_pct: 0.1
   - asset_id: "CN_ETF:518880.SH"
     code: "518880"
     name: "黄金ETF"
@@ -20,7 +18,7 @@ assets:
     exchange: "SH"
     currency: "CNY"
     lot_size: 100
-    price_limit_pct: 0.10
+    price_limit_pct: 0.1
   - asset_id: "CN_ETF:511260.SH"
     code: "511260"
     name: "十年国债ETF"
@@ -28,18 +26,14 @@ assets:
     exchange: "SH"
     currency: "CNY"
     lot_size: 100
-    price_limit_pct: 0.10
-
+    price_limit_pct: 0.1
 portfolio:
   initial_cash: 1000000.0
   initial_equity: 1000000.0
   initial_positions: []
-
 backtest:
-  start_date: "2014-01-01"
-  end_date: "2015-12-31"
-  enable_checkpoints: false
-
+  start_date: "2019-02-28"
+  end_date: "2026-06-01"
 execution:
   price_field: "close"
   weight_tolerance: 0.0005
@@ -47,32 +41,22 @@ execution:
   fee:
     rate: 0.0002
     min_fee: 5.0
-
 strategies:
   segments:
-    - start_date: "2014-01-01"
-      end_date: "2014-12-31"
-      strategy_name: "monthly_equal_weight"
+    - start_date: "2019-02-28"
+      end_date: null
+      strategy_name: "risk_parity_ewma"
       strategy_version_id: null
       cancel_pending_on_start: false
       params:
-        rebalance_on_start: true
-        cooldown_days: 20
+        rebalance_threshold: 0.05
+        init_mode: "calculate"
+        init_calc_days: 30
         universe:
-          - "CN_ETF:510300.SH"
+          - "CN_ETF:512890.SH"
           - "CN_ETF:518880.SH"
           - "CN_ETF:511260.SH"
-    - start_date: "2015-01-01"
-      end_date: null
-      strategy_name: "monthly_equal_weight"
-      strategy_version_id: null
-      cancel_pending_on_start: false
-      params:
-        rebalance_on_start: true
-        cooldown_days: 20
-        universe:
-          - "CN_ETF:510300.SH"
-          - "CN_ETF:518880.SH"
-
+        ewma_span: 60
+        ewma_min_periods: 20
 output:
   results_dir: "results/backtests"

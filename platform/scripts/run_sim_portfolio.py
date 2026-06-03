@@ -21,7 +21,7 @@ def load_config(path: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create or advance a simulated portfolio from a platform checkpoint.")
-    parser.add_argument("--config", default="configs/platform_m3m4.yaml", help="Platform YAML config path.")
+    parser.add_argument("--config", default="configs/baseline_m3m4_fundamental.yaml", help="Platform YAML config path.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
     parser.add_argument("--checkpoint", required=True, help="Checkpoint JSON to derive the simulated portfolio from.")
     parser.add_argument("--asof-date", required=True, help="Advance through this date, YYYY-MM-DD.")

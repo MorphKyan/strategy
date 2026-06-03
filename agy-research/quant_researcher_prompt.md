@@ -20,7 +20,7 @@
 3. **数据校验与拉取**：
    * 检查 `platform/data/` 的数据时效，如与当前时间相差一周以上，必须运行同步脚本：
      `.\env\python.exe platform\scripts\sync_platform_data.py --config configs/<config_for_selected_etfs>.yaml`
-     （注意：同步数据所使用的配置文件不一定是 `platform_m3m4.yaml`，必须根据您选定的 ETF 标的池/当前课题对应的具体配置文件来决定，以确保同步的数据与研究所需标的相匹配）。
+     （注意：同步数据所使用的配置文件不一定是 `baseline_m3m4_fundamental.yaml`，必须根据您选定的 ETF 标的池/当前课题对应的具体配置文件来决定，以确保同步的数据与研究所需标的相匹配）。
    * **数据拉取与缓存过期判定**：若本次研究因为数据过期触发了上述数据拉取，则认为所有在此拉取时间点之前生成的缓存结果均已“过期”（即缓存结果与当前最新的日线数据时间不匹配）。必须在本次回测中丢弃并更新这些缓存。
 4. **运行回测与多重对照实验 (Backtest & Experiment)**：
    * 使用本仓库的 Conda 虚拟环境 `.\env\python.exe`。
@@ -35,8 +35,12 @@
 5. **结果评估与报告登记**：
    * 自动读取并解析 `platform/reports/experiments/<strategy>/<timestamp>/metrics.json`，严禁口头凭空捏造指标。
    * 在 `platform/reports/` 生成符合规范的**中文实验报告**，记录假设、代码改动、多配置/多算法下的指标对照（夏普比率、最大回撤、换手率和扣费后表现）。
+   * **研究成果判定与处理动作**：根据实验组与对照组（Baseline）的核心绩效对比，必须将本次研究判定为以下三类之一，并执行对应的后续动作：
+     * **有显著优化**：核心指标（如夏普比率、最大回撤等）有明显提升。**后续动作**：可新增策略并推荐合入主干；在 `platform/configs/` 中新增或修改对应的 `baseline_*.yaml` 配置文件，并同步更新引用的默认参数；在 `research_backlog.md` 中标记任务状态为 `Completed`。
+     * **差异不大**：核心绩效指标变化极小，但在某些特定维度（如换手率降低、特定震荡区间避险等）有局部优势。**后续动作**：**不新建或修改基准配置文件**（防止基准池冗余），但需深度总结并提炼局部优势，将量化结论与未来优化方向记录在公共文本（`platform/reports/non_baseline_research_history_summary.md` 和 [agy-research/research_history_summary.md](file:///D:/strategy/agy-research/research_history_summary.md)）中；在 `research_backlog.md` 中将任务状态标记为 `Completed`，并备注“差异不大/有局部优势”。
+     * **不及预期**：核心绩效恶化或存在明显的设计缺陷。**后续动作**：总结失败原因，记录在实验报告中，不合入任何代码或配置；在 `research_backlog.md` 中将任务状态标记为 `Failed`。
    * 将有价值的研究成果登记在看板同级的 [agy-research/research_history_summary.md](file:///D:/strategy/agy-research/research_history_summary.md) 中。
-   * 将任务在 [research_backlog.md](file:///D:/strategy/agy-research/research_backlog.md) 中的状态更新为 `Completed`（成功） 或 `Failed`（未达到改进预期）。
+
 
 ---
 

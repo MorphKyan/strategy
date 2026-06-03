@@ -1,5 +1,5 @@
 platform:
-  run_name: "platform_risk_parity_ewma"
+  run_name: "platform_risk_parity_lw_cov"
 
 data:
   data_dir: "data"
@@ -52,12 +52,12 @@ strategies:
   segments:
     - start_date: "2017-08-24"
       end_date: null
-      strategy_name: "risk_parity_ewma"
+      strategy_name: "risk_parity_lw_cov"
       strategy_version_id: null
       cancel_pending_on_start: false
       params:
-        ewma_span: 60
-        ewma_min_periods: 20
+        rolling_window: 120
+        min_periods: 20
         rebalance_threshold: 0.05
         init_mode: "calculate"
         init_calc_days: 30

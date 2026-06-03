@@ -34,17 +34,17 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 Run from the repository root:
 
 ```powershell
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\platform_mvp.yaml
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\platform_risk_parity.yaml
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\platform_risk_parity_ewma.yaml
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\platform_risk_parity.yaml
-.\env\python.exe platform\scripts\run_sensitivity.py --config configs\platform_risk_parity.yaml
+.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_mvp_equal_weight.yaml
+.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_ewma.yaml
+.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\validate_hfq_data.py --codes 510300 518880 511260
-.\env\python.exe platform\scripts\sync_platform_data.py --config configs\platform_m3m4.yaml
-.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\platform_m3m4.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
+.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_m3m4_fundamental.yaml
+.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_m3m4_fundamental.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
 ```
 
-The platform scripts change their working directory to `platform/`, so relative paths such as `configs/platform_mvp.yaml`, `data/`, and `results/platform/` are platform-local.
+The platform scripts change their working directory to `platform/`, so relative paths such as `configs/baseline_mvp_equal_weight.yaml`, `data/`, and `results/platform/` are platform-local.
 
 All generated markdown reports should be written in Chinese. Keep exact config paths, commands, CSV column names, and metric keys unchanged when they are used as machine-readable identifiers.
 
