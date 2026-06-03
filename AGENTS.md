@@ -76,13 +76,18 @@ Avoid:
 
 Before claiming success:
 
-1. Confirm the baseline configuration and candidate configuration.
-2. Run the platform experiment using:
-   `.\env\python.exe platform\scripts\run_platform_experiment.py --config configs/<candidate-config>.yaml`
-3. Verify raw artifacts exist under `platform/results/`.
-4. Verify standardized artifacts exist under `platform/reports/`.
-5. Read generated metrics from `platform/reports/experiments/<strategy>/<timestamp>/metrics.json`; do not infer them from memory.
-6. Confirm the report includes hypothesis, files changed, exact command, metrics delta, turnover, trade count, and recommendation.
+1. Confirm the baseline configurations and candidate configurations.
+2. Run the platform experiment:
+   - **For strategy updates**: Run backtests using the new strategy for **all platform configurations** in `platform/configs/` and compare all results.
+   - **For ETF sleeve expansion**: Run backtests for the expanded portfolio using **multiple strategy algorithms** (e.g., `risk_parity`, `risk_parity_ewma`, `risk_parity_ewma_dd_recovery`) and compare all results.
+3. Manage and utilize the shared backtest cache:
+   - Save backtest results in the shared directory `platform/results/backtest_cache/` in JSON format with a `timestamp`.
+   - Before running a backtest, check if a valid cache exists.
+   - If a data sync (`sync_platform_data.py`) was triggered due to outdated data during the task, mark all existing cache entries generated before the sync timestamp as expired, and rebuild/update them.
+4. Verify raw artifacts exist under `platform/results/`.
+5. Verify standardized artifacts exist under `platform/reports/`.
+6. Read generated metrics from `platform/reports/experiments/<strategy>/<timestamp>/metrics.json`; do not infer them from memory.
+7. Confirm the report includes hypothesis, files changed, exact commands, metrics delta for all configurations/algorithms, turnover, trade count, and recommendation.
 
 ## Research Summary History
 

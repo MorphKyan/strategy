@@ -20,14 +20,20 @@
 3. **数据校验与拉取**：
    * 检查 `platform/data/` 的数据时效，如与当前时间相差一周以上，必须先运行：
      `.\env\python.exe platform\scripts\sync_platform_data.py --config configs/platform_m3m4.yaml`
-4. **运行回测实验 (Backtest & Experiment)**：
+   * **数据拉取与缓存过期判定**：若本次研究因为数据过期触发了上述数据拉取，则认为所有在此拉取时间点之前生成的缓存结果均已“过期”（即缓存结果与当前最新的日线数据时间不匹配）。必须在本次回测中丢弃并更新这些缓存。
+4. **运行回测与多重对照实验 (Backtest & Experiment)**：
    * 使用本仓库的 Conda 虚拟环境 `.\env\python.exe`。
-   * 运行实验对比脚本：
-     `.\env\python.exe platform\scripts\run_platform_experiment.py --config configs/<candidate-config>.yaml`
+   * **多重对照回测机制**：
+     * **如果是策略的更新**：不要仅对比标准基线。必须对 `platform/configs/` 下的**所有**平台配置文件进行新策略的回测，并对比所有配置下的结果。
+     * **如果是 ETF 标的池的扩充**：必须使用**多种策略算法**（如 `risk_parity`, `risk_parity_ewma`, `risk_parity_ewma_dd_recovery` 等已内置算法）分别对扩充后的投资组合进行回测，并对比所有算法在扩充前后的结果。
+   * **共享回测缓存机制**：
+     * 为了提高回测效率，每种投资组合(资产包) + 策略算法 + 参数配置的组合在回测完成后，应将结果指标（包括收益、夏普、回撤、换手率等）以 JSON 格式保存至公共缓存目录 `platform/results/backtest_cache/` 中。
+     * 缓存结果中必须包含时间戳 `timestamp`，以便于其他研究员或后续任务判定是否过期。
+     * 在运行回测前，应先检查该共享缓存中是否存在未过期的匹配结果，若存在且有效则直接复用，避免重复计算。
    * **严禁无限制的爆破式调参**，应基于研究假设进行有目的的对照实验。
 5. **结果评估与报告登记**：
    * 自动读取并解析 `platform/reports/experiments/<strategy>/<timestamp>/metrics.json`，严禁口头凭空捏造指标。
-   * 在 `platform/reports/` 生成符合规范的**中文实验报告**，记录假设、代码改动、指标对比（夏普比率、最大回撤、换手率和扣费后表现）。
+   * 在 `platform/reports/` 生成符合规范的**中文实验报告**，记录假设、代码改动、多配置/多算法下的指标对照（夏普比率、最大回撤、换手率和扣费后表现）。
    * 将有价值的研究成果登记在看板同级的 [agy-research/research_history_summary.md](file:///D:/strategy/agy-research/research_history_summary.md) 中。
    * 将任务在 [research_backlog.md](file:///D:/strategy/agy-research/research_backlog.md) 中的状态更新为 `Completed`（成功） 或 `Failed`（未达到改进预期）。
 
