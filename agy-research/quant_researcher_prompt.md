@@ -10,16 +10,17 @@
 
 ### 核心任务：
 1. **任务认领与状态锁定**：
-   * 读取 [research_backlog.md](file:///D:/strategy/agy-research/research_backlog.md)，在 **#2. 候选研究队列** 中挑选一个符合能力的课题。
+   * 读取 [research_backlog.md](file:///D:/strategy/agy-research/research_backlog.md)，按照 **#2. 候选研究队列** 中的顺序从上到下依次认领第一个处于 Todo 状态的课题，不需自行挑选。
    * 使用 `replace_file_content` 将该任务移动至 **#1. 正在进行中的研究**，填入你的 `Conversation ID`、启动时间与当前状态。
 2. **策略实现与注册**：
    * 进一步搜集并确定算法的数学细节与实现路径。
    * 在 [strategy.py](file:///D:/strategy/platform/src/platform_core/strategy.py) 中，以增量方式编写您的策略实现，**绝不修改已有的经典策略（如 `"risk_parity"`）**。
    * 将新编写的策略类注册到 `BUILTIN_STRATEGIES` 中，以便引擎能够识别。
-   * 代码应包含详尽的中文注释，包含参数说明及数学公式的物理意义。
+   * 代码应包含详尽 of 中文注释，包含参数说明及数学公式的物理意义。
 3. **数据校验与拉取**：
-   * 检查 `platform/data/` 的数据时效，如与当前时间相差一周以上，必须先运行：
-     `.\env\python.exe platform\scripts\sync_platform_data.py --config configs/platform_m3m4.yaml`
+   * 检查 `platform/data/` 的数据时效，如与当前时间相差一周以上，必须运行同步脚本：
+     `.\env\python.exe platform\scripts\sync_platform_data.py --config configs/<config_for_selected_etfs>.yaml`
+     （注意：同步数据所使用的配置文件不一定是 `platform_m3m4.yaml`，必须根据您选定的 ETF 标的池/当前课题对应的具体配置文件来决定，以确保同步的数据与研究所需标的相匹配）。
    * **数据拉取与缓存过期判定**：若本次研究因为数据过期触发了上述数据拉取，则认为所有在此拉取时间点之前生成的缓存结果均已“过期”（即缓存结果与当前最新的日线数据时间不匹配）。必须在本次回测中丢弃并更新这些缓存。
 4. **运行回测与多重对照实验 (Backtest & Experiment)**：
    * 使用本仓库的 Conda 虚拟环境 `.\env\python.exe`。

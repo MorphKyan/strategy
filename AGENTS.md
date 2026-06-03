@@ -45,7 +45,8 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 5. Do not run unrestricted parameter searches, silent optimizer sweeps, or broad benchmark changes.
 6. Preserve transaction-cost handling and trade reporting. If backtest artifacts exist, report turnover and trade count.
 7. Do not overwrite generated historical results, reports, or configs unless the user explicitly asks.
-8. 回测时如果发现数据与当前日期差距有一周以上请先获取数据再进行回测。
+8. 回测时如果发现数据与当前日期差距有一周以上请先获取数据再进行回测（同步数据时需使用与该课题/选定 ETF 组合匹配的配置文件，不一定是固定的 `platform_m3m4.yaml`）。
+9. QuantResearcher 认领课题时，应按照看板中的顺序由上至下依次认领第一个处于 Todo 状态的课题，不需自行挑选。
 
 ## Preferred Research Scope
 
