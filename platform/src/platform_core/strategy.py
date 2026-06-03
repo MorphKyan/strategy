@@ -436,6 +436,184 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
         return TargetPortfolio({asset_id: float(weights[asset_id]) for asset_id in universe})
 
 
+class RiskParityLWCovStrategy(RiskParityStrategy):
+    """
+    基于 Ledoit-Wolf 协方差收缩的风险平价策略 (RiskParityLWCovStrategy)
+    
+    相比于仅基于逆波动率的传统风险平价，本策略引入了资产之间的相关性。
+    使用 Ledoit-Wolf 收缩估计协方差矩阵，结合了样本协方差矩阵与常数相关系数目标矩阵，
+    从而在保证协方差矩阵正定性的同时平滑了历史噪声。
+    使用 Cyclical Coordinate Descent (CCD) 算法对风险平价权重进行精确求解。
+    """
+    name = "risk_parity_lw_cov"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np  # 确保导入 numpy
+        
+        rolling_window = int(context.params.get("rolling_window", 120))
+        min_periods = int(context.params.get("min_periods", 20))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        shrinkage_target = context.params.get("shrinkage_target", "constant_correlation")
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        # 转换为 DatetimeIndex
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        # 处理不同的估计频率
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        # 计算收益率
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        # 提取收益率 numpy 数组，大小为 (T, N)
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+            
+        # 估算协方差矩阵 (Ledoit-Wolf 收缩)
+        Sigma = self._estimate_covariance(X, shrinkage_target)
+        
+        # 求解风险平价权重
+        try:
+            weights = self._solve_risk_parity(Sigma)
+        except Exception as e:
+            # 如果求解失败，降级为等权重
+            weights = np.ones(N) / N
+            
+        # 返回目标资产组合
+        return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
+
+    def _estimate_covariance(self, X: np.ndarray, target: str) -> np.ndarray:
+        import numpy as np
+        T, N = X.shape
+        if N <= 1:
+            return np.cov(X, rowvar=False).reshape(N, N)
+            
+        # 去均值
+        X_demeaned = X - X.mean(axis=0)
+        
+        # 计算样本协方差
+        S = np.dot(X_demeaned.T, X_demeaned) / T
+        
+        if target == "constant_correlation":
+            # 提取对角方差和标准差
+            var = np.diag(S)
+            std = np.sqrt(np.maximum(var, 1e-8))
+            
+            # 计算相关系数矩阵
+            R = S / np.outer(std, std)
+            
+            # 平均相关系数 (排除对角线)
+            mean_corr = (R.sum() - N) / (N * (N - 1)) if N > 1 else 0.0
+            
+            # 目标矩阵 F (常数相关系数)
+            F = mean_corr * np.outer(std, std)
+            np.fill_diagonal(F, var)
+            
+            # 计算渐近方差和 pi
+            try:
+                Z = X_demeaned[:, :, None] * X_demeaned[:, None, :] - S[None, :, :]
+                pi_mat = np.mean(Z**2, axis=0)
+                pi = pi_mat.sum()
+            except MemoryError:
+                pi = 0.0
+                pi_mat = np.zeros((N, N))
+                for i in range(N):
+                    for j in range(N):
+                        val = np.mean((X_demeaned[:, i] * X_demeaned[:, j] - S[i, j])**2)
+                        pi_mat[i, j] = val
+                        pi += val
+            
+            # 计算渐近协方差和 rho
+            rho = 0.0
+            for i in range(N):
+                rho += pi_mat[i, i]
+                for j in range(N):
+                    if i == j:
+                        continue
+                    asy_cov_ii_ij = np.mean((X_demeaned[:, i]**2 - var[i]) * (X_demeaned[:, i] * X_demeaned[:, j] - S[i, j]))
+                    asy_cov_jj_ij = np.mean((X_demeaned[:, j]**2 - var[j]) * (X_demeaned[:, i] * X_demeaned[:, j] - S[i, j]))
+                    term = mean_corr * (std[j] / std[i] * asy_cov_ii_ij + std[i] / std[j] * asy_cov_jj_ij) / 2.0
+                    rho += term
+                    
+            # 样本协方差与目标矩阵的平方距离 gamma
+            gamma = np.sum((S - F)**2)
+            
+            if gamma == 0:
+                delta = 0.0
+            else:
+                delta = (pi - rho) / T / gamma
+                delta = max(0.0, min(1.0, delta))
+                
+            Sigma = delta * F + (1.0 - delta) * S
+            return Sigma
+        else:
+            # 默认：如果不匹配常数相关系数，则采用简单的对角线收缩
+            var = np.diag(S)
+            F = np.diag(var)
+            delta = 0.1
+            Sigma = delta * F + (1.0 - delta) * S
+            return Sigma
+
+    def _solve_risk_parity(self, Sigma: np.ndarray) -> np.ndarray:
+        import numpy as np
+        N = Sigma.shape[0]
+        diag_var = np.diag(Sigma)
+        
+        # 初始权重设置为逆波动率
+        x = 1.0 / np.sqrt(np.maximum(diag_var, 1e-8))
+        
+        max_iter = 100
+        tol = 1e-6
+        for _ in range(max_iter):
+            x_old = x.copy()
+            for i in range(N):
+                b = np.dot(Sigma[i], x) - Sigma[i, i] * x[i]
+                a = Sigma[i, i]
+                if a <= 1e-8:
+                    a = 1e-8
+                x[i] = (-b + np.sqrt(b**2 + 4 * a)) / (2 * a)
+                
+            if np.max(np.abs(x - x_old)) < tol:
+                break
+                
+        weights = x / np.sum(x)
+        return weights
+
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
@@ -443,6 +621,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     RiskParityStrategy.name: RiskParityStrategy,
     RiskParityEWMAStrategy.name: RiskParityEWMAStrategy,
     RiskParityEWMADrawdownRecoveryStrategy.name: RiskParityEWMADrawdownRecoveryStrategy,
+    RiskParityLWCovStrategy.name: RiskParityLWCovStrategy,
 }
 
 
