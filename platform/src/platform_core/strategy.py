@@ -613,6 +613,149 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
         weights = x / np.sum(x)
         return weights
 
+class RiskParityDynamicBudgetStrategy(RiskParityStrategy):
+    name = "risk_parity_dynamic_budget"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        """
+        实现结合趋势动量与波动率靶向的动态风险预算策略。
+        
+        数学原理：
+        1. 趋势动量计算：
+           计算过去 N 日（momentum_window，默认 60）的趋势动量 M_i。
+           支持两种模式：
+           - "return" (区间收益率)：M_i = P_i(t) / P_i(t-N) - 1
+           - "ma_deviation" (均线偏离度)：M_i = P_i(t) / MA_i(t, N) - 1
+        2. 动态风险预算（Risk Budget）分配：
+           对每个资产，其风险预算因子 B_i = 1.0 + momentum_sensitivity * M_i。
+           设定下限限制（避免预算为负数）：B_i = max(0.1, B_i)。
+        3. 初始权重分配：
+           w_i_raw ∝ B_i / \sigma_i，其中 \sigma_i 为过去 rolling_window 周期内估计的资产波动率。
+           归一化：w_i_raw = w_i_raw / sum(w_i_raw)。
+        4. 波动率靶向（Volatility Targeting）：
+           计算组合在当前权重 w_i_raw 下的预期波动率 \sigma_p = sqrt(w^T * \Sigma * w)。
+           其中 \Sigma 为过去 rolling_window 周期的协方差矩阵。
+           年化组合波动率 \sigma_p_annual = \sigma_p * sqrt(annualization_factor)。
+           杠杆因子 leverage = volatility_target / \sigma_p_annual。
+           若不加杠杆，则限制 leverage = min(max_leverage, leverage)。
+           最终权重 w_i_final = w_i_raw * leverage。
+        """
+        # 参数获取
+        momentum_window = int(context.params.get("momentum_window", 60))
+        momentum_sensitivity = float(context.params.get("momentum_sensitivity", 1.5))
+        volatility_target = float(context.params.get("volatility_target", 0.08))
+        momentum_type = context.params.get("momentum_type", "return")
+        
+        rolling_window = int(context.params.get("rolling_window", 120))
+        min_periods = int(context.params.get("min_periods", 20))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        max_leverage = float(context.params.get("max_leverage", 1.0))
+        budget_min = float(context.params.get("budget_min", 0.1))
+
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+
+        # Convert index to DatetimeIndex for resampling
+        price_frame.index = pd.to_datetime(price_frame.index)
+
+        # 调整估计周期与窗口
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+            m_window = max(2, int(momentum_window / 5))
+            annualization_factor = 52
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+            m_window = max(2, int(momentum_window / 20))
+            annualization_factor = 12
+        else:
+            window = rolling_window
+            min_p = min_periods
+            m_window = momentum_window
+            annualization_factor = 252
+
+        # 校验历史长度，需要满足至少估计窗口和动量窗口的要求
+        required_len = max(min_p, window, m_window) + 1
+        if len(price_frame) < required_len:
+            return None
+
+        returns_frame = price_frame.pct_change().dropna()
+        if len(returns_frame) < min_p:
+            return None
+
+        # 1. 计算各资产动量 M_i
+        momentum = {}
+        for asset_id in universe:
+            prices = price_frame[asset_id]
+            if len(prices) < m_window + 1:
+                momentum[asset_id] = 0.0
+                continue
+            
+            curr_price = prices.iloc[-1]
+            if momentum_type == "ma_deviation":
+                ma_val = prices.tail(m_window).mean()
+                m_i = (curr_price / ma_val - 1.0) if ma_val > 0 else 0.0
+            else:  # "return"
+                prev_price = prices.iloc[-(m_window + 1)]
+                m_i = (curr_price / prev_price - 1.0) if prev_price > 0 else 0.0
+            momentum[asset_id] = m_i
+
+        # 2. 计算资产各自波动率与协方差矩阵
+        volatility = returns_frame.tail(window).std()
+        volatility = volatility[volatility > 0]
+        if len(volatility) != len(universe):
+            return None
+
+        cov_matrix = returns_frame.tail(window).cov()
+        if cov_matrix.empty or cov_matrix.isnull().values.any():
+            return None
+
+        # 3. 计算动态风险预算与初始权重 w_raw
+        raw_weights_dict = {}
+        for asset_id in universe:
+            m_i = momentum.get(asset_id, 0.0)
+            budget = max(budget_min, 1.0 + momentum_sensitivity * m_i)
+            raw_weights_dict[asset_id] = budget / volatility[asset_id]
+
+        sum_raw = sum(raw_weights_dict.values())
+        if sum_raw == 0:
+            return None
+
+        raw_weights_series = pd.Series({asset_id: w / sum_raw for asset_id, w in raw_weights_dict.items()})
+
+        # 4. 波动率靶向调节
+        portfolio_variance = raw_weights_series.dot(cov_matrix).dot(raw_weights_series)
+        if portfolio_variance <= 0:
+            return None
+        
+        portfolio_vol = portfolio_variance ** 0.5
+        portfolio_vol_annual = portfolio_vol * (annualization_factor ** 0.5)
+
+        leverage = volatility_target / portfolio_vol_annual if portfolio_vol_annual > 0 else 0.0
+        leverage = min(max_leverage, leverage)
+
+        final_weights = {asset_id: float(raw_weights_series[asset_id] * leverage) for asset_id in universe}
+
+        return TargetPortfolio(final_weights)
+
 
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
@@ -622,6 +765,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     RiskParityEWMAStrategy.name: RiskParityEWMAStrategy,
     RiskParityEWMADrawdownRecoveryStrategy.name: RiskParityEWMADrawdownRecoveryStrategy,
     RiskParityLWCovStrategy.name: RiskParityLWCovStrategy,
+    RiskParityDynamicBudgetStrategy.name: RiskParityDynamicBudgetStrategy,
 }
 
 
