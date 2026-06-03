@@ -14,16 +14,16 @@
 ## 2. 候选研究队列 (Todo Backlog)
 | 任务ID | 研究课题方向 | 核心研究背景/期望改进 | 优先级 | 数据依赖 | 推荐回测配置 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| R001 | 基于 Ledoit-Wolf 协方差收缩的风险平价策略 | 现有的风险平价仅基于逆波动率，忽视了资产间相关性，引入协方差估计时容易受历史噪声干扰，使用 Ledoit-Wolf 协方差收缩能够保证矩阵正定并平滑极端噪声值。 | High | 现有 ETF 历史日线数据/ acc_nav 净值数据 | 策略：`risk_parity_lw_cov`，参数：`rolling_window=120/252`, `shrinkage_target="constant_correlation"` |
-| R002 | 基于换手率惩罚的动态再平衡控制策略 | 硬性阈值再平衡容易在临界点频繁交易或产生巨大单次冲击成本，引入换手率的 L1 惩罚或硬性上限约束，可实现更平滑的阻尼渐进式调仓。 | Medium | 现有 ETF 历史日线数据 | 策略：`risk_parity_turnover_constrained`，参数：`turnover_penalty_lambda=0.01/0.05` |
-| R003 | 结合趋势动量与波动率靶向的动态风险预算策略 | 传统等风险预算在资产下行周期中容易“越跌越买”，引入 Sleeve 级别的趋势动量动态调节风险预算，并利用波动率靶向控制大底回撤。 | High | 现有 ETF 历史日线数据 / sleeves 结构 | 策略：`risk_parity_dynamic_budget`，参数：`momentum_window=60`, `momentum_sensitivity=1.5`, `volatility_target=0.08` |
+| - | 暂无 | - | - | - | - |
 
 ---
 
 ## 3. 已完成研究历史 (Completed / Finished)
 | 任务ID | 研究课题方向 | 领用子Agent ID | 结束时间 | 核心实验表现 (Sharpe/MDD/换手率) | 结论及推荐动作 | 实验报告链接 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| - | 暂无 | - | - | - | - | - |
+| R001 | 基于 Ledoit-Wolf 协方差收缩的风险平价策略 | f12c0d48-270a-443f-9643-0ec2eb5ae365 | 2026-06-03 13:00 | 夏普2.39 / 回撤-5.81% / 年化换手238.7% | 累计收益显著提升约13% (年化+4.60%)。建议采用并入主干。 | [中文实验报告](file:///D:/strategy/platform/reports/R001_Ledoit_Wolf_Covariance_Shrinkage_Risk_Parity_Report.md) |
+| R002 | 基于换手率惩罚的动态再平衡控制策略 | 4d782315-f6c9-4a95-ad8f-2b1ec02f35df | 2026-06-03 13:00 | Sharpe: N/A; MaxDD: -4.66%; 换手降低 9%~31% | 换手惩罚策略在 EWMA 下可极具效用降低 31% 换手，效果显著，强烈推荐合入。 | [实验报告](file:///D:/strategy/platform/reports/experiments/risk_parity_turnover_constrained/20260603_130000/experiment_report.md) |
+| R003 | 结合趋势动量与波动率靶向的动态风险预算策略 | cba2b902-6559-4259-b83d-d0746fdc3bd4 | 2026-06-03 13:10 | Sharpe 0.51->1.08, MDD -23.1%->-10.1% (MVP); Sharpe 1.67->1.62, 换手 44.9%->44.6% (RP) | 动量控制避免“越跌越买”，波动率靶向压缩回撤超50%，夏普翻倍。强烈推荐合入主干并固化推广。 | [实验报告](file:///D:/strategy/platform/reports/R003_dynamic_risk_budget_report.md) |
 
 ---
 

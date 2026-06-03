@@ -1,0 +1,89 @@
+{
+  "experiment_name": "platform_m3m4_exp",
+  "candidate_config": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\configs\\generated\\platform_m3m4_candidate.yaml",
+  "baseline_config": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\configs\\platform_m3m4.yaml",
+  "candidate": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\risk_parity_dynamic_budget\\platform_m3m4_candidate_20260603_130848",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\risk_parity_dynamic_budget\\platform_m3m4_candidate_20260603_130848\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\risk_parity_dynamic_budget\\platform_m3m4_candidate_20260603_130848\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\risk_parity_dynamic_budget\\platform_m3m4_candidate_20260603_130848\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\risk_parity_dynamic_budget\\platform_m3m4_candidate_20260603_130848\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2014-01-02",
+    "end_date": "2015-12-31",
+    "observations": 489,
+    "total_return": 0.1952431158200001,
+    "annualized_return": 0.09647289447187979,
+    "annualized_volatility": 0.09602023448983873,
+    "max_drawdown": -0.0994843553787711,
+    "sharpe_ratio": 1.0047142145032875,
+    "turnover_total": 2376999.6999999997,
+    "annualized_turnover": 1224956.9006134968,
+    "trade_count": 24,
+    "order_count": 24,
+    "filled_order_count": 24,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 24
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 0,
+    "average_cash_weight": 0.43533605570583783,
+    "max_position_count": 2,
+    "chart_paths": [
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\risk_parity_dynamic_budget\\platform_m3m4_candidate_20260603_130848\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\risk_parity_dynamic_budget\\platform_m3m4_candidate_20260603_130848\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\risk_parity_dynamic_budget\\platform_m3m4_candidate_20260603_130848\\charts\\execution_effects.png"
+    ]
+  },
+  "baseline": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\fundamental_value_equal_weight\\platform_m3m4_baseline_20260603_130849",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\fundamental_value_equal_weight\\platform_m3m4_baseline_20260603_130849\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\fundamental_value_equal_weight\\platform_m3m4_baseline_20260603_130849\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\fundamental_value_equal_weight\\platform_m3m4_baseline_20260603_130849\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\fundamental_value_equal_weight\\platform_m3m4_baseline_20260603_130849\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2014-01-02",
+    "end_date": "2015-12-31",
+    "observations": 489,
+    "total_return": 0.3014675370328894,
+    "annualized_return": 0.1457572824294764,
+    "annualized_volatility": 0.16699011513733858,
+    "max_drawdown": -0.2364900763097616,
+    "sharpe_ratio": 0.8728497630509473,
+    "turnover_total": 961157.7000000001,
+    "annualized_turnover": 495320.53251533746,
+    "trade_count": 25,
+    "order_count": 25,
+    "filled_order_count": 25,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 25
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 1,
+    "max_pending_intent_count": 1,
+    "average_cash_weight": 0.49603361127838413,
+    "max_position_count": 1,
+    "chart_paths": [
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\fundamental_value_equal_weight\\platform_m3m4_baseline_20260603_130849\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\fundamental_value_equal_weight\\platform_m3m4_baseline_20260603_130849\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_m3m4_exp\\20260603_130848\\fundamental_value_equal_weight\\platform_m3m4_baseline_20260603_130849\\charts\\execution_effects.png"
+    ]
+  },
+  "comparison": {
+    "total_return_delta": -0.10622442121288933,
+    "annualized_return_delta": -0.0492843879575966,
+    "annualized_volatility_delta": -0.07096988064749984,
+    "max_drawdown_delta": 0.1370057209309905,
+    "sharpe_ratio_delta": 0.13186445145234016,
+    "annualized_turnover_delta": 729636.3680981593,
+    "trade_count_delta": -1.0,
+    "order_count_delta": -1.0,
+    "rejected_order_count_delta": 0.0,
+    "max_pending_intent_count_delta": -1.0,
+    "average_cash_weight_delta": -0.0606975555725463
+  },
+  "generated_at": "2026-06-03T13:08:50"
+}

@@ -1,0 +1,93 @@
+{
+  "experiment_name": "platform_risk_parity_exp",
+  "candidate_config": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\configs\\generated\\platform_risk_parity_candidate.yaml",
+  "baseline_config": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\configs\\platform_risk_parity.yaml",
+  "candidate": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2017-08-24",
+    "end_date": "2026-05-19",
+    "observations": 2116,
+    "total_return": 0.6000466332607008,
+    "annualized_return": 0.057601813726862794,
+    "annualized_volatility": 0.0355382444545916,
+    "max_drawdown": -0.04098121037137992,
+    "sharpe_ratio": 1.6208401571569624,
+    "turnover_total": 3742345.356872485,
+    "annualized_turnover": 445685.7419337742,
+    "trade_count": 58,
+    "order_count": 59,
+    "filled_order_count": 58,
+    "rejected_order_count": 1,
+    "order_status_counts": {
+      "FILLED": 58,
+      "REJECTED": 1
+    },
+    "rejection_reason_counts": {
+      "insufficient_cash_or_lot": 1
+    },
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 3,
+    "average_cash_weight": 0.04083197220680927,
+    "max_position_count": 3,
+    "chart_paths": [
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757\\charts\\execution_effects.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity_dynamic_budget\\platform_risk_parity_candidate_20260603_130757\\charts\\rejected_orders.png"
+    ]
+  },
+  "baseline": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity\\platform_risk_parity_baseline_20260603_130758",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity\\platform_risk_parity_baseline_20260603_130758\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity\\platform_risk_parity_baseline_20260603_130758\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity\\platform_risk_parity_baseline_20260603_130758\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity\\platform_risk_parity_baseline_20260603_130758\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2017-08-24",
+    "end_date": "2026-05-19",
+    "observations": 2116,
+    "total_return": 0.6118357664517422,
+    "annualized_return": 0.05852727124273582,
+    "annualized_volatility": 0.03506631194517482,
+    "max_drawdown": -0.04370852979709783,
+    "sharpe_ratio": 1.6690455310567458,
+    "turnover_total": 3773106.2883394226,
+    "annualized_turnover": 449349.14208957204,
+    "trade_count": 58,
+    "order_count": 58,
+    "filled_order_count": 58,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 58
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.024066630932976448,
+    "max_position_count": 3,
+    "chart_paths": [
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity\\platform_risk_parity_baseline_20260603_130758\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity\\platform_risk_parity_baseline_20260603_130758\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\419e7723-6b9d-45aa-a98c-cfd5ad22f4bd\\.system_generated\\worktrees\\subagent-Quant-Researcher--R003--quant-researcher-v2-303d9418\\platform\\results\\backtests\\platform_risk_parity_exp\\20260603_130757\\risk_parity\\platform_risk_parity_baseline_20260603_130758\\charts\\execution_effects.png"
+    ]
+  },
+  "comparison": {
+    "total_return_delta": -0.011789133191041357,
+    "annualized_return_delta": -0.0009254575158730294,
+    "annualized_volatility_delta": 0.00047193250941677395,
+    "max_drawdown_delta": 0.002727319425717911,
+    "sharpe_ratio_delta": -0.04820537389978341,
+    "annualized_turnover_delta": -3663.4001557978336,
+    "trade_count_delta": 0.0,
+    "order_count_delta": 1.0,
+    "rejected_order_count_delta": 1.0,
+    "max_pending_intent_count_delta": 1.0,
+    "average_cash_weight_delta": 0.016765341273832824
+  },
+  "generated_at": "2026-06-03T13:07:59"
+}

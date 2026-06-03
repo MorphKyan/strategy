@@ -436,6 +436,473 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
         return TargetPortfolio({asset_id: float(weights[asset_id]) for asset_id in universe})
 
 
+class RiskParityLWCovStrategy(RiskParityStrategy):
+    """
+    基于 Ledoit-Wolf 协方差收缩的风险平价策略 (RiskParityLWCovStrategy)
+    
+    相比于仅基于逆波动率的传统风险平价，本策略引入了资产之间的相关性。
+    使用 Ledoit-Wolf 收缩估计协方差矩阵，结合了样本协方差矩阵与常数相关系数目标矩阵，
+    从而在保证协方差矩阵正定性的同时平滑了历史噪声。
+    使用 Cyclical Coordinate Descent (CCD) 算法对风险平价权重进行精确求解。
+    """
+    name = "risk_parity_lw_cov"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np  # 确保导入 numpy
+        
+        rolling_window = int(context.params.get("rolling_window", 120))
+        min_periods = int(context.params.get("min_periods", 20))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        shrinkage_target = context.params.get("shrinkage_target", "constant_correlation")
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        # 转换为 DatetimeIndex
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        # 处理不同的估计频率
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        # 计算收益率
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        # 提取收益率 numpy 数组，大小为 (T, N)
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+            
+        # 估算协方差矩阵 (Ledoit-Wolf 收缩)
+        Sigma = self._estimate_covariance(X, shrinkage_target)
+        
+        # 求解风险平价权重
+        try:
+            weights = self._solve_risk_parity(Sigma)
+        except Exception as e:
+            # 如果求解失败，降级为等权重
+            weights = np.ones(N) / N
+            
+        # 返回目标资产组合
+        return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
+
+    def _estimate_covariance(self, X: np.ndarray, target: str) -> np.ndarray:
+        import numpy as np
+        T, N = X.shape
+        if N <= 1:
+            return np.cov(X, rowvar=False).reshape(N, N)
+            
+        # 去均值
+        X_demeaned = X - X.mean(axis=0)
+        
+        # 计算样本协方差
+        S = np.dot(X_demeaned.T, X_demeaned) / T
+        
+        if target == "constant_correlation":
+            # 提取对角方差和标准差
+            var = np.diag(S)
+            std = np.sqrt(np.maximum(var, 1e-8))
+            
+            # 计算相关系数矩阵
+            R = S / np.outer(std, std)
+            
+            # 平均相关系数 (排除对角线)
+            mean_corr = (R.sum() - N) / (N * (N - 1)) if N > 1 else 0.0
+            
+            # 目标矩阵 F (常数相关系数)
+            F = mean_corr * np.outer(std, std)
+            np.fill_diagonal(F, var)
+            
+            # 计算渐近方差和 pi
+            try:
+                Z = X_demeaned[:, :, None] * X_demeaned[:, None, :] - S[None, :, :]
+                pi_mat = np.mean(Z**2, axis=0)
+                pi = pi_mat.sum()
+            except MemoryError:
+                pi = 0.0
+                pi_mat = np.zeros((N, N))
+                for i in range(N):
+                    for j in range(N):
+                        val = np.mean((X_demeaned[:, i] * X_demeaned[:, j] - S[i, j])**2)
+                        pi_mat[i, j] = val
+                        pi += val
+            
+            # 计算渐近协方差和 rho
+            rho = 0.0
+            for i in range(N):
+                rho += pi_mat[i, i]
+                for j in range(N):
+                    if i == j:
+                        continue
+                    asy_cov_ii_ij = np.mean((X_demeaned[:, i]**2 - var[i]) * (X_demeaned[:, i] * X_demeaned[:, j] - S[i, j]))
+                    asy_cov_jj_ij = np.mean((X_demeaned[:, j]**2 - var[j]) * (X_demeaned[:, i] * X_demeaned[:, j] - S[i, j]))
+                    term = mean_corr * (std[j] / std[i] * asy_cov_ii_ij + std[i] / std[j] * asy_cov_jj_ij) / 2.0
+                    rho += term
+                    
+            # 样本协方差与目标矩阵的平方距离 gamma
+            gamma = np.sum((S - F)**2)
+            
+            if gamma == 0:
+                delta = 0.0
+            else:
+                delta = (pi - rho) / T / gamma
+                delta = max(0.0, min(1.0, delta))
+                
+            Sigma = delta * F + (1.0 - delta) * S
+            return Sigma
+        else:
+            # 默认：如果不匹配常数相关系数，则采用简单的对角线收缩
+            var = np.diag(S)
+            F = np.diag(var)
+            delta = 0.1
+            Sigma = delta * F + (1.0 - delta) * S
+            return Sigma
+
+    def _solve_risk_parity(self, Sigma: np.ndarray) -> np.ndarray:
+        import numpy as np
+        N = Sigma.shape[0]
+        diag_var = np.diag(Sigma)
+        
+        # 初始权重设置为逆波动率
+        x = 1.0 / np.sqrt(np.maximum(diag_var, 1e-8))
+        
+        max_iter = 100
+        tol = 1e-6
+        for _ in range(max_iter):
+            x_old = x.copy()
+            for i in range(N):
+                b = np.dot(Sigma[i], x) - Sigma[i, i] * x[i]
+                a = Sigma[i, i]
+                if a <= 1e-8:
+                    a = 1e-8
+                x[i] = (-b + np.sqrt(b**2 + 4 * a)) / (2 * a)
+                
+            if np.max(np.abs(x - x_old)) < tol:
+                break
+                
+        weights = x / np.sum(x)
+        return weights
+
+
+class RiskParityTurnoverConstrainedStrategy(RiskParityStrategy):
+    """
+    基于换手率惩罚的动态再平衡控制策略 (R002)
+    在传统的风险平价（逆波动率）权重基础上，引入换手率的 L1 惩罚项以及硬性上限约束，
+    使用 SLSQP 二次规划进行平滑渐进式调仓，避免频繁微调与单次冲击成本过大。
+    """
+    name = "risk_parity_turnover_constrained"
+    version = "0.1.0"
+
+    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+        universe = context.params.get("universe") or context.available_asset_ids()
+        universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
+        if not universe:
+            return None
+
+        # 初始建仓逻辑（不施加换手率惩罚）
+        if not bool(context.runtime.get("opened", False)):
+            target = self._initial_target(context, universe)
+            if target is None:
+                return None
+            context.runtime["opened"] = True
+            return target
+
+        # 检查是否是调仓日
+        if not self._is_rebalance_day(context):
+            return None
+
+        # 计算无约束风险平价目标权重
+        if "ewma_span" in context.params:
+            target = RiskParityEWMAStrategy._inverse_vol_target(self, context, universe)
+        else:
+            target = RiskParityStrategy._inverse_vol_target(self, context, universe)
+            
+        if target is None:
+            return None
+
+        prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
+        current_weights = context.state.weights(prices)
+
+        # 检查是否满足偏离度阈值触发条件
+        threshold = float(context.params.get("rebalance_threshold", 0.05))
+        trigger = False
+        for asset_id in universe:
+            target_weight = target.weights.get(asset_id, 0.0)
+            if abs(current_weights.get(asset_id, 0.0) - target_weight) > threshold:
+                trigger = True
+                break
+
+        # 如果有当前持有的资产不在 universe 中，且其当前权重显著大于 0.01，也应触发调仓（需要卖出）
+        if not trigger:
+            for asset_id, w_curr in current_weights.items():
+                if asset_id not in universe and w_curr > 0.01:
+                    trigger = True
+                    break
+
+        if not trigger:
+            return None
+
+        # 触发调仓后，引入换手率惩罚优化
+        import numpy as np
+        from scipy.optimize import minimize
+
+        lmbda = float(context.params.get("turnover_penalty_lambda", 0.01))
+        max_turnover = context.params.get("max_turnover", None)
+        if max_turnover is not None:
+            max_turnover = float(max_turnover)
+
+        # 构建资产全集（目标组合资产与当前持有资产的并集）
+        all_assets = list(set(universe) | set(current_weights.keys()))
+        all_assets.sort()  # 保证变量索引顺序确定
+        n = len(all_assets)
+
+        w_current_arr = np.array([current_weights.get(aid, 0.0) for aid in all_assets])
+        w_target_arr = np.array([target.weights.get(aid, 0.0) if aid in universe else 0.0 for aid in all_assets])
+
+        # 优化变量 x = [w (n), u (n), v (n)]
+        # 初始值 w = w_current, u = 0, v = 0
+        x0 = np.concatenate([w_current_arr, np.zeros(n), np.zeros(n)])
+
+        # 目标函数：二次偏离惩罚 + 换手率 L1 惩罚
+        def objective(x):
+            w = x[:n]
+            u = x[n:2*n]
+            v = x[2*n:]
+            dist = np.sum((w - w_target_arr) ** 2)
+            penalty = lmbda * np.sum(u + v)
+            return dist + penalty
+
+        # 约束条件
+        cons = []
+        # 1. 权重之和为 1
+        cons.append({
+            'type': 'eq',
+            'fun': lambda x: np.sum(x[:n]) - 1.0
+        })
+        # 2. 线性化绝对值约束: w - w_current - u + v = 0
+        cons.append({
+            'type': 'eq',
+            'fun': lambda x: x[:n] - w_current_arr - x[n:2*n] + x[2*n:]
+        })
+        # 3. 换手率硬上限约束 (若设置了 max_turnover, 限制单边换手率 <= max_turnover, 即双边和 <= 2 * max_turnover)
+        if max_turnover is not None and max_turnover > 0:
+            cons.append({
+                'type': 'ineq',
+                'fun': lambda x: 2.0 * max_turnover - np.sum(x[n:])
+            })
+
+        # 变量边界
+        bounds = []
+        # w_i 边界：如果是目标资产则为 [0, 1]，如果不在目标资产中则强制为 0
+        for aid in all_assets:
+            if aid in universe:
+                bounds.append((0.0, 1.0))
+            else:
+                bounds.append((0.0, 0.0))
+        # u_i, v_i 边界：[0, None]
+        for _ in range(2 * n):
+            bounds.append((0.0, None))
+
+        res = minimize(objective, x0, method='SLSQP', bounds=bounds, constraints=cons)
+        
+        if res.success:
+            w_opt = res.x[:n]
+            # 生成新目标权重字典
+            opt_weights = {}
+            for aid, w_val in zip(all_assets, w_opt):
+                if w_val > 1e-5:
+                    opt_weights[aid] = float(w_val)
+            
+            # 归一化以防止浮点数微小误差
+            total_w = sum(opt_weights.values())
+            if total_w > 0:
+                opt_weights = {aid: w_val / total_w for aid, w_val in opt_weights.items()}
+                
+            # 检查与当前权重的差异，若没有显著变动则不调仓
+            total_diff = sum(abs(opt_weights.get(aid, 0.0) - current_weights.get(aid, 0.0)) for aid in all_assets)
+            if total_diff > 1e-4:
+                return TargetPortfolio(opt_weights)
+            else:
+                return None
+        else:
+            # 若优化失败，降级回退到原始逆波动率加权
+            return target
+
+
+class RiskParityDynamicBudgetStrategy(RiskParityStrategy):
+    name = "risk_parity_dynamic_budget"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        """
+        实现结合趋势动量与波动率靶向的动态风险预算策略。
+        
+        数学原理：
+        1. 趋势动量计算：
+           计算过去 N 日（momentum_window，默认 60）的趋势动量 M_i。
+           支持两种模式：
+           - "return" (区间收益率)：M_i = P_i(t) / P_i(t-N) - 1
+           - "ma_deviation" (均线偏离度)：M_i = P_i(t) / MA_i(t, N) - 1
+        2. 动态风险预算（Risk Budget）分配：
+           对每个资产，其风险预算因子 B_i = 1.0 + momentum_sensitivity * M_i。
+           设定下限限制（避免预算为负数）：B_i = max(0.1, B_i)。
+        3. 初始权重分配：
+           w_i_raw ∝ B_i / \sigma_i，其中 \sigma_i 为过去 rolling_window 周期内估计的资产波动率。
+           归一化：w_i_raw = w_i_raw / sum(w_i_raw)。
+        4. 波动率靶向（Volatility Targeting）：
+           计算组合在当前权重 w_i_raw 下的预期波动率 \sigma_p = sqrt(w^T * \Sigma * w)。
+           其中 \Sigma 为过去 rolling_window 周期的协方差矩阵。
+           年化组合波动率 \sigma_p_annual = \sigma_p * sqrt(annualization_factor)。
+           杠杆因子 leverage = volatility_target / \sigma_p_annual。
+           若不加杠杆，则限制 leverage = min(max_leverage, leverage)。
+           最终权重 w_i_final = w_i_raw * leverage。
+        """
+        # 参数获取
+        momentum_window = int(context.params.get("momentum_window", 60))
+        momentum_sensitivity = float(context.params.get("momentum_sensitivity", 1.5))
+        volatility_target = float(context.params.get("volatility_target", 0.08))
+        momentum_type = context.params.get("momentum_type", "return")
+        
+        rolling_window = int(context.params.get("rolling_window", 120))
+        min_periods = int(context.params.get("min_periods", 20))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        max_leverage = float(context.params.get("max_leverage", 1.0))
+        budget_min = float(context.params.get("budget_min", 0.1))
+
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+
+        # Convert index to DatetimeIndex for resampling
+        price_frame.index = pd.to_datetime(price_frame.index)
+
+        # 调整估计周期与窗口
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+            m_window = max(2, int(momentum_window / 5))
+            annualization_factor = 52
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+            m_window = max(2, int(momentum_window / 20))
+            annualization_factor = 12
+        else:
+            window = rolling_window
+            min_p = min_periods
+            m_window = momentum_window
+            annualization_factor = 252
+
+        # 校验历史长度，需要满足至少估计窗口和动量窗口的要求
+        required_len = max(min_p, window, m_window) + 1
+        if len(price_frame) < required_len:
+            return None
+
+        returns_frame = price_frame.pct_change().dropna()
+        if len(returns_frame) < min_p:
+            return None
+
+        # 1. 计算各资产动量 M_i
+        momentum = {}
+        for asset_id in universe:
+            prices = price_frame[asset_id]
+            if len(prices) < m_window + 1:
+                momentum[asset_id] = 0.0
+                continue
+            
+            curr_price = prices.iloc[-1]
+            if momentum_type == "ma_deviation":
+                ma_val = prices.tail(m_window).mean()
+                m_i = (curr_price / ma_val - 1.0) if ma_val > 0 else 0.0
+            else:  # "return"
+                prev_price = prices.iloc[-(m_window + 1)]
+                m_i = (curr_price / prev_price - 1.0) if prev_price > 0 else 0.0
+            momentum[asset_id] = m_i
+
+        # 2. 计算资产各自波动率与协方差矩阵
+        volatility = returns_frame.tail(window).std()
+        volatility = volatility[volatility > 0]
+        if len(volatility) != len(universe):
+            return None
+
+        cov_matrix = returns_frame.tail(window).cov()
+        if cov_matrix.empty or cov_matrix.isnull().values.any():
+            return None
+
+        # 3. 计算动态风险预算与初始权重 w_raw
+        raw_weights_dict = {}
+        for asset_id in universe:
+            m_i = momentum.get(asset_id, 0.0)
+            budget = max(budget_min, 1.0 + momentum_sensitivity * m_i)
+            raw_weights_dict[asset_id] = budget / volatility[asset_id]
+
+        sum_raw = sum(raw_weights_dict.values())
+        if sum_raw == 0:
+            return None
+
+        raw_weights_series = pd.Series({asset_id: w / sum_raw for asset_id, w in raw_weights_dict.items()})
+
+        # 4. 波动率靶向调节
+        portfolio_variance = raw_weights_series.dot(cov_matrix).dot(raw_weights_series)
+        if portfolio_variance <= 0:
+            return None
+        
+        portfolio_vol = portfolio_variance ** 0.5
+        portfolio_vol_annual = portfolio_vol * (annualization_factor ** 0.5)
+
+        leverage = volatility_target / portfolio_vol_annual if portfolio_vol_annual > 0 else 0.0
+        leverage = min(max_leverage, leverage)
+
+        final_weights = {asset_id: float(raw_weights_series[asset_id] * leverage) for asset_id in universe}
+
+        return TargetPortfolio(final_weights)
+
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
@@ -443,6 +910,9 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     RiskParityStrategy.name: RiskParityStrategy,
     RiskParityEWMAStrategy.name: RiskParityEWMAStrategy,
     RiskParityEWMADrawdownRecoveryStrategy.name: RiskParityEWMADrawdownRecoveryStrategy,
+    RiskParityLWCovStrategy.name: RiskParityLWCovStrategy,
+    RiskParityTurnoverConstrainedStrategy.name: RiskParityTurnoverConstrainedStrategy,
+    RiskParityDynamicBudgetStrategy.name: RiskParityDynamicBudgetStrategy,
 }
 
 
