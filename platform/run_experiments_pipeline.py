@@ -14,7 +14,7 @@ CACHE_DIR = ROOT / "results" / "backtest_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Data was synchronized on 2026-06-03 12:55. Any cache older than this must expire.
-SYNC_DATETIME = datetime(2026, 6, 3, 12, 55, 0)
+SYNC_DATETIME = datetime(2026, 6, 3, 14, 55, 0)
 
 configs_to_test = [
     "platform_mvp",
@@ -55,12 +55,15 @@ def generate_candidate_config(config_name):
         config = yaml.safe_load(f)
         
     for segment in config["strategies"]["segments"]:
-        segment["strategy_name"] = "risk_parity_dynamic_budget"
+        segment["strategy_name"] = "risk_parity_lw_cov"
         if "params" not in segment:
             segment["params"] = {}
-        segment["params"]["momentum_window"] = 60
-        segment["params"]["momentum_sensitivity"] = 1.5
-        segment["params"]["volatility_target"] = 0.08
+        if "rolling_window" not in segment["params"]:
+            segment["params"]["rolling_window"] = 120
+        if "min_periods" not in segment["params"]:
+            segment["params"]["min_periods"] = 20
+        if "rebalance_threshold" not in segment["params"]:
+            segment["params"]["rebalance_threshold"] = 0.05
         
     candidate_path.parent.mkdir(parents=True, exist_ok=True)
     with open(candidate_path, "w", encoding="utf-8") as f:
