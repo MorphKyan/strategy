@@ -93,3 +93,26 @@ Before claiming success:
 ## Research Summary History
 
 - 非基线研究价值成果汇总：[non_baseline_research_history_summary.md](file:///D:/strategy/platform/reports/non_baseline_research_history_summary.md)
+
+## 研究辅助工具 (Research Utility Tools)
+
+为了在研究和回测中提高配置生成的便利性与稳定性，我们在 `platform/scripts/` 下提供了一系列工具：
+
+1. **无配置依赖数据同步工具 (Sync All Market Data)**:
+   - **执行命令**: `.\env\python.exe platform/scripts/sync_all_market_data.py`
+   - **说明**: 自动从 Finshare 获取并同步组合内全部 12 个 ETF 标的的最新的市场日线数据和基本面指标数据，直到当前日期。此脚本独立运行，不依赖于任何配置文件。
+   - **参数**:
+     - `--start-date <YYYY-MM-DD>` (默认值: `2010-01-01`): 从指定日期开始同步。
+     - `--no-fundamentals`: 跳过基本面财务指标数据的同步。
+     - `--data-dir <path>` (默认值: `data`): 指定保存市场数据的本地目录。
+     - `--fundamentals-dir <path>` (默认值: `data/platform_fundamentals`): 指定保存基本面财务指标数据的本地目录。
+
+2. **最长公共历史时段计算工具 (Get Common Date Range)**:
+   - **执行命令**: `.\env\python.exe platform/scripts/get_common_date_range.py --config platform/configs/baseline_r3_global_nasdaq_all_weather_ewma.yaml`
+   - **说明**: 计算指定配置或标的列表在本地数据中的最长公共历史交易时段（历史数据的交集）。这有助于在回测时动态对齐并稳定 `start_date` 和 `end_date`。
+   - **参数**:
+     - `--config <path1> <path2> ...`: 从一个或多个平台配置文件中加载标的列表。
+     - `--codes <code1> <code2> ...`: 直接指定一个或多个标的代码。
+     - `--data-dir <path>` (默认值: `data`): 本地市场数据存储目录。
+     - 例如: `.\env\python.exe platform/scripts/get_common_date_range.py --codes 510300 518880 511260`
+
