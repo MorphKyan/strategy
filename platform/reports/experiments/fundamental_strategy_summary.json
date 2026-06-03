@@ -1,0 +1,50 @@
+{
+  "m3m4": {
+    "total_return": 0.3014675370328894,
+    "annualized_return": 0.1457572824294764,
+    "annualized_volatility": 0.16699011513733858,
+    "max_drawdown": -0.2364900763097616,
+    "sharpe_ratio": 0.8728497630509473,
+    "annualized_turnover": 495320.53251533746,
+    "trade_count": 25,
+    "order_count": 25,
+    "average_cash_weight": 0.49603361127838413,
+    "report_path": "reports\\experiments\\fundamental_value_equal_weight\\20260602_235441\\report.md"
+  },
+  "baseline": {
+    "total_return": 0.4212450311845424,
+    "annualized_return": 0.043659641180610054,
+    "annualized_volatility": 0.08390847373544796,
+    "max_drawdown": -0.15415712120074154,
+    "sharpe_ratio": 0.5203245779235954,
+    "annualized_turnover": 316990.5934426229,
+    "trade_count": 144,
+    "order_count": 144,
+    "average_cash_weight": 0.003456924995083711,
+    "report_path": "reports\\experiments\\fundamental_value_equal_weight\\20260602_235443\\report.md"
+  },
+  "dividend": {
+    "total_return": 0.40562052162551354,
+    "annualized_return": 0.041948247851017806,
+    "annualized_volatility": 0.06050372733043662,
+    "max_drawdown": -0.08196069434660314,
+    "sharpe_ratio": 0.6933167542211169,
+    "annualized_turnover": 224345.11708951654,
+    "trade_count": 104,
+    "order_count": 107,
+    "average_cash_weight": 0.0030252483147421567,
+    "report_path": "reports\\experiments\\fundamental_value_equal_weight\\20260602_235505\\report.md"
+  },
+  "global": {
+    "total_return": 0.9244848985621894,
+    "annualized_return": 0.08112465396226964,
+    "annualized_volatility": 0.09342949930746611,
+    "max_drawdown": -0.13427235250027247,
+    "sharpe_ratio": 0.8682980703481822,
+    "annualized_turnover": 459311.40850661625,
+    "trade_count": 253,
+    "order_count": 274,
+    "average_cash_weight": 0.006047065285842176,
+    "report_path": "reports\\experiments\\fundamental_value_equal_weight\\20260602_235528\\report.md"
+  }
+}

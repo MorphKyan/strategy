@@ -1,0 +1,50 @@
+{
+  "experiment_name": "fundamental_value_equal_weight",
+  "candidate_config": "configs\\generated\\platform_research_baseline_fundamental.yaml",
+  "baseline_config": null,
+  "candidate": {
+    "results_dir": "results\\backtests\\fundamental_value_equal_weight\\20260602_235443\\fundamental_value_equal_weight\\fundamental_baseline_candidate_20260602_235443",
+    "nav_csv": "results\\backtests\\fundamental_value_equal_weight\\20260602_235443\\fundamental_value_equal_weight\\fundamental_baseline_candidate_20260602_235443\\nav.csv",
+    "positions_csv": "results\\backtests\\fundamental_value_equal_weight\\20260602_235443\\fundamental_value_equal_weight\\fundamental_baseline_candidate_20260602_235443\\positions.csv",
+    "orders_csv": "results\\backtests\\fundamental_value_equal_weight\\20260602_235443\\fundamental_value_equal_weight\\fundamental_baseline_candidate_20260602_235443\\orders.csv",
+    "trades_csv": "results\\backtests\\fundamental_value_equal_weight\\20260602_235443\\fundamental_value_equal_weight\\fundamental_baseline_candidate_20260602_235443\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2017-08-24",
+    "end_date": "2026-03-16",
+    "observations": 2074,
+    "total_return": 0.4212450311845424,
+    "annualized_return": 0.043659641180610054,
+    "annualized_volatility": 0.08390847373544796,
+    "max_drawdown": -0.15415712120074154,
+    "sharpe_ratio": 0.5203245779235954,
+    "turnover_total": 2608882.8999999994,
+    "annualized_turnover": 316990.5934426229,
+    "trade_count": 144,
+    "order_count": 144,
+    "filled_order_count": 144,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 144
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 1,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.003456924995083711,
+    "max_position_count": 2
+  },
+  "baseline": null,
+  "comparison": {
+    "total_return_delta": null,
+    "annualized_return_delta": null,
+    "annualized_volatility_delta": null,
+    "max_drawdown_delta": null,
+    "sharpe_ratio_delta": null,
+    "annualized_turnover_delta": null,
+    "trade_count_delta": null,
+    "order_count_delta": null,
+    "rejected_order_count_delta": null,
+    "max_pending_intent_count_delta": null,
+    "average_cash_weight_delta": null
+  },
+  "generated_at": "2026-06-02T23:55:04"
+}
