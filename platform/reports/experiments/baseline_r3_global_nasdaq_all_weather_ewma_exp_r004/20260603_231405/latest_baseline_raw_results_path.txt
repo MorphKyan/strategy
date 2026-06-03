@@ -1,0 +1,1 @@
+C:\Users\morph\.gemini\antigravity-cli\brain\d7b43de1-bf98-4325-ab26-ff1006c4e272\.system_generated\worktrees\subagent-Quant-Researcher-1-quant-researcher-97090326\platform\results\backtests\baseline_r3_global_nasdaq_all_weather_ewma_exp_r004\20260603_231405\risk_parity_ewma\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260603_231425

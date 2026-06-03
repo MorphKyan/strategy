@@ -1,0 +1,98 @@
+assets:
+- asset_id: CN_ETF:510300.SH
+  asset_type: etf
+  code: '510300'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 沪深300ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512890.SH
+  asset_type: etf
+  code: '512890'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 红利低波ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:513100.SH
+  asset_type: etf
+  code: '513100'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 纳指ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:518880.SH
+  asset_type: etf
+  code: '518880'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 黄金ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511260.SH
+  asset_type: etf
+  code: '511260'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 十年国债ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:159985.SZ
+  asset_type: etf
+  code: '159985'
+  currency: CNY
+  exchange: SZ
+  lot_size: 100
+  name: 豆粕ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:159981.SZ
+  asset_type: etf
+  code: '159981'
+  currency: CNY
+  exchange: SZ
+  lot_size: 100
+  name: 能源化工ETF
+  price_limit_pct: 0.1
+backtest:
+  end_date: '2026-06-01'
+  start_date: '2022-05-31'
+data:
+  data_dir: data
+execution:
+  fee:
+    min_fee: 5.0
+    rate: 0.0002
+  price_field: close
+  unfilled_policy: retry_next_day
+  weight_tolerance: 0.0005
+output:
+  results_dir: results/backtests
+platform:
+  run_name: baseline_r3_global_nasdaq_all_weather_ewma
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+strategies:
+  segments:
+  - cancel_pending_on_start: false
+    end_date: null
+    params:
+      ewma_min_periods: 20
+      ewma_span: 60
+      init_calc_days: 30
+      init_mode: calculate
+      rebalance_threshold: 0.05
+      universe:
+      - CN_ETF:510300.SH
+      - CN_ETF:512890.SH
+      - CN_ETF:513100.SH
+      - CN_ETF:518880.SH
+      - CN_ETF:511260.SH
+      - CN_ETF:159985.SZ
+      - CN_ETF:159981.SZ
+    start_date: '2022-05-31'
+    strategy_name: risk_parity_garch_semivar
+    strategy_version_id: null

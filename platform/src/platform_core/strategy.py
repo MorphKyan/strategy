@@ -188,8 +188,8 @@ class RiskParityStrategy(Strategy):
         return self._inverse_vol_target(context, universe)
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        rolling_window = int(context.params.get("rolling_window", 120))
-        min_periods = int(context.params.get("min_periods", 20))
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
         use_nav = bool(context.params.get("use_nav", False))
         estimation_freq = context.params.get("estimation_freq", "daily")
         
@@ -441,8 +441,8 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         import numpy as np  # 确保导入 numpy
         
-        rolling_window = int(context.params.get("rolling_window", 120))
-        min_periods = int(context.params.get("min_periods", 20))
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
         use_nav = bool(context.params.get("use_nav", False))
         estimation_freq = context.params.get("estimation_freq", "daily")
         shrinkage_target = context.params.get("shrinkage_target", "constant_correlation")
@@ -783,8 +783,8 @@ class RiskParityDynamicBudgetStrategy(RiskParityStrategy):
         volatility_target = float(context.params.get("volatility_target", 0.08))
         momentum_type = context.params.get("momentum_type", "return")
         
-        rolling_window = int(context.params.get("rolling_window", 120))
-        min_periods = int(context.params.get("min_periods", 20))
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
         use_nav = bool(context.params.get("use_nav", False))
         estimation_freq = context.params.get("estimation_freq", "daily")
         max_leverage = float(context.params.get("max_leverage", 1.0))
@@ -893,6 +893,186 @@ class RiskParityDynamicBudgetStrategy(RiskParityStrategy):
         return TargetPortfolio(final_weights)
 
 
+
+
+class RiskParityGarchSemiVarStrategy(RiskParityStrategy):
+    """
+    基于 GARCH(1,1) 与下行半方差的非对称风险平价策略 (R004)
+    
+    1. GARCH(1,1) 条件波动率预测：
+       对各资产的历史收益率序列进行 GARCH(1,1) 参数估计，通过极大似然估计 (MLE) 得到时变方差参数 omega, alpha, beta，
+       并预测下一期的条件波动率。这相比于传统的 rolling std 能够更快速地反应最新的时变波动聚集效应。
+    2. 下行半方差与下行半协方差：
+       只惩罚负收益率（下行波动），定义下行半收益率 D_i = min(R_i, 0)。
+       计算资产间的下行半协方差矩阵 Sigma_D = (D^T * D) / T，并求出下行相关系数矩阵 R_D。
+    3. 结合 GARCH 与下行相关性：
+       重构非对称下行协方差矩阵：Sigma_ij = sigma_garch_i * sigma_garch_j * R_D_ij。
+       利用 Cyclical Coordinate Descent (CCD) 求解非对称风险平价下的投资组合权重。
+    """
+    name = "risk_parity_garch_semivar"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np
+        
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+            
+        # 1. 估计各资产的 GARCH(1,1) 条件标准差
+        garch_vols = []
+        for i in range(N):
+            r_asset = X[:, i]
+            garch_vol = self._estimate_garch_vol(r_asset)
+            garch_vols.append(garch_vol)
+        garch_vols = np.array(garch_vols)
+        
+        # 2. 计算下行半协方差矩阵及下行相关系数矩阵
+        # 下行半收益率 D_i = min(R_i, 0)
+        D = np.minimum(X, 0.0)
+        Sigma_D = np.dot(D.T, D) / T
+        
+        # 提取对角线下行标准差
+        std_D = np.sqrt(np.diag(Sigma_D))
+        std_D = np.maximum(std_D, 1e-8)  # 避免除以 0
+        
+        # 下行相关系数矩阵 R_D
+        R_D = Sigma_D / np.outer(std_D, std_D)
+        R_D = np.nan_to_num(R_D, nan=0.0)
+        # 确保对角线为 1
+        for i in range(N):
+            R_D[i, i] = 1.0
+            
+        # 3. 重构非对称 GARCH 条件协方差矩阵 Sigma_GD
+        Sigma_GD = np.outer(garch_vols, garch_vols) * R_D
+        
+        # 为了 CCD 算法数值稳定性，进行微量的收缩或正则化调整
+        # 保证矩阵严格正定
+        shrinkage = 0.05
+        Sigma_GD = (1.0 - shrinkage) * Sigma_GD + shrinkage * np.diag(np.diag(Sigma_GD))
+        Sigma_GD += 1e-8 * np.eye(N)
+        
+        # 4. 求解风险平价权重
+        try:
+            weights = self._solve_risk_parity_garch(Sigma_GD)
+        except Exception as e:
+            weights = np.ones(N) / N
+            
+        return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
+
+    def _estimate_garch_vol(self, returns: np.ndarray) -> float:
+        from scipy.optimize import minimize
+        import numpy as np
+        
+        T = len(returns)
+        variance_sample = np.var(returns)
+        if variance_sample <= 0:
+            return 1e-4
+            
+        # 负对数似然函数
+        def garch_log_likelihood(params):
+            omega, alpha, beta = params
+            sigma2 = np.zeros(T)
+            sigma2[0] = variance_sample
+            for t in range(1, T):
+                sigma2[t] = omega + alpha * (returns[t-1]**2) + beta * sigma2[t-1]
+            
+            sigma2 = np.maximum(sigma2, 1e-10)
+            log_lik = 0.5 * np.sum(np.log(sigma2) + (returns**2) / sigma2)
+            return log_lik
+
+        # 初始参数，典型经验值
+        x0 = [0.05 * variance_sample, 0.05, 0.90]
+        # 边界
+        bounds = [(1e-9, 1.0 * variance_sample), (1e-4, 0.3), (0.5, 0.98)]
+        # 约束 alpha + beta <= 0.999 保证平稳性
+        cons = ({'type': 'ineq', 'fun': lambda x: 0.999 - x[1] - x[2]})
+        
+        try:
+            res = minimize(garch_log_likelihood, x0, method='SLSQP', bounds=bounds, constraints=cons, options={'maxiter': 50, 'ftol': 1e-4})
+            if res.success:
+                omega_opt, alpha_opt, beta_opt = res.x
+                # 递推计算最新的条件方差
+                sigma2_last = variance_sample
+                for t in range(1, T):
+                    sigma2_last = omega_opt + alpha_opt * (returns[t-1]**2) + beta_opt * sigma2_last
+                next_var = omega_opt + alpha_opt * (returns[-1]**2) + beta_opt * sigma2_last
+                return np.sqrt(max(1e-10, next_var))
+        except Exception:
+            pass
+            
+        # 降级：如果估计失败，直接返回样本标准差
+        return np.std(returns)
+
+    def _solve_risk_parity_garch(self, Sigma: np.ndarray) -> np.ndarray:
+        import numpy as np
+        N = Sigma.shape[0]
+        diag_var = np.diag(Sigma)
+        
+        # 初始权重设置为逆波动率
+        x = 1.0 / np.sqrt(np.maximum(diag_var, 1e-8))
+        
+        max_iter = 100
+        tol = 1e-6
+        for _ in range(max_iter):
+            x_old = x.copy()
+            for i in range(N):
+                b = np.dot(Sigma[i], x) - Sigma[i, i] * x[i]
+                a = Sigma[i, i]
+                if a <= 1e-8:
+                    a = 1e-8
+                x[i] = (-b + np.sqrt(b**2 + 4 * a)) / (2 * a)
+                
+            if np.max(np.abs(x - x_old)) < tol:
+                break
+                
+        weights = x / np.sum(x)
+        return weights
+
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
@@ -903,6 +1083,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     RiskParityLWCovStrategy.name: RiskParityLWCovStrategy,
     RiskParityTurnoverConstrainedStrategy.name: RiskParityTurnoverConstrainedStrategy,
     RiskParityDynamicBudgetStrategy.name: RiskParityDynamicBudgetStrategy,
+    RiskParityGarchSemiVarStrategy.name: RiskParityGarchSemiVarStrategy,
 }
 
 

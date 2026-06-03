@@ -1,22 +1,22 @@
 {
-  "timestamp": "2026-06-03T16:22:31.306186",
+  "timestamp": "2026-06-03T23:11:57.586291",
   "config_name": "baseline_r1_domestic_ewma",
   "strategy_type": "baseline",
   "metrics": {
-    "results_dir": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r003\\20260603_162149\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_162209",
-    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r003\\20260603_162149\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_162209\\nav.csv",
-    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r003\\20260603_162149\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_162209\\positions.csv",
-    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r003\\20260603_162149\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_162209\\orders.csv",
-    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r003\\20260603_162149\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_162209\\trades.csv",
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-1-quant-researcher-97090326\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r004\\20260603_231107\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_231133",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-1-quant-researcher-97090326\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r004\\20260603_231107\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_231133\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-1-quant-researcher-97090326\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r004\\20260603_231107\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_231133\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-1-quant-researcher-97090326\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r004\\20260603_231107\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_231133\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-1-quant-researcher-97090326\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r004\\20260603_231107\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_231133\\trades.csv",
     "oos_metrics_available": false,
     "start_date": "2019-02-28",
     "end_date": "2026-06-01",
     "observations": 1758,
     "total_return": 0.2920200452138888,
     "annualized_return": 0.037430319831433856,
-    "annualized_volatility": 0.025376916418052183,
-    "max_drawdown": -0.03366048648646591,
-    "sharpe_ratio": 1.4749751000010125,
+    "annualized_volatility": 0.025376916418052196,
+    "max_drawdown": -0.033660486486466135,
+    "sharpe_ratio": 1.4749751000010118,
     "turnover_total": 2898091.343741106,
     "annualized_turnover": 415426.06292534625,
     "trade_count": 37,
@@ -32,9 +32,9 @@
     "average_cash_weight": 0.6546802380559662,
     "max_position_count": 4,
     "chart_paths": [
-      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r003\\20260603_162149\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_162209\\charts\\nav_drawdown.png",
-      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r003\\20260603_162149\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_162209\\charts\\position_weights.png",
-      "D:\\strategy\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r003\\20260603_162149\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_162209\\charts\\execution_effects.png"
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-1-quant-researcher-97090326\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r004\\20260603_231107\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_231133\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-1-quant-researcher-97090326\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r004\\20260603_231107\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_231133\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\d7b43de1-bf98-4325-ab26-ff1006c4e272\\.system_generated\\worktrees\\subagent-Quant-Researcher-1-quant-researcher-97090326\\platform\\results\\backtests\\baseline_r1_domestic_ewma_exp_r004\\20260603_231107\\risk_parity_ewma\\baseline_r1_domestic_ewma_baseline_20260603_231133\\charts\\execution_effects.png"
     ]
   }
 }
