@@ -61,7 +61,7 @@ strategies:
   segments:
     - start_date: "2019-02-28"
       end_date: null
-      strategy_name: "risk_parity_ewma"
+      strategy_name: "risk_parity_lw_cov"
       strategy_version_id: null
       cancel_pending_on_start: false
       params:

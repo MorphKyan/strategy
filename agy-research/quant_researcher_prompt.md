@@ -32,14 +32,17 @@
      * 缓存结果中必须包含时间戳 `timestamp`，以便于其他研究员或后续任务判定是否过期。
      * 在运行回测前，应先检查该共享缓存中是否存在未过期的匹配结果，若存在且有效则直接复用，避免重复计算。
    * **严禁无限制的爆破式调参**，应基于研究假设进行有目的的对照实验。
-5. **结果评估与报告登记**：
-   * 自动读取并解析 `platform/reports/experiments/<strategy>/<timestamp>/metrics.json`，严禁口头凭空捏造指标。
-   * 在 `platform/reports/` 生成符合规范的**中文实验报告**，记录假设、代码改动、多配置/多算法下的指标对照（夏普比率、最大回撤、换手率和扣费后表现）。
-   * **研究成果判定与处理动作**：根据实验组与对照组（Baseline）的核心绩效对比，必须将本次研究判定为以下三类之一，并执行对应的后续动作：
-     * **有显著优化**：核心指标（如夏普比率、最大回撤等）有明显提升。**后续动作**：可新增策略并推荐合入主干；在 `platform/configs/` 中新增或修改对应的 `baseline_*.yaml` 配置文件，并同步更新引用的默认参数；在 `research_backlog.md` 中标记任务状态为 `Completed`。
-     * **差异不大**：核心绩效指标变化极小，但在某些特定维度（如换手率降低、特定震荡区间避险等）有局部优势。**后续动作**：**不新建或修改基准配置文件**（防止基准池冗余），但需深度总结并提炼局部优势，将量化结论与未来优化方向记录在公共文本（`platform/reports/non_baseline_research_history_summary.md` 和 [agy-research/research_history_summary.md](file:///D:/strategy/agy-research/research_history_summary.md)）中；在 `research_backlog.md` 中将任务状态标记为 `Completed`，并备注“差异不大/有局部优势”。
-     * **不及预期**：核心绩效恶化或存在明显的设计缺陷。**后续动作**：总结失败原因，记录在实验报告中，不合入任何代码或配置；在 `research_backlog.md` 中将任务状态标记为 `Failed`。
-   * 将有价值的研究成果登记在看板同级的 [agy-research/research_history_summary.md](file:///D:/strategy/agy-research/research_history_summary.md) 中。
+    * **研究成果判定与处理动作**：根据实验组与对照组（Baseline）的核心绩效对比，必须严格评估**过拟合风险**与**策略平庸度**，判定为以下三类之一：
+      * **有显著优化**：
+        1. **核心绩效标准**：必须在**全线平台测试配置**下表现出夏普比率（Sharpe）的显著提升，且最大回撤普遍持平或收紧。如果仅在少数资产包上表现较好，而其他组合中性能发生退化或没有提升，绝不能判定为有显著优化，必须归类为“差异不大/有局部优势”。
+        2. **换手率摩擦控制**：如果 Candidate 的年化双边换手率相比 Baseline 增加幅度超过 30%（即频繁交易以换取微弱超额），必须识别为高概率样本内过拟合路径，不能判定为显著优化。
+        3. **过拟合与样本充足率审查**：评估策略在调仓日进行协方差/波动率估计或极端尾部度量所依赖的有效样本数（如下行收益率天数、VaR超限天数）。在 120 天日线滚动窗口下，若其核心参数估计或风险边际贡献（MRC）计算的有效天数少于 30 天，必须被认定为存在严重的估计不稳定及过拟合风险，严禁添加为默认固化候选策略，只能判定为“差异不大/局部优势”。
+        **后续动作**：可新增策略并推荐合入主干；在 `platform/configs/` 中为最适合且经过严格验证的资产组合配置新增或修改对应的专属 `baseline_*.yaml` 配置文件进行绑定（即将最优组合与最优策略配套固定），并更新看板状态为 `Completed`。
+      * **差异不大 / 有局部优势**：核心指标提升不明显，或仅在特定类型组合下（如仅在 3 只 ETF 的极窄配置中因阻尼红利占优，但在全球混合多资产中发生退化），或者存在高换手/过拟合嫌疑但具备定制价值的策略。
+        **后续动作**：**绝不修改或新建全局 defaults 默认策略配置文件**，以保持策略基准池的纯净与稳定。但需深度总结并提炼其局部适用组合（阐明其与特定组合的绑定关系），将量化结论与未来优化方向记录在公共文本（`platform/reports/non_baseline_research_history_summary.md` 和 [agy-research/research_history_summary.md](file:///D:/strategy/agy-research/research_history_summary.md)）中；在 `research_backlog.md` 中将任务状态标记为 `Completed`，并备注“差异不大/有局部优势”。
+      * **不及预期**：核心绩效恶化、存在明显的设计缺陷或有严重过拟合倾向。
+        **后续动作**：总结失败原因，记录在实验报告中，不合入任何代码或配置；在 `research_backlog.md` 中将任务状态标记为 `Failed`。
+    * 将有价值的研究成果登记在看板同级的 [agy-research/research_history_summary.md](file:///D:/strategy/agy-research/research_history_summary.md) 中。
 
 
 ---
