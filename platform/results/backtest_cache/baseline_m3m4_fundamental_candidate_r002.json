@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-06-03T16:10:08.591498",
+  "config_name": "baseline_m3m4_fundamental",
+  "strategy_type": "candidate_r002",
+  "metrics": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\ce57bf55-da49-4dd6-ad68-bc8c5b2e7d27\\.system_generated\\worktrees\\subagent-Quant-Researcher--Topic-2--quant-researcher-32465a63\\platform\\results\\backtests\\R002_re_run\\baseline_m3m4_fundamental\\candidate\\baseline_m3m4_fundamental_candidate_r002_20260603_161007",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\ce57bf55-da49-4dd6-ad68-bc8c5b2e7d27\\.system_generated\\worktrees\\subagent-Quant-Researcher--Topic-2--quant-researcher-32465a63\\platform\\results\\backtests\\R002_re_run\\baseline_m3m4_fundamental\\candidate\\baseline_m3m4_fundamental_candidate_r002_20260603_161007\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\ce57bf55-da49-4dd6-ad68-bc8c5b2e7d27\\.system_generated\\worktrees\\subagent-Quant-Researcher--Topic-2--quant-researcher-32465a63\\platform\\results\\backtests\\R002_re_run\\baseline_m3m4_fundamental\\candidate\\baseline_m3m4_fundamental_candidate_r002_20260603_161007\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\ce57bf55-da49-4dd6-ad68-bc8c5b2e7d27\\.system_generated\\worktrees\\subagent-Quant-Researcher--Topic-2--quant-researcher-32465a63\\platform\\results\\backtests\\R002_re_run\\baseline_m3m4_fundamental\\candidate\\baseline_m3m4_fundamental_candidate_r002_20260603_161007\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\ce57bf55-da49-4dd6-ad68-bc8c5b2e7d27\\.system_generated\\worktrees\\subagent-Quant-Researcher--Topic-2--quant-researcher-32465a63\\platform\\results\\backtests\\R002_re_run\\baseline_m3m4_fundamental\\candidate\\baseline_m3m4_fundamental_candidate_r002_20260603_161007\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2023-10-11",
+    "end_date": "2026-06-01",
+    "observations": 639,
+    "total_return": 0.31104791253496766,
+    "annualized_return": 0.1129034506452049,
+    "annualized_volatility": 0.037709946615001454,
+    "max_drawdown": -0.03355667908638127,
+    "sharpe_ratio": 2.9939965653595118,
+    "turnover_total": 1729419.2031119447,
+    "annualized_turnover": 682024.4744666824,
+    "trade_count": 40,
+    "order_count": 40,
+    "filled_order_count": 40,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 40
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.05337476589090509,
+    "max_position_count": 3,
+    "chart_paths": [
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\ce57bf55-da49-4dd6-ad68-bc8c5b2e7d27\\.system_generated\\worktrees\\subagent-Quant-Researcher--Topic-2--quant-researcher-32465a63\\platform\\results\\backtests\\R002_re_run\\baseline_m3m4_fundamental\\candidate\\baseline_m3m4_fundamental_candidate_r002_20260603_161007\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\ce57bf55-da49-4dd6-ad68-bc8c5b2e7d27\\.system_generated\\worktrees\\subagent-Quant-Researcher--Topic-2--quant-researcher-32465a63\\platform\\results\\backtests\\R002_re_run\\baseline_m3m4_fundamental\\candidate\\baseline_m3m4_fundamental_candidate_r002_20260603_161007\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\ce57bf55-da49-4dd6-ad68-bc8c5b2e7d27\\.system_generated\\worktrees\\subagent-Quant-Researcher--Topic-2--quant-researcher-32465a63\\platform\\results\\backtests\\R002_re_run\\baseline_m3m4_fundamental\\candidate\\baseline_m3m4_fundamental_candidate_r002_20260603_161007\\charts\\execution_effects.png"
+    ]
+  }
+}
