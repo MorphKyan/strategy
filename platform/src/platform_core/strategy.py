@@ -896,6 +896,208 @@ class RiskParityCVaRDynamicBudgetStrategy(RiskParityLWCovStrategy):
         weights = x / np.sum(x)
         return weights
 
+
+
+class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
+    """
+    基于自适应风险偏离阈值与系统波动触发的动态再平衡风险平价策略 (AdaptiveRiskDeviationVolatilityTriggeredStrategy)
+    
+    本策略在 Ledoit-Wolf 协方差收缩风险平价策略的基础上，引入了创新的自适应动态再平衡机制：
+    1. 自适应偏离阈值 (Adaptive Threshold)：
+       利用短期系统波动率（反映即期市场冲击与噪声）与长期系统波动率（反映历史常态波动中枢）的比值，
+       动态调整权重偏离的容忍度阈值 theta_t。
+       公式：theta_t = theta_0 * exp(gamma * (vol_ratio - 1.0))，其中 vol_ratio = vol_short / vol_long。
+       当市场波动骤增时（vol_ratio > 1），主动调大容忍阈值，以避免组合在震荡市中因无谓噪声被反复触发调仓（即换手阻尼机制）；
+       当市场极度平稳时（vol_ratio < 1），阈值恢复或微降，实现高精度微调。
+    2. 系统波动触发机制 (Crisis Trigger / Systematic Volatility Trigger)：
+       若短期波动率发生剧烈飙升，超过长期波动率 of K 倍（默认 2.0 倍），意味着发生了系统性黑天鹅危机。
+       此时强制打破阻尼机制，立刻以最新数据重构风险暴露，实现危机下的主动防守与风险再分配。
+    3. 自适应偏离度检测 (Adaptive Deviation Check)：
+       对比当前持仓的实际组合权重与最新的目标风险平价权重，计算最大单资产权重偏离度 max_deviation。
+       如果 max_deviation > theta_t，或已触发系统波动危机机制，则启动再平衡调仓。
+    4. 波动率目标控制 (Volatility Targeting Overlay)：
+       支持通过配置 volatility_target，对求出的风险平价权重进行等比例的下调放缩（余下持币），
+       在系统性熊市中提供强有力的绝对回撤保护。
+    """
+    name = "adaptive_risk_deviation_volatility_triggered"
+    version = "0.1.0"
+
+    def initialize(self, context: StrategyContext) -> None:
+        # 首日初始化建仓标记，默认由 init_mode 参数控制
+        context.runtime["opened"] = context.params.get("init_mode", "calculate") == "manual"
+        # 动态再平衡需要每日检测，因此默认 rebalance_frequency 设置为 daily
+        context.runtime["rebalance_frequency"] = context.params.get("rebalance_frequency", "daily")
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        # 调用基类 (RiskParityLWCovStrategy) 的求解器获得未经过波动率目标控制的原始风险平价权重
+        target = super()._inverse_vol_target(context, universe)
+        if target is None:
+            return None
+            
+        # 如果配置中启用了 volatility_target，则执行波动率目标控制 (Volatility Targeting Overlay)
+        volatility_target = context.params.get("volatility_target", None)
+        if volatility_target is not None:
+            volatility_target = float(volatility_target)
+            if volatility_target > 0:
+                import numpy as np
+                rolling_window = int(context.params.get("rolling_window", 120))
+                min_periods = int(context.params.get("min_periods", 20))
+                use_nav = bool(context.params.get("use_nav", False))
+                
+                closes = {}
+                for asset_id in universe:
+                    frame = context.data.frames.get(asset_id)
+                    if frame is None:
+                        return target
+                    col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+                    history = frame[frame.index <= context.date][col]
+                    closes[asset_id] = history
+
+                price_frame = pd.DataFrame(closes).dropna()
+                if price_frame.empty:
+                    return target
+                price_frame.index = pd.to_datetime(price_frame.index)
+                
+                if len(price_frame) < min_periods + 1:
+                    return target
+                returns = price_frame.pct_change().dropna().tail(rolling_window)
+                if len(returns) < min_periods:
+                    return target
+                    
+                X = returns.values
+                # 估计协方差矩阵并年化
+                Sigma = self._estimate_covariance(X, context.params.get("shrinkage_target", "constant_correlation"))
+                Sigma_annual = Sigma * 252.0
+                
+                weights = np.array([target.weights.get(asset_id, 0.0) for asset_id in universe])
+                portfolio_vol = np.sqrt(np.dot(weights, np.dot(Sigma_annual, weights)))
+                
+                scale_factor = min(1.0, volatility_target / portfolio_vol) if portfolio_vol > 0 else 1.0
+                
+                # 等比例缩放目标资产的暴露仓位
+                scaled_weights = {asset_id: float(target.weights[asset_id] * scale_factor) for asset_id in universe}
+                return TargetPortfolio(scaled_weights)
+                
+        return target
+
+    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+        import numpy as np
+        
+        universe = context.params.get("universe") or context.available_asset_ids()
+        universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
+        if not universe:
+            return None
+
+        # 1. 首次建仓决策
+        if not bool(context.runtime.get("opened", False)):
+            target = self._initial_target(context, universe)
+            if target is None:
+                return None
+            context.runtime["opened"] = True
+            return target
+
+        # 2. 是否是调仓检测日（在 daily 下，每天均是检测日）
+        if not self._is_rebalance_day(context):
+            return None
+
+        # 3. 计算最新的风险平价目标权重
+        target = self._inverse_vol_target(context, universe)
+        if target is None:
+            return None
+
+        # 4. 获取当前组合中各资产的实际持仓权重
+        prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
+        current_weights = context.state.weights(prices)
+
+        # 5. 估计短期和长期的协方差矩阵以测度系统波动状态
+        rolling_window = int(context.params.get("rolling_window", 120))  # 长期波动中枢窗口
+        short_window = int(context.params.get("short_window", 20))       # 短期冲击窗口
+        min_periods = int(context.params.get("min_periods", 20))
+        use_nav = bool(context.params.get("use_nav", False))
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        if len(price_frame) < min_periods + 1:
+            return None
+            
+        returns = price_frame.pct_change().dropna()
+        if len(returns) < min_periods:
+            return None
+
+        # 分别截取长期和短期窗口的收益率序列
+        returns_long = returns.tail(rolling_window)
+        returns_short = returns.tail(short_window)
+        
+        if len(returns_long) < min_periods or len(returns_short) < max(2, int(short_window / 2)):
+            return None
+            
+        X_long = returns_long.values
+        X_short = returns_short.values
+        
+        # 估计两套协方差矩阵（并年化，日频率取 252）
+        shrinkage_target = context.params.get("shrinkage_target", "constant_correlation")
+        Sigma_long = self._estimate_covariance(X_long, shrinkage_target) * 252.0
+        Sigma_short = self._estimate_covariance(X_short, shrinkage_target) * 252.0
+        
+        # 提取当前组合在两个协方差矩阵下的年化预期波动率
+        curr_w_vector = np.array([current_weights.get(asset_id, 0.0) for asset_id in universe])
+        # 如果当前没有持仓，则以目标平价权重代入作为基准
+        if np.sum(curr_w_vector) < 1e-4:
+            curr_w_vector = np.array([target.weights.get(asset_id, 0.0) for asset_id in universe])
+            curr_w_vector = curr_w_vector / np.sum(curr_w_vector)
+            
+        vol_long = np.sqrt(np.dot(curr_w_vector, np.dot(Sigma_long, curr_w_vector)))
+        vol_short = np.sqrt(np.dot(curr_w_vector, np.dot(Sigma_short, curr_w_vector)))
+        
+        if vol_long <= 1e-6:
+            vol_long = 1e-6
+            
+        vol_ratio = vol_short / vol_long
+        
+        # 6. 确定自适应偏离容忍值
+        rebalance_threshold_base = float(context.params.get("rebalance_threshold", 0.05))
+        threshold_sensitivity = float(context.params.get("threshold_sensitivity", 1.0))
+        
+        # theta_t = theta_0 * exp(gamma * (vol_ratio - 1.0))
+        adaptive_threshold = rebalance_threshold_base * np.exp(threshold_sensitivity * (vol_ratio - 1.0))
+        
+        # 对自适应阈值进行上下限截断，防止在极度波动或极度平稳时数值失真
+        min_threshold = float(context.params.get("min_threshold", 0.01))
+        max_threshold = float(context.params.get("max_threshold", 0.20))
+        adaptive_threshold = np.clip(adaptive_threshold, min_threshold, max_threshold)
+        
+        # 7. 危机触发判定 (Crisis Trigger / Systematic Volatility Trigger)
+        vol_trigger_ratio = float(context.params.get("vol_trigger_ratio", 2.0))
+        crisis_triggered = vol_ratio > vol_trigger_ratio
+        
+        # 8. 计算实际持仓偏离度 (基于最大单资产权重绝对偏离)
+        max_deviation = 0.0
+        for asset_id, target_weight in target.weights.items():
+            dev = abs(current_weights.get(asset_id, 0.0) - target_weight)
+            if dev > max_deviation:
+                max_deviation = dev
+                
+        # 9. 决策是否执行再平衡
+        rebalance_triggered = (max_deviation > adaptive_threshold) or crisis_triggered
+        
+        if rebalance_triggered:
+            context.runtime["last_rebalance_reason"] = "crisis" if crisis_triggered else f"deviation({max_deviation:.4f}>{adaptive_threshold:.4f})"
+            return target
+            
+        return None
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
@@ -906,6 +1108,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     RiskParityLWCovStrategy.name: RiskParityLWCovStrategy,
     HierarchicalRiskParityStrategy.name: HierarchicalRiskParityStrategy,
     RiskParityCVaRDynamicBudgetStrategy.name: RiskParityCVaRDynamicBudgetStrategy,
+    AdaptiveRiskDeviationVolatilityTriggeredStrategy.name: AdaptiveRiskDeviationVolatilityTriggeredStrategy,
 }
 
 
