@@ -1,0 +1,15 @@
+{
+  "baseline_m3m4_fundamental.yaml": "risk_parity_ewma",
+  "baseline_mvp_equal_weight.yaml": "risk_parity_ewma",
+  "baseline_r1_domestic_ewma.yaml": "risk_parity_cvar_dynamic_budget",
+  "baseline_r1_domestic_low_vol_ewma.yaml": "risk_parity_cvar_dynamic_budget",
+  "baseline_r1_domestic_rolling.yaml": "risk_parity_cvar_dynamic_budget",
+  "baseline_r2_global_dividend_ewma.yaml": "risk_parity_cvar_dynamic_budget",
+  "baseline_r2_global_ewma.yaml": "risk_parity_cvar_dynamic_budget",
+  "baseline_r3_global_nasdaq_all_weather_ewma.yaml": "risk_parity_cvar_dynamic_budget",
+  "baseline_r5_cvar_dynamic_budget.yaml": "risk_parity_ewma",
+  "baseline_r6_adaptive_risk_deviation.yaml": "risk_parity_ewma",
+  "baseline_risk_parity_hrp.yaml": "risk_parity_ewma",
+  "baseline_risk_parity_lw_cov.yaml": "risk_parity_ewma",
+  "baseline_us_blend_ewma.yaml": "risk_parity_cvar_dynamic_budget"
+}
