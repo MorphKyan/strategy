@@ -604,6 +604,152 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
         return weights
 
 
+
+
+class HierarchicalRiskParityStrategy(RiskParityStrategy):
+    """
+    基于层次风险平价 (HRP) 的多资产 ETF 组合优化策略 (HierarchicalRiskParityStrategy)
+    
+    相比于传统风险平价（RP），HRP 采用层次聚类将相关资产进行分群，然后通过准对角化和
+    递归二分法，分配各层级的投资权重。这种方法在不计算逆协方差矩阵的情况下即可进行配置，
+    从而有效避免了在资产高相关或协方差矩阵病态时的数学求解不稳定性，显著降低了样本外波动和换手率。
+    """
+    name = "hrp"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np
+        
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        # 转换为 DatetimeIndex
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        # 处理不同的估计频率
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        # 计算收益率
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        # 提取收益率 numpy 数组
+        X = returns.values
+        T, N = X.shape
+        if N <= 1:
+            return TargetPortfolio({asset_id: 1.0 / max(1, N) for asset_id in universe})
+            
+        # 计算样本协方差矩阵和相关系数矩阵
+        cov = np.cov(X, rowvar=False).reshape(N, N)
+        # 避免单资产或极小方差除以0，添加微小扰动
+        diag_var = np.diag(cov)
+        std = np.sqrt(np.maximum(diag_var, 1e-8))
+        corr = cov / np.outer(std, std)
+        # 数值截断确保 corr 在 [-1, 1] 内
+        corr_clipped = np.clip(corr, -1.0, 1.0)
+        
+        # 1. 距离矩阵计算 d_ij = sqrt( (1 - rho_ij) / 2 )
+        D = np.sqrt(0.5 * (1.0 - corr_clipped))
+        
+        # 2. 凝聚层次聚类（Single Linkage 单联动）
+        clusters = [[i] for i in range(N)]
+        while len(clusters) > 1:
+            min_dist = float('inf')
+            best_p, best_q = -1, -1
+            for p in range(len(clusters)):
+                for q in range(p + 1, len(clusters)):
+                    # 簇之间叶子节点两两距离的最小值
+                    dist = min(D[i, j] for i in clusters[p] for j in clusters[q])
+                    if dist < min_dist:
+                        min_dist = dist
+                        best_p, best_q = p, q
+            # 合并簇
+            c_p = clusters[best_p]
+            c_q = clusters[best_q]
+            clusters.pop(max(best_p, best_q))
+            clusters.pop(min(best_p, best_q))
+            clusters.append(c_p + c_q)
+            
+        # 凝聚树构建完成，此时 clusters[0] 便是准对角化 (Quasi-Diagonalization) 重新排序后的叶子节点序列
+        quasi_order = clusters[0]
+        
+        # 3. 递归平分权重分配 (Recursive Bisection)
+        weights = np.zeros(N)
+        
+        def recursive_bisection(order: list[int], w_factor: float) -> None:
+            if len(order) == 0:
+                return
+            if len(order) == 1:
+                weights[order[0]] = w_factor
+                return
+                
+            # 二分拆分
+            k = len(order) // 2
+            left_order = order[:k]
+            right_order = order[k:]
+            
+            # 计算左半部分的局部逆方差权重和虚拟投资组合方差
+            cov_left = cov[np.ix_(left_order, left_order)]
+            diag_left = np.diag(cov_left)
+            inv_var_left = 1.0 / np.maximum(diag_left, 1e-8)
+            w_left = inv_var_left / np.sum(inv_var_left)
+            V_left = float(np.dot(w_left, np.dot(cov_left, w_left)))
+            
+            # 计算右半部分的局部逆方差权重和虚拟投资组合方差
+            cov_right = cov[np.ix_(right_order, right_order)]
+            diag_right = np.diag(cov_right)
+            inv_var_right = 1.0 / np.maximum(diag_right, 1e-8)
+            w_right = inv_var_right / np.sum(inv_var_right)
+            V_right = float(np.dot(w_right, np.dot(cov_right, w_right)))
+            
+            # 计算左右两部分资产的分配比重
+            if V_left + V_right <= 0:
+                alpha = 0.5
+            else:
+                alpha = V_right / (V_left + V_right)
+                
+            recursive_bisection(left_order, w_factor * alpha)
+            recursive_bisection(right_order, w_factor * (1.0 - alpha))
+            
+        # 开始递归分配
+        recursive_bisection(quasi_order, 1.0)
+        
+        # 组合 HRP 目标资产权重
+        return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
+
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
@@ -612,6 +758,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     RiskParityEWMAStrategy.name: RiskParityEWMAStrategy,
     RiskParityEWMADrawdownRecoveryStrategy.name: RiskParityEWMADrawdownRecoveryStrategy,
     RiskParityLWCovStrategy.name: RiskParityLWCovStrategy,
+    HierarchicalRiskParityStrategy.name: HierarchicalRiskParityStrategy,
 }
 
 
