@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-06-04T20:05:08.813048",
+  "config_name": "baseline_r2_global_dividend_ewma",
+  "strategy_name": "risk_parity_mad_nocov",
+  "params": {
+    "rebalance_threshold": 0.05,
+    "init_mode": "calculate",
+    "init_calc_days": 30,
+    "universe": [
+      "CN_ETF:512890.SH",
+      "CN_ETF:513500.SH",
+      "CN_ETF:518880.SH",
+      "CN_ETF:511260.SH"
+    ],
+    "ewma_span": 60,
+    "ewma_min_periods": 20,
+    "use_cov": false
+  },
+  "metrics": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r2_global_dividend_ewma_mad_nocov_20260604_200433",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r2_global_dividend_ewma_mad_nocov_20260604_200433\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r2_global_dividend_ewma_mad_nocov_20260604_200433\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r2_global_dividend_ewma_mad_nocov_20260604_200433\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r2_global_dividend_ewma_mad_nocov_20260604_200433\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2019-02-28",
+    "end_date": "2026-06-01",
+    "observations": 1759,
+    "total_return": 0.3018679752845379,
+    "annualized_return": 0.03853841461786223,
+    "annualized_volatility": 0.024722353539090018,
+    "max_drawdown": -0.0262073681131616,
+    "sharpe_ratio": 1.558848940369969,
+    "turnover_total": 2800508.196561039,
+    "annualized_turnover": 401209.81553915964,
+    "trade_count": 40,
+    "order_count": 40,
+    "filled_order_count": 40,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 40
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 1,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.6643536753214491,
+    "max_position_count": 4
+  }
+}

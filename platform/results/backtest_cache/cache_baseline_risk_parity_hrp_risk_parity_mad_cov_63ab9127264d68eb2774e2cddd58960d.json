@@ -1,0 +1,48 @@
+{
+  "timestamp": "2026-06-04T20:08:15.155652",
+  "config_name": "baseline_risk_parity_hrp",
+  "strategy_name": "risk_parity_mad_cov",
+  "params": {
+    "rolling_window": 120,
+    "min_periods": 20,
+    "rebalance_threshold": 0.05,
+    "init_mode": "calculate",
+    "init_calc_days": 30,
+    "universe": [
+      "CN_ETF:510300.SH",
+      "CN_ETF:518880.SH",
+      "CN_ETF:511260.SH"
+    ],
+    "use_cov": true
+  },
+  "metrics": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_risk_parity_hrp_mad_cov_20260604_200814",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_risk_parity_hrp_mad_cov_20260604_200814\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_risk_parity_hrp_mad_cov_20260604_200814\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_risk_parity_hrp_mad_cov_20260604_200814\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_risk_parity_hrp_mad_cov_20260604_200814\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2023-10-11",
+    "end_date": "2026-05-19",
+    "observations": 630,
+    "total_return": 0.26652729456993707,
+    "annualized_return": 0.0992869620623964,
+    "annualized_volatility": 0.03247330767630401,
+    "max_drawdown": -0.029527190697868577,
+    "sharpe_ratio": 3.05749457530151,
+    "turnover_total": 1730494.2877790676,
+    "annualized_turnover": 692197.715111627,
+    "trade_count": 25,
+    "order_count": 25,
+    "filled_order_count": 25,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 25
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.06174275281997803,
+    "max_position_count": 3
+  }
+}

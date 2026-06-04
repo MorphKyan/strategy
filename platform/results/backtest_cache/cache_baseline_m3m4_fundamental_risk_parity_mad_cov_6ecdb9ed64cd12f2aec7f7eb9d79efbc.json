@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-06-04T19:58:46.669754",
+  "config_name": "baseline_m3m4_fundamental",
+  "strategy_name": "risk_parity_mad_cov",
+  "params": {
+    "rebalance_frequency": "monthly",
+    "cooldown_days": 20,
+    "universe": [
+      "CN_ETF:510300.SH",
+      "CN_ETF:518880.SH",
+      "CN_ETF:511260.SH"
+    ],
+    "fundamental_rules": {
+      "required": [
+        "pe",
+        "pb"
+      ],
+      "max": {
+        "pe": 30,
+        "pb": 5
+      },
+      "min": {
+        "roe": 0
+      },
+      "sort_by": "dividend_yield",
+      "descending": true,
+      "limit": 3
+    },
+    "use_cov": true,
+    "rolling_window": 120,
+    "min_periods": 20
+  },
+  "metrics": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_m3m4_fundamental_mad_cov_20260604_195846",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_m3m4_fundamental_mad_cov_20260604_195846\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_m3m4_fundamental_mad_cov_20260604_195846\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_m3m4_fundamental_mad_cov_20260604_195846\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_m3m4_fundamental_mad_cov_20260604_195846\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2023-10-11",
+    "end_date": "2026-06-01",
+    "observations": 639,
+    "total_return": 0.27062123751611633,
+    "annualized_return": 0.09922028206282474,
+    "annualized_volatility": 0.03177691483836913,
+    "max_drawdown": -0.02480004792813173,
+    "sharpe_ratio": 3.1224013585806296,
+    "turnover_total": 1924624.4265087768,
+    "annualized_turnover": 759006.8160879684,
+    "trade_count": 30,
+    "order_count": 30,
+    "filled_order_count": 30,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 30
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 1,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.05730067006821927,
+    "max_position_count": 3
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-06-04T20:08:13.862962",
+  "config_name": "baseline_r5_cvar_dynamic_budget",
+  "strategy_name": "risk_parity_cvar_dynamic_budget",
+  "params": {
+    "rolling_window": 120,
+    "min_periods": 20,
+    "rebalance_threshold": 0.05,
+    "confidence_level": 0.95,
+    "cvar_sensitivity": 1.0,
+    "volatility_target": 0.08,
+    "cov_estimator": "ledoit_wolf",
+    "universe": [
+      "CN_ETF:510300.SH",
+      "CN_ETF:518880.SH",
+      "CN_ETF:511260.SH"
+    ]
+  },
+  "metrics": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_r5_cvar_dynamic_budget_baseline_20260604_200813",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_r5_cvar_dynamic_budget_baseline_20260604_200813\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_r5_cvar_dynamic_budget_baseline_20260604_200813\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_r5_cvar_dynamic_budget_baseline_20260604_200813\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\platform_r5_cvar_dynamic_budget_baseline_20260604_200813\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2023-10-11",
+    "end_date": "2026-06-01",
+    "observations": 639,
+    "total_return": 0.21762362208658637,
+    "annualized_return": 0.08087711129917707,
+    "annualized_volatility": 0.024550432264788966,
+    "max_drawdown": -0.01634923311916081,
+    "sharpe_ratio": 3.2943253473859877,
+    "turnover_total": 1482012.6748632044,
+    "annualized_turnover": 584455.7027629538,
+    "trade_count": 20,
+    "order_count": 20,
+    "filled_order_count": 20,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 20
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 2,
+    "average_cash_weight": 0.054979844539794244,
+    "max_position_count": 3
+  }
+}

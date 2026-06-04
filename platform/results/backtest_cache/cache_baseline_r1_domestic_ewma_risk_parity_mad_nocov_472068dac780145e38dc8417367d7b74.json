@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-06-04T19:59:50.141024",
+  "config_name": "baseline_r1_domestic_ewma",
+  "strategy_name": "risk_parity_mad_nocov",
+  "params": {
+    "rebalance_threshold": 0.05,
+    "init_mode": "calculate",
+    "init_calc_days": 30,
+    "universe": [
+      "CN_ETF:510300.SH",
+      "CN_ETF:512890.SH",
+      "CN_ETF:518880.SH",
+      "CN_ETF:511260.SH"
+    ],
+    "ewma_span": 60,
+    "ewma_min_periods": 20,
+    "use_cov": false
+  },
+  "metrics": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r1_domestic_ewma_mad_nocov_20260604_195918",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r1_domestic_ewma_mad_nocov_20260604_195918\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r1_domestic_ewma_mad_nocov_20260604_195918\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r1_domestic_ewma_mad_nocov_20260604_195918\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R014-quant-researcher-61d00530\\platform\\results\\backtests\\baseline_r1_domestic_ewma_mad_nocov_20260604_195918\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2019-02-28",
+    "end_date": "2026-06-01",
+    "observations": 1758,
+    "total_return": 0.2722365496401724,
+    "annualized_return": 0.03513687979962676,
+    "annualized_volatility": 0.025104981533021913,
+    "max_drawdown": -0.024096637616214056,
+    "sharpe_ratio": 1.3995979145975217,
+    "turnover_total": 2739533.629534631,
+    "annualized_turnover": 392697.6533803908,
+    "trade_count": 42,
+    "order_count": 42,
+    "filled_order_count": 42,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 42
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 2,
+    "max_pending_intent_count": 3,
+    "average_cash_weight": 0.66054625595262,
+    "max_position_count": 4
+  }
+}

@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-06-04T14:49:27.232545",
+  "timestamp": "2026-06-04T19:58:38.801417",
   "config_name": "baseline_m3m4_fundamental",
   "strategy_type": "baseline",
   "metrics": {
-    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_semi_cov\\20260604_144925\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_144926",
-    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_semi_cov\\20260604_144925\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_144926\\nav.csv",
-    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_semi_cov\\20260604_144925\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_144926\\positions.csv",
-    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_semi_cov\\20260604_144925\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_144926\\orders.csv",
-    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_semi_cov\\20260604_144925\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_144926\\trades.csv",
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R015-quant-researcher-67cf88c3\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_oas_cov\\20260604_195838\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_195838",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R015-quant-researcher-67cf88c3\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_oas_cov\\20260604_195838\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_195838\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R015-quant-researcher-67cf88c3\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_oas_cov\\20260604_195838\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_195838\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R015-quant-researcher-67cf88c3\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_oas_cov\\20260604_195838\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_195838\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\5e334c80-fcbd-4004-aeb1-5590bd7bfc7a\\.system_generated\\worktrees\\subagent-Quant-Researcher---R015-quant-researcher-67cf88c3\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_oas_cov\\20260604_195838\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_195838\\trades.csv",
     "oos_metrics_available": false,
     "start_date": "2023-10-11",
     "end_date": "2026-06-01",
@@ -28,10 +28,6 @@
     "pending_intent_count": 0,
     "max_pending_intent_count": 0,
     "average_cash_weight": 1.0,
-    "max_position_count": 0,
-    "chart_paths": [
-      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_semi_cov\\20260604_144925\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_144926\\charts\\nav_drawdown.png",
-      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_m3m4_fundamental_exp_semi_cov\\20260604_144925\\fundamental_value_equal_weight\\baseline_m3m4_fundamental_baseline_20260604_144926\\charts\\execution_effects.png"
-    ]
+    "max_position_count": 0
   }
 }
