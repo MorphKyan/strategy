@@ -41,6 +41,10 @@ class LocalCsvBarData:
         self.assets = {asset.asset_id: asset for asset in assets}
         self.start_date = parse_date(start_date) if start_date else None
         self.end_date = parse_date(end_date) if end_date else None
+        if self.start_date and hasattr(self.start_date, "date"):
+            self.start_date = self.start_date.date()
+        if self.end_date and hasattr(self.end_date, "date"):
+            self.end_date = self.end_date.date()
         self.quality = DataQualityReport()
         self.frames = self._load_frames()
         self.calendar = self._build_calendar()
