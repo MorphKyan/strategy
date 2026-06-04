@@ -750,6 +750,152 @@ class HierarchicalRiskParityStrategy(RiskParityStrategy):
         return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
 
 
+
+class RiskParityCVaRDynamicBudgetStrategy(RiskParityLWCovStrategy):
+    """
+    基于 CVaR 动态预算与波动率目标控制的风险平价策略 (RiskParityCVaRDynamicBudgetStrategy)
+    
+    本策略结合了四种核心量化设计思想以解决极端风险控制与过度交易痛点：
+    1. 资产级 CVaR 风险测度：在滚动窗口内计算每个资产各自的历史模拟条件风险价值 (CVaR)，捕捉尾部极端风险；
+    2. 动态风险预算 (CVaR Dynamic Budget)：基于各资产的 CVaR 倒数动态分配其风险预算 (b_i)，降低极端风险高资产的风险预算；
+    3. 协方差收缩与 CCD 求解：使用 Ledoit-Wolf 协方差收缩矩阵及 Cyclical Coordinate Descent (CCD) 算法进行精确、高稳定的风险平价求解；
+    4. 组合波动率目标控制 (Volatility Targeting Overlay)：在资产权重确定后，通过预期组合年化波动率与目标波动率的比例，等比例缩放最终仓位以规避系统性大跌。
+    """
+    name = "risk_parity_cvar_dynamic_budget"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np
+        
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        cov_estimator = context.params.get("cov_estimator", "ledoit_wolf")
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+            
+        # 1. 估算协方差矩阵
+        if cov_estimator == "ledoit_wolf":
+            Sigma = self._estimate_covariance(X, "constant_correlation")
+        else:
+            Sigma = np.cov(X, rowvar=False).reshape(N, N)
+            
+        # 2. 计算各资产自身的 CVaR
+        confidence_level = float(context.params.get("confidence_level", 0.95))
+        cvar_sensitivity = float(context.params.get("cvar_sensitivity", 1.0))
+        
+        cvars = []
+        for i in range(N):
+            asset_returns = X[:, i]
+            losses = -asset_returns
+            var_val = np.percentile(losses, confidence_level * 100)
+            tail_losses = losses[losses >= var_val]
+            if len(tail_losses) > 0:
+                cvar_val = np.mean(tail_losses)
+            else:
+                cvar_val = var_val
+            cvar_val = max(cvar_val, 1e-4)
+            cvars.append(cvar_val)
+            
+        cvars = np.array(cvars)
+        
+        # 3. 计算动态风险预算 (b_i 与 CVaR^p 的倒数成正比)
+        inv_cvar = 1.0 / cvars
+        if cvar_sensitivity != 1.0:
+            inv_cvar = inv_cvar ** cvar_sensitivity
+        b_target = inv_cvar / np.sum(inv_cvar)
+        
+        # 4. 用动态 CCD 求解风险平价权重
+        try:
+            weights = self._solve_risk_parity_dynamic(Sigma, b_target)
+        except Exception:
+            weights = b_target.copy()
+            
+        # 5. 叠加波动率目标控制
+        volatility_target = context.params.get("volatility_target", None)
+        if volatility_target is not None:
+            volatility_target = float(volatility_target)
+            if volatility_target > 0:
+                if estimation_freq == "weekly":
+                    ann_factor = 52.0
+                elif estimation_freq == "monthly":
+                    ann_factor = 12.0
+                else:
+                    ann_factor = 252.0
+                    
+                Sigma_annual = Sigma * ann_factor
+                portfolio_vol = np.sqrt(np.dot(weights, np.dot(Sigma_annual, weights)))
+                
+                scale_factor = min(1.0, volatility_target / portfolio_vol) if portfolio_vol > 0 else 1.0
+                weights = weights * scale_factor
+
+        return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
+
+    def _solve_risk_parity_dynamic(self, Sigma: np.ndarray, b_target: np.ndarray) -> np.ndarray:
+        import numpy as np
+        N = Sigma.shape[0]
+        diag_var = np.diag(Sigma)
+        
+        x = 1.0 / np.sqrt(np.maximum(diag_var, 1e-8))
+        
+        max_iter = 100
+        tol = 1e-6
+        for _ in range(max_iter):
+            x_old = x.copy()
+            for i in range(N):
+                b = np.dot(Sigma[i], x) - Sigma[i, i] * x[i]
+                a = Sigma[i, i]
+                if a <= 1e-8:
+                    a = 1e-8
+                x[i] = (-b + np.sqrt(b**2 + 4 * a * b_target[i])) / (2 * a)
+                
+            if np.max(np.abs(x - x_old)) < tol:
+                break
+                
+        weights = x / np.sum(x)
+        return weights
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
@@ -759,6 +905,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     RiskParityEWMADrawdownRecoveryStrategy.name: RiskParityEWMADrawdownRecoveryStrategy,
     RiskParityLWCovStrategy.name: RiskParityLWCovStrategy,
     HierarchicalRiskParityStrategy.name: HierarchicalRiskParityStrategy,
+    RiskParityCVaRDynamicBudgetStrategy.name: RiskParityCVaRDynamicBudgetStrategy,
 }
 
 

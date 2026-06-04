@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-06-04T15:05:14.843443",
+  "config_name": "baseline_m3m4_fundamental",
+  "strategy_type": "candidate",
+  "metrics": {
+    "start_date": "2023-10-11",
+    "end_date": "2026-06-01",
+    "observations": 639,
+    "total_return": 0.2129264881045121,
+    "annualized_return": 0.07909948485084417,
+    "annualized_volatility": 0.024652583702559586,
+    "max_drawdown": -0.016985308601219606,
+    "sharpe_ratio": 3.208567743048838,
+    "turnover_total": 1627149.6415954058,
+    "annualized_turnover": 0.6416928164038219,
+    "trade_count": 24,
+    "results_dir": "results\\backtests\\baseline_m3m4_fundamental_20260604_150514",
+    "nav_csv": "results\\backtests\\baseline_m3m4_fundamental_20260604_150514\\nav.csv",
+    "trades_csv": "results\\backtests\\baseline_m3m4_fundamental_20260604_150514\\trades.csv"
+  }
+}

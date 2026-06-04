@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-06-04T15:05:17.641872",
+  "config_name": "baseline_mvp_equal_weight",
+  "strategy_type": "candidate",
+  "metrics": {
+    "start_date": "2023-10-11",
+    "end_date": "2026-06-01",
+    "observations": 639,
+    "total_return": 0.21762362208658637,
+    "annualized_return": 0.08074556547797718,
+    "annualized_volatility": 0.024550432264788966,
+    "max_drawdown": -0.01634923311916081,
+    "sharpe_ratio": 3.2889671598078176,
+    "turnover_total": 1482012.6748632046,
+    "annualized_turnover": 0.5844557027629539,
+    "trade_count": 20,
+    "results_dir": "results\\backtests\\baseline_mvp_equal_weight_20260604_150517",
+    "nav_csv": "results\\backtests\\baseline_mvp_equal_weight_20260604_150517\\nav.csv",
+    "trades_csv": "results\\backtests\\baseline_mvp_equal_weight_20260604_150517\\trades.csv"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-06-04T14:49:09.858304",
+  "config_name": "baseline_mvp_equal_weight.yaml",
+  "candidate": {
+    "strategy": "rotated_risk_parity",
+    "metrics": {
+      "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\rotated_risk_parity\\baseline_mvp_equal_weight_candidate_r013_candidate_20260604_144909",
+      "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\rotated_risk_parity\\baseline_mvp_equal_weight_candidate_r013_candidate_20260604_144909\\nav.csv",
+      "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\rotated_risk_parity\\baseline_mvp_equal_weight_candidate_r013_candidate_20260604_144909\\positions.csv",
+      "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\rotated_risk_parity\\baseline_mvp_equal_weight_candidate_r013_candidate_20260604_144909\\orders.csv",
+      "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\rotated_risk_parity\\baseline_mvp_equal_weight_candidate_r013_candidate_20260604_144909\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-10-11",
+      "end_date": "2026-06-01",
+      "observations": 639,
+      "total_return": 0.2625615311381355,
+      "annualized_return": 0.09646095560710899,
+      "annualized_volatility": 0.034975745623743164,
+      "max_drawdown": -0.04052942681160965,
+      "sharpe_ratio": 2.7579385052945606,
+      "turnover_total": 1371376.0677615213,
+      "annualized_turnover": 540824.3647510225,
+      "trade_count": 12,
+      "order_count": 12,
+      "filled_order_count": 12,
+      "rejected_order_count": 0,
+      "order_status_counts": {
+        "FILLED": 12
+      },
+      "rejection_reason_counts": {},
+      "pending_intent_count": 0,
+      "max_pending_intent_count": 1,
+      "average_cash_weight": 0.06314921032241134,
+      "max_position_count": 3
+    }
+  },
+  "baseline": {
+    "strategy": "mvp_equal_weight",
+    "metrics": {
+      "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260604_144909",
+      "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260604_144909\\nav.csv",
+      "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260604_144909\\positions.csv",
+      "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260604_144909\\orders.csv",
+      "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-3--R013--quant-researcher-3a029428\\platform\\results\\backtests\\baseline_mvp_equal_weight_vs_rotated\\20260604_144909\\monthly_equal_weight\\baseline_mvp_equal_weight_baseline_20260604_144909\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-10-11",
+      "end_date": "2026-06-01",
+      "observations": 639,
+      "total_return": 0.5564903930349385,
+      "annualized_return": 0.1909535789725021,
+      "annualized_volatility": 0.09853109602800705,
+      "max_drawdown": -0.11139659288971626,
+      "sharpe_ratio": 1.9380031956431738,
+      "turnover_total": 1893337.1400958265,
+      "annualized_turnover": 746668.1679251147,
+      "trade_count": 77,
+      "order_count": 77,
+      "filled_order_count": 77,
+      "rejected_order_count": 0,
+      "order_status_counts": {
+        "FILLED": 77
+      },
+      "rejection_reason_counts": {},
+      "pending_intent_count": 1,
+      "max_pending_intent_count": 2,
+      "average_cash_weight": 0.007303673640968586,
+      "max_position_count": 3
+    }
+  }
+}

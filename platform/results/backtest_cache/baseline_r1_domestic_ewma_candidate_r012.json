@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-06-04T15:05:58.488413",
+  "config_name": "baseline_r1_domestic_ewma",
+  "strategy_type": "candidate",
+  "metrics": {
+    "start_date": "2019-02-28",
+    "end_date": "2026-06-01",
+    "observations": 1758,
+    "total_return": 0.20220616921259293,
+    "annualized_return": 0.026749641077487007,
+    "annualized_volatility": 0.01614017647252331,
+    "max_drawdown": -0.017912805913817276,
+    "sharpe_ratio": 1.6573326272500812,
+    "turnover_total": 2912693.1603751443,
+    "annualized_turnover": 0.41751915609473056,
+    "trade_count": 40,
+    "results_dir": "results\\backtests\\baseline_r1_domestic_ewma_20260604_150539",
+    "nav_csv": "results\\backtests\\baseline_r1_domestic_ewma_20260604_150539\\nav.csv",
+    "trades_csv": "results\\backtests\\baseline_r1_domestic_ewma_20260604_150539\\trades.csv"
+  }
+}
