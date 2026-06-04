@@ -1,0 +1,89 @@
+{
+  "experiment_name": "baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov",
+  "candidate_config": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\configs\\generated\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_semi_cov.yaml",
+  "baseline_config": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\configs\\baseline_r3_global_nasdaq_all_weather_ewma.yaml",
+  "candidate": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_semi_cov\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260604_150202",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_semi_cov\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260604_150202\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_semi_cov\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260604_150202\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_semi_cov\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260604_150202\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_semi_cov\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260604_150202\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2022-05-31",
+    "end_date": "2026-06-01",
+    "observations": 970,
+    "total_return": 0.23497499541646238,
+    "annualized_return": 0.05642044656637646,
+    "annualized_volatility": 0.031641872248581705,
+    "max_drawdown": -0.022230897284915674,
+    "sharpe_ratio": 1.7830944428045155,
+    "turnover_total": 2483251.8229731806,
+    "annualized_turnover": 645133.4632878779,
+    "trade_count": 61,
+    "order_count": 61,
+    "filled_order_count": 61,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 61
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 3,
+    "average_cash_weight": 0.37596205098469165,
+    "max_position_count": 7,
+    "chart_paths": [
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_semi_cov\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260604_150202\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_semi_cov\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260604_150202\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_semi_cov\\baseline_r3_global_nasdaq_all_weather_ewma_candidate_20260604_150202\\charts\\execution_effects.png"
+    ]
+  },
+  "baseline": {
+    "results_dir": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_lw_cov\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260604_150220",
+    "nav_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_lw_cov\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260604_150220\\nav.csv",
+    "positions_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_lw_cov\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260604_150220\\positions.csv",
+    "orders_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_lw_cov\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260604_150220\\orders.csv",
+    "trades_csv": "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_lw_cov\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260604_150220\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2022-05-31",
+    "end_date": "2026-06-01",
+    "observations": 970,
+    "total_return": 0.2588845657431831,
+    "annualized_return": 0.061701735862665696,
+    "annualized_volatility": 0.03519994463357768,
+    "max_drawdown": -0.03664617442131357,
+    "sharpe_ratio": 1.7528929805136004,
+    "turnover_total": 3348099.7185971625,
+    "annualized_turnover": 869815.5969963762,
+    "trade_count": 64,
+    "order_count": 64,
+    "filled_order_count": 64,
+    "rejected_order_count": 0,
+    "order_status_counts": {
+      "FILLED": 64
+    },
+    "rejection_reason_counts": {},
+    "pending_intent_count": 2,
+    "max_pending_intent_count": 3,
+    "average_cash_weight": 0.3810793604708493,
+    "max_position_count": 7,
+    "chart_paths": [
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_lw_cov\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260604_150220\\charts\\nav_drawdown.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_lw_cov\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260604_150220\\charts\\position_weights.png",
+      "C:\\Users\\morph\\.gemini\\antigravity-cli\\brain\\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\\.system_generated\\worktrees\\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\\platform\\results\\backtests\\baseline_r3_global_nasdaq_all_weather_ewma_exp_semi_cov\\20260604_150202\\risk_parity_lw_cov\\baseline_r3_global_nasdaq_all_weather_ewma_baseline_20260604_150220\\charts\\execution_effects.png"
+    ]
+  },
+  "comparison": {
+    "total_return_delta": -0.023909570326720697,
+    "annualized_return_delta": -0.005281289296289238,
+    "annualized_volatility_delta": -0.003558072384995975,
+    "max_drawdown_delta": 0.014415277136397897,
+    "sharpe_ratio_delta": 0.030201462290915027,
+    "annualized_turnover_delta": -224682.13370849832,
+    "trade_count_delta": -3.0,
+    "order_count_delta": -3.0,
+    "rejected_order_count_delta": 0.0,
+    "max_pending_intent_count_delta": 0.0,
+    "average_cash_weight_delta": -0.0051173094861576285
+  },
+  "generated_at": "2026-06-04T15:02:37"
+}

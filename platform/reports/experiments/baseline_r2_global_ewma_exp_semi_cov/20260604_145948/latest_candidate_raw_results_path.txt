@@ -1,0 +1,1 @@
+C:\Users\morph\.gemini\antigravity-cli\brain\0b91284b-6f95-49a8-9bc5-f0f112a0ce57\.system_generated\worktrees\subagent-Quant-Researcher-1--R011--quant-researcher-66d2a2f5\platform\results\backtests\baseline_r2_global_ewma_exp_semi_cov\20260604_145948\risk_parity_semi_cov\baseline_r2_global_ewma_candidate_20260604_145948
