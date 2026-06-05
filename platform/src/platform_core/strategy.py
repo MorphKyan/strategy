@@ -1348,3 +1348,126 @@ def get_strategy_class(name: str) -> type[Strategy]:
         return BUILTIN_STRATEGIES[name]
     except KeyError as exc:
         raise ValueError(f"Unknown platform strategy: {name}") from exc
+
+class RiskParityGerberStrategy(RiskParityLWCovStrategy):
+    """
+    基于 Gerber 稳健统计量相关性过滤的风险平价策略 (RiskParityGerberStrategy)
+    
+    相比于传统的风险平价策略，本策略引入了 Gerber 稳健相关系数来过滤历史收益率中的噪声与异常值。
+    当收益率绝对值超过设定的阈值时才被视为有显著运动，从而通过同向/异向显著运动天数占有效天数的比例
+    计算相关性。对于可能不满足半正定（PSD）的 Gerber 相关系数矩阵，使用高稳定性谱裁剪与重构
+    （Spectral Truncation and Renormalization）算法强制正定化，最终利用 CCD 算法精确求解风险平价权重。
+    """
+    name = "risk_parity_gerber"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np
+        
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        gerber_c = float(context.params.get("gerber_c", 0.5))  # 阈值比例因子，默认 0.5
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        # 频率调整
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+            
+        # 1. 计算资产收益率样本标准差
+        std = np.std(X, axis=0, ddof=1)
+        std = np.maximum(std, 1e-8)  # 避免标准差为零
+        
+        # 2. 计算 Gerber 状态矩阵 U
+        # 对每个资产，如果 R_t >= c * std_i，记为 1.0；如果 R_t <= -c * std_i，记为 -1.0；否则为 0.0
+        U = np.zeros_like(X)
+        for i in range(N):
+            threshold = gerber_c * std[i]
+            U[X[:, i] >= threshold, i] = 1.0
+            U[X[:, i] <= -threshold, i] = -1.0
+            
+        # 3. 计算 Gerber 相关系数矩阵 G
+        G = np.zeros((N, N))
+        for i in range(N):
+            for j in range(N):
+                if i == j:
+                    G[i, j] = 1.0
+                    continue
+                u_i = U[:, i]
+                u_j = U[:, j]
+                
+                # 同号且不为0的时刻数
+                n_plus = np.sum((u_i == u_j) & (u_i != 0.0))
+                # 异号且不为0的时刻数
+                n_minus = np.sum((u_i == -u_j) & (u_i != 0.0) & (u_j != 0.0))
+                # 双方均落于中性区间的时刻数
+                n_zero = np.sum((u_i == 0.0) & (u_j == 0.0))
+                
+                denom = n_plus + n_minus + n_zero
+                if denom > 0:
+                    G[i, j] = (n_plus - n_minus) / denom
+                else:
+                    G[i, j] = 0.0
+                    
+        # 4. 正定化相关系数矩阵 (Spectral Truncation and Renormalization)
+        try:
+            eigenvals, eigenvecs = np.linalg.eigh(G)
+            eigenvals = np.maximum(eigenvals, 1e-8)
+            G_clipped = eigenvecs @ np.diag(eigenvals) @ eigenvecs.T
+            d_clipped = np.sqrt(np.diag(G_clipped))
+            G_psd = G_clipped / np.outer(d_clipped, d_clipped)
+            G_psd = (G_psd + G_psd.T) / 2.0
+        except Exception:
+            G_psd = np.eye(N)
+            
+        # 5. 构建协方差矩阵 Sigma = D * G_psd * D
+        Sigma = np.diag(std) @ G_psd @ np.diag(std)
+        
+        # 6. 用 CCD 算法求解风险平价权重
+        try:
+            weights = self._solve_risk_parity(Sigma)
+        except Exception:
+            weights = np.ones(N) / N
+            
+        return TargetPortfolio({asset_id: float(weights[idx]) for idx, asset_id in enumerate(universe)})
+
+BUILTIN_STRATEGIES[RiskParityGerberStrategy.name] = RiskParityGerberStrategy
