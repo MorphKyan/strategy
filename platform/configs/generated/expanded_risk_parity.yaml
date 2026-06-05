@@ -1,0 +1,103 @@
+assets:
+- asset_id: CN_ETF:518880.SH
+  asset_type: etf
+  code: '518880'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 黄金ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:510310.SH
+  asset_type: etf
+  code: '510310'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 沪深300ETF易方达
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:159985.SZ
+  asset_type: etf
+  code: '159985'
+  currency: CNY
+  exchange: SZ
+  lot_size: 100
+  name: 豆粕ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:159981.SZ
+  asset_type: etf
+  code: '159981'
+  currency: CNY
+  exchange: SZ
+  lot_size: 100
+  name: 能源化工ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511130.SH
+  asset_type: etf
+  code: '511130'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 30年国债ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:513500.SH
+  asset_type: etf
+  code: '513500'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 标普500ETF
+  price_limit_pct: 0.1
+backtest:
+  end_date: '2026-06-01'
+  start_date: '2024-03-28'
+data:
+  data_dir: data
+execution:
+  fee:
+    min_fee: 5.0
+    rate: 0.0002
+  price_field: close
+  unfilled_policy: retry_next_day
+  weight_tolerance: 0.0005
+output:
+  results_dir: results/backtests
+platform:
+  run_name: expanded_risk_parity
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+selection_metadata:
+  avg_abs_corr: 0.143783
+  basket_id: basket_14
+  codes:
+  - '518880'
+  - '510310'
+  - '159985'
+  - '159981'
+  - '511130'
+  - '513500'
+  common_history_years: 1.881
+  inverse_vol_hhi: 0.208591
+  max_abs_corr: 0.361265
+  score: 0.654651
+strategies:
+  segments:
+  - cancel_pending_on_start: false
+    end_date: null
+    params:
+      init_calc_days: 30
+      init_mode: calculate
+      min_periods: 20
+      rebalance_threshold: 0.05
+      rolling_window: 120
+      universe:
+      - CN_ETF:518880.SH
+      - CN_ETF:510310.SH
+      - CN_ETF:159985.SZ
+      - CN_ETF:159981.SZ
+      - CN_ETF:511130.SH
+      - CN_ETF:513500.SH
+    start_date: '2024-03-28'
+    strategy_name: risk_parity
+    strategy_version_id: null

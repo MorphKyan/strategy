@@ -1098,6 +1098,236 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
             
         return None
 
+
+
+class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
+    """
+    基于聚类代表性与切换阻尼的渐进式 ETF 筛选与轮动风险平价策略 (ClusterRepresentativeDampedRiskParityStrategy)
+    
+    本策略在 Ledoit-Wolf 协方差收缩风险平价的基础上，引入了两大核心创新设计以解决资产重合与过度换手痛点：
+    1. 聚类代表性渐进式筛选 (Clustering Representativeness-based Screening)：
+       - 根据传入的 sleeve_mapping 类别映射，或在策略内部基于相关性系数（阈值默认 0.70）进行在线动态聚类，将资产分为不同的风险类别。
+       - 在每个聚类内部，计算各资产与其他资产的平均相关性绝对值作为代表性得分 (Representativeness Score)。
+       - 渐进式筛选：每个聚类内仅保留得分排名前 top_k_per_sleeve (默认 1) 的代表性资产，其余资产予以剔除（权重设为 0.0），规避同质化资产的过度暴露。
+    2. 双重切换阻尼控制 (Dual Switching Damping Control)：
+       - 资产切换阻尼 (Switching Damping)：在更新入选资产池时，引入 switching_threshold (默认 0.05) 优惠。只有新资产得分显著高于已持有的旧资产时，才执行替换，防止临界点的频繁鞭梢切换。
+       - 权重平滑阻尼 (Weight Smoothing Damping)：如果触发调仓，最终调仓权重按 damping_factor (lambda，默认 1.0) 进行渐进式过渡：
+         w_actual = (1 - lambda) * w_current + lambda * w_target，从而极大地平滑调仓过程中的交易磨损。
+    """
+    name = "cluster_representative_damped_risk_parity"
+    version = "0.1.0"
+
+    def initialize(self, context: StrategyContext) -> None:
+        context.runtime["opened"] = context.params.get("init_mode", "calculate") == "manual"
+        context.runtime["rebalance_frequency"] = context.params.get("rebalance_frequency", "daily")
+        context.runtime["selected_assets"] = []  # 记录上一期入选的资产列表
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np
+        
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        shrinkage_target = context.params.get("shrinkage_target", "constant_correlation")
+        
+        top_k = int(context.params.get("top_k_per_sleeve", 1))
+        switching_threshold = float(context.params.get("switching_threshold", 0.05))
+        sleeve_mapping = context.params.get("sleeve_mapping", None)
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        # 频率调整
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+            
+        # 1. 估算全量协方差矩阵与相关系数矩阵
+        Sigma_full = self._estimate_covariance(X, shrinkage_target)
+        
+        # 提取标准差和相关系数矩阵
+        std_full = np.sqrt(np.maximum(np.diag(Sigma_full), 1e-8))
+        corr_full = Sigma_full / np.outer(std_full, std_full)
+        corr_full = np.clip(corr_full, -1.0, 1.0)
+        
+        # 2. 确定资产所属的聚类（sleeve）
+        if sleeve_mapping:
+            # 建立类别到资产索引的映射
+            categories = {}
+            for i, asset_id in enumerate(universe):
+                cat = sleeve_mapping.get(asset_id, "default_sleeve")
+                categories.setdefault(cat, []).append(i)
+        else:
+            # 在线贪心聚类：如果两资产相关系数绝对值 >= 0.70，则归入同一聚类
+            categories = {}
+            visited = set()
+            cat_count = 0
+            for i in range(N):
+                if i in visited:
+                    continue
+                cat_name = f"cluster_{cat_count}"
+                categories[cat_name] = [i]
+                visited.add(i)
+                for j in range(i + 1, N):
+                    if j not in visited and abs(corr_full[i, j]) >= 0.70:
+                        categories[cat_name].append(j)
+                        visited.add(j)
+                cat_count += 1
+                
+        # 3. 计算每个资产在所属类别中的代表性得分 (同类资产平均相关性绝对值)
+        rep_scores = np.zeros(N)
+        for cat_name, idx_list in categories.items():
+            if len(idx_list) <= 1:
+                for idx in idx_list:
+                    rep_scores[idx] = 1.0
+            else:
+                for idx in idx_list:
+                    # 计算与本聚类内其他资产的平均绝对相关系数
+                    others = [j for j in idx_list if j != idx]
+                    rep_scores[idx] = np.mean(np.abs(corr_full[idx, others]))
+                    
+        # 4. 资产切换阻尼控制以决定入选的子资产池
+        last_selected = context.runtime.setdefault("selected_assets", [])
+        # 映射上一期入选资产的索引
+        last_selected_indices = {universe.index(asset_id) for asset_id in last_selected if asset_id in universe}
+        
+        selected_indices = []
+        for cat_name, idx_list in categories.items():
+            # 计算本聚类内所有候选资产的调整得分
+            adjusted_scores = []
+            for idx in idx_list:
+                score = rep_scores[idx]
+                # 如果是上一期已入选的资产，增加切换优惠偏置
+                if idx in last_selected_indices:
+                    score += switching_threshold
+                adjusted_scores.append((score, idx))
+            
+            # 按调整得分降序排列，选择前 top_k
+            adjusted_scores.sort(key=lambda x: x[0], reverse=True)
+            chosen = [idx for _, idx in adjusted_scores[:min(top_k, len(adjusted_scores))]]
+            selected_indices.extend(chosen)
+            
+        # 记录本次入选的资产
+        new_selected = [universe[idx] for idx in selected_indices]
+        context.runtime["selected_assets"] = new_selected
+        
+        # 5. 对入选资产求解风险平价权重
+        if not selected_indices:
+            return None
+            
+        Sigma_sub = Sigma_full[np.ix_(selected_indices, selected_indices)]
+        try:
+            sub_weights = self._solve_risk_parity(Sigma_sub)
+        except Exception:
+            sub_weights = np.ones(len(selected_indices)) / len(selected_indices)
+            
+        # 将权重映射回全量资产
+        weights_full = np.zeros(N)
+        for i, idx in enumerate(selected_indices):
+            weights_full[idx] = sub_weights[i]
+            
+        return TargetPortfolio({asset_id: float(weights_full[i]) for i, asset_id in enumerate(universe)})
+
+    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+        # 1. 首次建仓决策
+        universe = context.params.get("universe") or context.available_asset_ids()
+        universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
+        if not universe:
+            return None
+
+        if not bool(context.runtime.get("opened", False)):
+            target = self._initial_target(context, universe)
+            if target is None:
+                return None
+            context.runtime["opened"] = True
+            return target
+
+        # 2. 调仓检测日判断
+        if not self._is_rebalance_day(context):
+            return None
+
+        # 3. 求解最新的目标权重
+        target = self._inverse_vol_target(context, universe)
+        if target is None:
+            return None
+
+        # 4. 判断是否触发再平衡
+        prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
+        current_weights = context.state.weights(prices)
+        
+        # 判断是否有资产发生了进出变化（轮动）
+        last_selected = context.runtime.get("selected_assets", [])
+        current_selected = [asset_id for asset_id in universe if current_weights.get(asset_id, 0.0) > 1e-4]
+        
+        # 如果当前持仓的资产组合与筛选出来的资产组合不同，则必须触发调仓
+        portfolio_changed = set(last_selected) != set(current_selected)
+        
+        # 或者是权重绝对偏离度超标
+        deviation_triggered = False
+        threshold = float(context.params.get("rebalance_threshold", 0.05))
+        for asset_id, target_weight in target.weights.items():
+            if abs(current_weights.get(asset_id, 0.0) - target_weight) > threshold:
+                deviation_triggered = True
+                break
+                
+        if not (portfolio_changed or deviation_triggered):
+            return None
+            
+        # 5. 权重平滑阻尼控制 (Damping Factor)
+        damping_factor = float(context.params.get("damping_factor", 1.0))
+        if damping_factor < 1.0 and current_weights:
+            # w_actual = (1 - lambda) * w_current + lambda * w_target
+            damped_weights = {}
+            for asset_id in universe:
+                w_curr = current_weights.get(asset_id, 0.0)
+                w_targ = target.weights.get(asset_id, 0.0)
+                damped_weights[asset_id] = (1.0 - damping_factor) * w_curr + damping_factor * w_targ
+                
+            # 归一化以确保总权重为 1.0
+            total_w = sum(damped_weights.values())
+            if total_w > 0:
+                damped_weights = {asset_id: w / total_w for asset_id, w in damped_weights.items()}
+            return TargetPortfolio(damped_weights)
+            
+        return target
+
+
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
@@ -1109,6 +1339,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     HierarchicalRiskParityStrategy.name: HierarchicalRiskParityStrategy,
     RiskParityCVaRDynamicBudgetStrategy.name: RiskParityCVaRDynamicBudgetStrategy,
     AdaptiveRiskDeviationVolatilityTriggeredStrategy.name: AdaptiveRiskDeviationVolatilityTriggeredStrategy,
+    ClusterRepresentativeDampedRiskParityStrategy.name: ClusterRepresentativeDampedRiskParityStrategy,
 }
 
 
