@@ -7,9 +7,7 @@
 ## 1. 正在进行中的研究 (In-Progress / Running)
 | 任务ID | 研究课题方向 | 领用子Agent ID | 启动时间 | 预估完成时间 | 当前状态/最新日志 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| R017 | 基于单变量 GARCH 与 Ledoit-Wolf 收缩相关系数的混合协方差风险平价策略 | de1c5e7a-eba1-4230-ac51-4660aef0884b | 2026-06-05 08:02 | 2026-06-05 09:00 | 运行中：代码编写与数据校验 |
-| R018 | 基于 Gini 均差 (Gini Mean Difference, GMD) 稳健风险度量的风险平价策略 | f8f19f51-6c9e-401f-8d7e-f34bf75e97bf | 2026-06-05 08:02 | 2026-06-05 09:00 | 运行中：代码编写与数据校验 |
-| R019 | 基于聚类代表性与切换阻尼的渐进式 ETF 筛选与轮动风险平价策略 | a5fbf143-10d3-48b1-a422-cb50d53c163b | 2026-06-05 08:02 | 2026-06-05 09:00 | 运行中：筛选规则优化与数据校验 |
+| - | 暂无 | - | - | - | - |
 
 ---
 
@@ -24,9 +22,11 @@
 ## 3. 已完成研究历史 (Completed / Finished)
 | 任务ID | 研究课题方向 | 领用子Agent ID | 结束时间 | 核心实验表现 (Sharpe/MDD/换手率) | 结论及推荐动作 | 实验报告链接 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| R019 | 基于聚类代表性与切换阻尼的渐进式 ETF 筛选与轮动风险平价策略 | a5fbf143-10d3-48b1-a422-cb50d53c163b | 2026-06-05 08:12 | 扩充6资产基准 Sharpe 1.369 -> CRD 1.736, MDD -5.41% -> -4.47%, 换手率及摩擦优化 | CRD 聚类代表性渐进筛选极其有效。双重阻尼模式有效将年化换手削减 36.8%~53.7%，平滑 whipsaw 损耗。无样本外过拟合，物理合入主干并固化 yaml。 | [中文实验报告](file:///D:/strategy/platform/reports/R019_Cluster_Representative_Damped_Rotational_Report.md) |
+| R018 | 基于 Gini 均差 (Gini Mean Difference, GMD) 稳健风险度量的风险平价策略 | f8f19f51-6c9e-401f-8d7e-f34bf75e97bf | 2026-06-05 08:27 | MVP Sharpe 1.938->3.009, MDD -11.14%->-3.20%; GlobalDiv Sharpe 1.531->1.489, MDD -2.90%->-4.29%; 换手全线降15%~30% | 各配置下年化换手率全线下降 15%~30%，换手控制极其优秀。然而全球红利夏普轻微退化，且多个大类配置最大回撤恶化。判定为差异不大/局部优势，物理拒绝。 | [中文实验报告](file:///D:/strategy/platform/reports/R018_Gini_Mean_Difference_Robust_Risk_Parity_Report.md) |
 | R016 | 基于自适应风险偏离阈值与系统波动触发的动态再平衡风险平价策略 | 8d6155e0-78f3-4544-a5f5-a697961b4e6b | 2026-06-04 20:10 | MVP Sharpe 1.938->2.816, MDD -11.14%->-3.58%; Nasdaq Sharpe 1.753->2.027, MDD -3.66%->-2.50% | 动态偏离自适应为策略提供优秀换手阻尼，交易笔数和换手率在各配置下录得断崖式下跌(-30%~-80%)，极好平滑 whipsaw 交易磨损。同时夏普比率在全基准配置下录得显著提升，最大回撤大幅收紧。物理合入主干并固化。 | [中文实验报告](file:///D:/strategy/platform/reports/R016_Adaptive_Risk_Deviation_Volatility_Triggered_Report.md) |
 | R015 | 基于 Oracle Approximating Shrinkage (OAS) 协方差估计的风险平价策略 | f8db5acd-62c7-4d2b-a086-e0198bf29b97 | 2026-06-04 22:00 | MVP Sharpe 1.94->2.63, MDD -11.14%->-4.95%; LW Sharpe 2.67->2.65, MDD -4.51%->-4.95% | 多数多资产配置下夏普退化且最大回撤变大，且换手率增幅超30%。判定为差异不大/局部优势 (物理拒绝/未合入代码)。 | [中文实验报告](file:///D:/strategy/platform/reports/R015_OAS_Covariance_Risk_Parity_Report.md) |
-| R014 | 基于中位数绝对偏差 (MAD) 稳健波动率估计的风险平价策略 | 55df5935-79d7-44f3-879e-395931945b0d | 2026-06-04 20:10 | 局部提升 (Nasdaq 夏普+0.20)，但多资产组合退化 (CVaR -0.23)，且 HRP 换手率剧增 74% 触发红线。 | 差异不大/有局部优势 (物理拒绝/未合入代码) | [中文实验报告](file:///D:/strategy/platform/reports/R014_MAD_Robust_Volatility_Risk_Parity_Report.md) |
+| R014 | 基于中位数绝对偏差 (MAD) 稳健波动率估计 of 风险平价策略 | 55df5935-79d7-44f3-879e-395931945b0d | 2026-06-04 20:10 | 局部提升 (Nasdaq 夏普+0.20)，但多资产组合退化 (CVaR -0.23)，且 HRP 换手率剧增 74% 触发红线。 | 差异不大/有局部优势 (物理拒绝/未合入代码) | [中文实验报告](file:///D:/strategy/platform/reports/R014_MAD_Robust_Volatility_Risk_Parity_Report.md) |
 | R012 | 基于 CVaR 动态预算与波动率目标控制的风险平价策略 | 0b64290c-b32c-4ea3-ac78-39f55bca0a35 | 2026-06-04 15:10 | MVP Sharpe 1.93->3.29, MDD -11.14%->-1.63%; LW Sharpe 2.66->3.27, MDD -4.51%->-1.63% | 全线测试配置下夏普显著提升，最大回撤大幅收紧，无过拟合风险且换手率合理，物理合入主干并固化。 | [中文实验报告](file:///D:/strategy/platform/reports/R012_CVaR_Dynamic_Budget_Volatility_Target_Report.md) |
 | R011 | 基于下行半协方差的稳健风险平价策略 | a2e8c45f-e772-4e20-b0f6-9116c2bdae6e | 2026-06-04 15:05 | Sharpe 局部有提升（如MVP +0.55），但在国内滚动及大部分 EWMA 多资产组合中下降（如 low_vol -0.05, global_dividend -0.16），且换手率多处增幅超 30%（最高+118%） | 仅特定资产包有效且表现平庸，部分组合换手率大幅升高触发交易摩擦红线，判定为局部优势，已根据规约物理拒绝进入 platform 主干，策略代码完全擦除。 | [中文实验报告](file:///D:/strategy/platform/reports/R011_Downside_Semi_Covariance_Risk_Parity_Report.md) |
 | R008 | 基于层次风险平价 (HRP) 的多资产 ETF 组合优化策略 | 490d3bd3-c217-4986-8ebf-484ef7cc8f82 | 2026-06-04 11:45 | Sharpe 1.40~1.75 -> 1.51~2.25（全线稳健提升）；MDD 全线降至约 -2% 左右；换手暴降 16% ~ 75% | 层次聚类及递归平分不需逆协方差矩阵，规避求解不稳定。回测表现夏普全线提升，回撤从 -3.5% 减至约 -2%，换手暴降平均超过 50%。物理合入主干，新增专属 yaml。 | [中文实验报告](file:///D:/strategy/platform/reports/R008_HRP_Multi_Asset_ETF_Optimization_Report.md) |
@@ -44,6 +44,7 @@
 ## 4. 废弃/失败的研究记录 (Failed / Deprecated)
 | 任务ID | 研究课题方向 | 领用子Agent ID | 失败原因/表现衰退详情 |
 | :--- | :--- | :--- | :--- |
+| R017 | 基于单变量 GARCH 与 Ledoit-Wolf 收缩相关系数的混合协方差风险平价策略 | de1c5e7a-eba1-4230-ac51-4660aef0884b | 在部分大类配置（全球红利/EWMA）上表现退化，且由于 GARCH 条件标准差的时变敏感性，在各配置下的年化换手暴涨（最高+243.9%）严重触发 30% 限制红线，存在严重过拟合与摩擦损耗，物理拒绝并完全清除代码。 |
 | R007 | 结合 DCC-GARCH 动态协方差预测与动量过滤的 ETF 轮动风险平价策略 | 5fd5d059-99c7-4bd1-8090-1f7ad766dccf | 夏普比率全线严重退化（如 LW Cov 2.67->1.40）；20日动量硬过滤导致严重的 whipsaw 顺周期磨损与踏空效应；DCC-GARCH 条件协方差估计时变噪声极大，导致年化换手率暴涨数倍。物理拒绝进入平台。 |
 | R013 | 基于 etf_selection 多维打分筛选的 ETF 轮动风险平价策略 | 26e24bd9-411a-4471-aa79-fc097db1b7c7 | 夏普比率全线表现退化（大部分配置夏普降至0.439）；在 12-ETF 袖子扩充宇宙中，得分轮动使得夏普比率由 0.974 恶化至 0.554，年化换手率暴增 296.40%，存在严重 whipsaw 磨损与过拟合风险。已物理清除策略代码，物理拒绝合入平台。 |
 
