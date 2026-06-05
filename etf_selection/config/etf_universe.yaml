@@ -1,5 +1,5 @@
 selection:
-  min_history_years: 3
+  min_history_years: 1.5
   top_k_per_sleeve: 3
   max_baskets: 20
   required_sleeves:
