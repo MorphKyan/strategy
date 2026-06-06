@@ -274,7 +274,7 @@ def test_platform_backtest_outputs_and_checkpoint_resume(tmp_path: Path):
     assert reference_count == 1
 
 
-def test_platform_backtest_executes_signal_next_day_at_open_close_midpoint(tmp_path: Path):
+def test_platform_backtest_executes_signal_next_day_at_open(tmp_path: Path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     (data_dir / "AAA.csv").write_text(
@@ -289,12 +289,12 @@ def test_platform_backtest_executes_signal_next_day_at_open_close_midpoint(tmp_p
         encoding="utf-8",
     )
     config = {
-        "platform": {"run_name": "next_day_midpoint"},
+        "platform": {"run_name": "next_day_open"},
         "data": {"data_dir": str(data_dir)},
         "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None}],
         "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
         "backtest": {"start_date": "2024-01-02", "end_date": "2024-01-04"},
-        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001, "execution_price_field": "open_close_mid"},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001, "execution_price_field": "open"},
         "strategies": {
             "segments": [
                 {
@@ -325,8 +325,8 @@ def test_platform_backtest_executes_signal_next_day_at_open_close_midpoint(tmp_p
     assert orders[0]["signal_date"] == "2024-01-02"
     assert trades[0]["date"] == "2024-01-03"
     assert trades[0]["signal_date"] == "2024-01-02"
-    assert float(trades[0]["price"]) == pytest.approx(12.0024)
-    assert float(trades[0]["quantity"]) == pytest.approx(83.0)
+    assert float(trades[0]["price"]) == pytest.approx(10.002)
+    assert float(trades[0]["quantity"]) == pytest.approx(99.0)
 
 
 class DummySource:

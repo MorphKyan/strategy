@@ -193,8 +193,6 @@ class ExecutionEngine:
 
     def _price_for_bar(self, bar: Bar) -> float:
         field = self.config.price_field
-        if field in {"open_close_mid", "oc_mid", "open_close_midpoint"}:
-            return (float(bar.open) + float(bar.close)) / 2.0
         return float(getattr(bar, field))
 
     def _execution_price(self, valuation_price: float, side: str, asset: Asset) -> float:
