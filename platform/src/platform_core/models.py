@@ -44,6 +44,7 @@ class Bar:
     limit_up: float | None = None
     limit_down: float | None = None
     is_suspended: bool = False
+    adj_close: float = 0.0
 
 
 @dataclass
@@ -98,6 +99,7 @@ class PortfolioState:
     cooldown_pool: dict[str, int] = field(default_factory=dict)
     strategy_state: dict[str, Any] = field(default_factory=dict)
     last_date: date | None = None
+    dividend_receivables: list[dict[str, Any]] = field(default_factory=list)  # list of dict: {asset_id, payment_date, amount}
 
     def position(self, asset_id: str) -> Position:
         if asset_id not in self.positions:
@@ -108,6 +110,8 @@ class PortfolioState:
         value = self.cash
         for asset_id, position in self.positions.items():
             value += position.quantity * prices.get(asset_id, 0.0)
+        for item in self.dividend_receivables:
+            value += float(item.get("amount", 0.0))
         return value
 
     def weights(self, prices: dict[str, float]) -> dict[str, float]:
@@ -147,6 +151,14 @@ class PortfolioState:
             "cooldown_pool": dict(self.cooldown_pool),
             "strategy_state": self.strategy_state,
             "last_date": date_str(self.last_date),
+            "dividend_receivables": [
+                {
+                    "asset_id": item["asset_id"],
+                    "payment_date": date_str(item["payment_date"]),
+                    "amount": float(item["amount"]),
+                }
+                for item in self.dividend_receivables
+            ],
         }
 
     @classmethod
@@ -168,6 +180,14 @@ class PortfolioState:
             cooldown_pool={asset_id: int(days) for asset_id, days in payload.get("cooldown_pool", {}).items()},
             strategy_state=payload.get("strategy_state", {}),
             last_date=parse_date(payload["last_date"]) if payload.get("last_date") else None,
+            dividend_receivables=[
+                {
+                    "asset_id": item["asset_id"],
+                    "payment_date": parse_date(item["payment_date"]),
+                    "amount": float(item["amount"]),
+                }
+                for item in payload.get("dividend_receivables", [])
+            ],
         )
 
 

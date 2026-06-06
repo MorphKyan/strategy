@@ -198,7 +198,7 @@ class RiskParityStrategy(Strategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
@@ -280,7 +280,7 @@ class RiskParityEWMAStrategy(RiskParityStrategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
@@ -340,7 +340,7 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
@@ -452,7 +452,7 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
@@ -630,7 +630,7 @@ class HierarchicalRiskParityStrategy(RiskParityStrategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
@@ -778,7 +778,7 @@ class RiskParityCVaRDynamicBudgetStrategy(RiskParityLWCovStrategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
@@ -949,7 +949,7 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
                     frame = context.data.frames.get(asset_id)
                     if frame is None:
                         return target
-                    col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+                    col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
                     history = frame[frame.index <= context.date][col]
                     closes[asset_id] = history
 
@@ -1020,7 +1020,7 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
@@ -1140,7 +1140,7 @@ class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 
@@ -1403,7 +1403,7 @@ class QDIIPremiumFactorRotationRiskParityStrategy(RiskParityLWCovStrategy):
             hist = frame[frame.index <= context.date]
             if len(hist) < min_periods:
                 return None
-            closes[asset_id] = hist["close"]
+            closes[asset_id] = hist["adj_close"]
             
             # 尝试提取 nav 或 acc_nav
             if "nav" in hist.columns:
@@ -1432,7 +1432,7 @@ class QDIIPremiumFactorRotationRiskParityStrategy(RiskParityLWCovStrategy):
             elif is_qdii and "nav" in hist.columns:
                 price_series = hist["nav"]
             else:
-                price_series = hist["close"]
+                price_series = hist["adj_close"]
                 
             # 动量计算
             if len(price_series) > n_mom:
@@ -1521,7 +1521,7 @@ class QDIIPremiumFactorRotationRiskParityStrategy(RiskParityLWCovStrategy):
         closes_sub = {}
         for asset_id in selected_assets:
             frame = context.data.frames.get(asset_id)
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             closes_sub[asset_id] = frame[frame.index <= context.date][col]
             
         price_frame = pd.DataFrame(closes_sub).dropna()
@@ -1671,7 +1671,7 @@ class RiskParityGerberStrategy(RiskParityLWCovStrategy):
             frame = context.data.frames.get(asset_id)
             if frame is None:
                 return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "close"
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
             history = frame[frame.index <= context.date][col]
             closes[asset_id] = history
 

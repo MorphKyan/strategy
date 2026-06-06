@@ -14,6 +14,7 @@ This note compares the original `research/` risk-parity workflow with the newer 
 - Standardized experiment reports are available through `platform/scripts/run_platform_experiment.py`, including optional baseline comparison and `metrics.json`.
 - Research-grade metrics are computed by `platform/src/platform_core/metrics.py`.
 - Low-coupling chart rendering is available through `platform/src/platform_core/visualization.py`.
+- Precision corporate actions modeling: handles stock splits and cash dividends with payment delays (receivables) on raw prices.
 - Start-date sensitivity analysis is available through `platform/scripts/run_sensitivity.py` with default step `3` and no sample cap.
 - HFQ chain validation is available through `platform/scripts/validate_hfq_data.py`.
 

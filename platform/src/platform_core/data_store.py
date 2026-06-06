@@ -303,9 +303,12 @@ class PointInTimeFundamentals:
             return pd.DataFrame(columns=FUNDAMENTAL_COLUMNS)
         frames = []
         for path in self.fundamentals_dir.glob("*.csv"):
-            if path.name.endswith("_raw.csv"):
+            if path.name.endswith("_raw.csv") or path.stat().st_size == 0:
                 continue
-            frame = pd.read_csv(path)
+            try:
+                frame = pd.read_csv(path)
+            except Exception:
+                continue
             if all(column in frame.columns for column in FUNDAMENTAL_COLUMNS):
                 frames.append(frame[FUNDAMENTAL_COLUMNS])
         if not frames:

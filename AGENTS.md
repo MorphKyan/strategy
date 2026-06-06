@@ -17,8 +17,8 @@ Do not mix their source, configs, scripts, reports, or results. Shared workspace
 - Platform tests: `platform/tests/`
 - Platform backtest entry: `.\env\python.exe platform\scripts\run_platform_backtest.py --config configs/baseline_mvp_equal_weight.yaml`
 - Platform risk-parity config: `platform/configs/baseline_r1_domestic_rolling.yaml`
-- Platform data sync entry: `.\env\python.exe platform\scripts\sync_platform_data.py --config configs/baseline_m3m4_fundamental.yaml`
-- Platform simulated portfolio entry: `.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs/baseline_m3m4_fundamental.yaml --checkpoint <checkpoint.json> --asof-date <YYYY-MM-DD>`
+- Platform data sync entry: `.\env\python.exe platform\scripts\sync_platform_data.py --config configs/baseline_mvp_equal_weight.yaml`
+- Platform simulated portfolio entry: `.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs/baseline_mvp_equal_weight.yaml --checkpoint <checkpoint.json> --asof-date <YYYY-MM-DD>`
 - Platform raw artifacts: `platform/results/`
 - Platform reports: `platform/reports/`
 - Platform metadata/data: `platform/data/`
@@ -45,7 +45,7 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 5. Do not run unrestricted parameter searches, silent optimizer sweeps, or broad benchmark changes.
 6. Preserve transaction-cost handling and trade reporting. If backtest artifacts exist, report turnover and trade count.
 7. Do not overwrite generated historical results, reports, or configs unless the user explicitly asks.
-8. 回测时如果发现数据与当前日期差距有一周以上请先获取数据再进行回测（同步数据时需使用与该课题/选定 ETF 组合匹配的配置文件，不一定是固定的 `baseline_m3m4_fundamental.yaml`）。
+8. 回测时如果发现数据与当前日期差距有一周以上请先获取数据再进行回测（同步数据时需使用与该课题/选定 ETF 组合匹配的配置文件，不一定是固定的 `baseline_mvp_equal_weight.yaml`）。
 9. QuantResearcher 认领课题时，应按照看板中的顺序由上至下依次认领第一个处于 Todo 状态的课题，不需自行挑选。
 10. 研究阶段必须固定样本切分：`2025-07-01`（含）之后的数据为最终测试样本；策略构思、ETF 选择、参数选择、阈值设定、候选筛选、缓存复用和报告中的研究结论不得使用测试样本信息。
 11. 所有平台研究在提交前必须执行起点敏感性测试：在不触碰最终测试样本的前提下，从该配置/组合的最早可用交易日开始，到训练样本末日（最晚 `2025-06-30`）为止，每隔 2 个月生成一个 `start_date`，逐一起跑回测并报告核心指标是否稳定。

@@ -86,6 +86,43 @@ class PlatformBacktestEngine:
         configured_output = output_dir or config.get("output", {}).get("results_dir", "results/platform")
         self.output_dir = Path(configured_output) / self.run_id
         self.checkpoint_dir = self.output_dir / "checkpoints"
+        
+        self.code_to_asset_id = {asset.code: asset_id for asset_id, asset in self.assets.items()}
+        self.dividends = self._load_dividends()
+        self.splits = self._load_splits()
+
+    def _load_dividends(self) -> list[dict[str, Any]]:
+        platform_dir = Path(__file__).resolve().parent.parent.parent
+        path = platform_dir / "data" / "platform_dividends.csv"
+        if not path.exists():
+            return []
+        dividends = []
+        with path.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                dividends.append({
+                    "code": row["code"].strip(),
+                    "ex_date": parse_date(row["ex_date"].strip()),
+                    "payment_date": parse_date(row["payment_date"].strip()),
+                    "dividend_per_share": float(row["dividend_per_share"].strip()),
+                })
+        return dividends
+
+    def _load_splits(self) -> list[dict[str, Any]]:
+        platform_dir = Path(__file__).resolve().parent.parent.parent
+        path = platform_dir / "data" / "platform_splits.csv"
+        if not path.exists():
+            return []
+        splits = []
+        with path.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                splits.append({
+                    "code": row["code"].strip(),
+                    "split_date": parse_date(row["split_date"].strip()),
+                    "split_ratio": float(row["split_ratio"].strip()),
+                })
+        return splits
 
     def run(self) -> PlatformBacktestResult:
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -107,6 +144,39 @@ class PlatformBacktestEngine:
             segment = self._segment_for_date(current_date)
             if segment is None:
                 continue
+
+            # 1. Process Splits
+            for split in self.splits:
+                if split["split_date"] == current_date:
+                    asset_id = self.code_to_asset_id.get(split["code"])
+                    if asset_id and asset_id in state.positions:
+                        pos = state.positions[asset_id]
+                        if pos.quantity > 0:
+                            pos.quantity *= split["split_ratio"]
+                            pos.cost_basis /= split["split_ratio"]
+
+            # 2. Process Ex-Dividends
+            for div in self.dividends:
+                if div["ex_date"] == current_date:
+                    asset_id = self.code_to_asset_id.get(div["code"])
+                    if asset_id and asset_id in state.positions:
+                        pos = state.positions[asset_id]
+                        if pos.quantity > 0:
+                            amount = pos.quantity * div["dividend_per_share"]
+                            state.dividend_receivables.append({
+                                "asset_id": asset_id,
+                                "payment_date": div["payment_date"],
+                                "amount": amount,
+                            })
+
+            # 3. Process Cash Payouts
+            remaining_receivables = []
+            for item in state.dividend_receivables:
+                if item["payment_date"] <= current_date:
+                    state.cash += item["amount"]
+                else:
+                    remaining_receivables.append(item)
+            state.dividend_receivables = remaining_receivables
 
             segment_key = self._segment_key(segment)
             bars = self.data.bars_on(current_date)

@@ -40,8 +40,8 @@ Run from the repository root:
 .\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\validate_hfq_data.py --codes 510300 518880 511260
-.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_m3m4_fundamental.yaml
-.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_m3m4_fundamental.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
+.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_mvp_equal_weight.yaml
+.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_mvp_equal_weight.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
 ```
 
 The platform scripts change their working directory to `platform/`, so relative paths such as `configs/baseline_mvp_equal_weight.yaml`, `data/`, and `results/platform/` are platform-local.
@@ -59,7 +59,9 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 ## Implemented Capabilities
 
 - Daily event loop with per-day checkpoints.
-- Target-weight strategies and multi-segment date scheduling.
+- Raw (unadjusted) price-based valuation and trade execution engine, which eliminates implicit compounding and cash drag.
+- Corporate action modeling: stock splits are processed on `split_date` by scaling held positions, and cash dividends are recorded as `dividend_receivables` on `ex_date` and paid out on `payment_date`.
+- Target-weight strategies and multi-segment date scheduling (strategies calculate signals on smooth `adj_close`).
 - Cash, position, cost-basis, pending-intent, and cooldown state.
 - Fee, lot-size, suspension, limit-up, and limit-down execution checks.
 - Retry, cancel, or mark-failed handling for unfilled intents.

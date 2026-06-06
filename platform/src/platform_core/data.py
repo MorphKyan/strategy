@@ -76,15 +76,16 @@ class LocalCsvBarData:
             if close_col is None:
                 raise ValueError(f"No close price column found in {path}")
 
-            close = pd.to_numeric(raw[close_col], errors="coerce") * factor
+            close = pd.to_numeric(raw[close_col], errors="coerce")
             for field_name in ["open", "high", "low"]:
                 source = _first_column(raw, PRICE_COLUMNS[field_name])
                 if source is None:
                     normalized[field_name] = close
                     self.quality.add(f"{asset.asset_id}: missing {field_name}; filled with close.")
                 else:
-                    normalized[field_name] = pd.to_numeric(raw[source], errors="coerce") * factor
+                    normalized[field_name] = pd.to_numeric(raw[source], errors="coerce")
             normalized["close"] = close
+            normalized["adj_close"] = close * factor
             if "nav" in raw.columns:
                 normalized["nav"] = pd.to_numeric(raw["nav"], errors="coerce")
             if "acc_nav" in raw.columns:
@@ -151,6 +152,7 @@ class LocalCsvBarData:
                     limit_up=float(row["limit_up"]) if pd.notna(row["limit_up"]) else None,
                     limit_down=float(row["limit_down"]) if pd.notna(row["limit_down"]) else None,
                     is_suspended=bool(row["is_suspended"]),
+                    adj_close=float(row["adj_close"]),
                 )
                 continue
 
@@ -158,6 +160,7 @@ class LocalCsvBarData:
             if not prior.empty:
                 last = prior.iloc[-1]
                 close = float(last["close"])
+                adj_close = float(last["adj_close"])
                 bars[asset_id] = Bar(
                     date=current_date,
                     asset_id=asset_id,
@@ -168,6 +171,7 @@ class LocalCsvBarData:
                     volume=0.0,
                     amount=0.0,
                     is_suspended=True,
+                    adj_close=adj_close,
                 )
         return bars
 

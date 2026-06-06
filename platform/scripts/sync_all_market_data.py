@@ -55,10 +55,11 @@ def main() -> int:
     fundamentals_dir = resolve_path(args.fundamentals_dir, ROOT, ORIG_CWD)
 
     print("Syncing market data for all 12 universe assets from Finshare...")
+    from datetime import datetime
     market_report = MarketDataStore(data_dir).sync_assets(
         assets,
         start=args.start_date,
-        end=None,
+        end=datetime.now().strftime("%Y-%m-%d"),
         fetch=True
     )
     print("Market data synced:")

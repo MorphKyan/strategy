@@ -29,10 +29,10 @@ Common commands (executed from repository root):
 .\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml
 
 # Fetch/Sync latest ETF market prices and metadata
-.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_m3m4_fundamental.yaml
+.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_mvp_equal_weight.yaml
 
 # Run a simulated portfolio rollover tracking script
-.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_m3m4_fundamental.yaml --checkpoint platform\results\platform_sim_portfolio\checkpoint.json --asof-date 2026-05-30
+.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_mvp_equal_weight.yaml --checkpoint platform\results\platform_sim_portfolio\checkpoint.json --asof-date 2026-05-30
 ```
 
 Relative paths in platform commands are resolved from `platform/`.
