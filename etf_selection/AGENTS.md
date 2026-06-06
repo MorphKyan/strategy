@@ -14,13 +14,15 @@ This directory is for ETF universe screening and basket construction. Treat it a
 
 ## Main Workflow
 
-1. Screen ETFs inside each sleeve first.
-2. Validate correlation inside each sleeve to find representative ETFs.
-3. Build cross-sleeve baskets from shortlisted ETFs.
-4. Validate cross-sleeve correlation and inverse-vol concentration.
-5. Write generated platform configs under `etf_selection/generated_configs/`.
-6. Write reports under `etf_selection/reports/`.
-7. Optionally call `platform/scripts/run_platform_experiment.py` to backtest generated configs.
+1. Apply the fixed sample split before screening: `2025-07-01` and later data is the final test sample; ETF screening, ranking, basket construction, and score comparison must use only data up to `2025-06-30`.
+2. Screen ETFs inside each sleeve first.
+3. Validate correlation inside each sleeve to find representative ETFs.
+4. Build cross-sleeve baskets from shortlisted ETFs.
+5. Validate cross-sleeve correlation and inverse-vol concentration.
+6. Write generated platform configs under `etf_selection/generated_configs/`.
+7. Write reports under `etf_selection/reports/`.
+8. Optionally call `platform/scripts/run_platform_experiment.py` to backtest generated configs.
+9. If platform backtests are run, first run training-sample comparisons and start-date sensitivity. Start-date sensitivity must generate one `start_date` every 2 calendar months from the earliest common available trading date through `2025-06-30`; only after the ETF basket and strategy choices are frozen may `2025-07-01` and later data be used for final testing.
 
 ## Sleeves
 
@@ -61,6 +63,8 @@ Across sleeves, prefer:
 - acceptable liquidity
 - stable execution when platform backtests are run
 
+Do not compute sleeve rankings, basket scores, correlations, inverse-vol concentration, or liquidity scores using `2025-07-01` and later data during research. Those data are reserved for final testing only.
+
 ## Reporting
 
 Reports must be written in Chinese, but keep machine-readable keys, file names, config paths, and metric names in ASCII. Every report should include:
@@ -70,4 +74,7 @@ Reports must be written in Chinese, but keep machine-readable keys, file names, 
 - sleeve correlation matrices
 - generated basket configs
 - basket score components
+- confirmation that ETF screening and basket scoring used only data up to `2025-06-30`
+- start-date sensitivity results when platform backtests are run
+- final test-sample metrics for `2025-07-01` and later data, after the basket is frozen
 - exact platform commands when backtests are run

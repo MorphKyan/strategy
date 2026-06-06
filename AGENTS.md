@@ -47,6 +47,9 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 7. Do not overwrite generated historical results, reports, or configs unless the user explicitly asks.
 8. 回测时如果发现数据与当前日期差距有一周以上请先获取数据再进行回测（同步数据时需使用与该课题/选定 ETF 组合匹配的配置文件，不一定是固定的 `baseline_m3m4_fundamental.yaml`）。
 9. QuantResearcher 认领课题时，应按照看板中的顺序由上至下依次认领第一个处于 Todo 状态的课题，不需自行挑选。
+10. 研究阶段必须固定样本切分：`2025-07-01`（含）之后的数据为最终测试样本；策略构思、ETF 选择、参数选择、阈值设定、候选筛选、缓存复用和报告中的研究结论不得使用测试样本信息。
+11. 所有平台研究在提交前必须执行起点敏感性测试：在不触碰最终测试样本的前提下，从该配置/组合的最早可用交易日开始，到训练样本末日（最晚 `2025-06-30`）为止，每隔 2 个月生成一个 `start_date`，逐一起跑回测并报告核心指标是否稳定。
+12. 只有在训练样本内研究通过、起点敏感性测试稳定，并且固定后的策略/组合在 `2025-07-01`（含）之后最终测试样本中仍表现良好时，QuantResearcher 才允许提交成果；否则必须标记为“Failed”或“仅研究观察”，不得合入或注册为可投策略。
 
 ## Preferred Research Scope
 
@@ -78,17 +81,29 @@ Avoid:
 Before claiming success:
 
 1. Confirm the baseline configurations and candidate configurations.
-2. Run the platform experiment:
+2. Enforce the fixed sample split:
+   - Training/research sample: data up to `2025-06-30`.
+   - Final test sample: data from `2025-07-01` onward.
+   - Do not inspect, tune, rank, select, or reject candidates using the final test sample before the research candidate is frozen.
+3. Run the platform experiment:
    - **For strategy updates**: Run backtests using the new strategy for **all platform configurations** in `platform/configs/` and compare all results.
    - **For ETF sleeve expansion**: Run backtests for the expanded portfolio using **multiple strategy algorithms** (e.g., `risk_parity`, `risk_parity_ewma`, `risk_parity_ewma_dd_recovery`) and compare all results.
-3. Manage and utilize the shared backtest cache:
+4. Run start-date sensitivity:
+   - For each candidate/baseline configuration or algorithm, generate start dates from the earliest available common date to the training-sample end date, stepping by 2 calendar months.
+   - Run or reuse valid cached backtests for each start date, keeping the end date capped at `2025-06-30`.
+   - Report whether ranking, Sharpe, max drawdown, turnover, trade count, and rejection count materially change across start dates.
+5. Run the final test stage only after the candidate is frozen:
+   - Use `2025-07-01` and later data only in this stage.
+   - Do not change strategy code, parameters, ETF basket membership, rebalance rules, or acceptance thresholds after seeing test results.
+   - A candidate may be submitted only if the final test sample remains acceptable versus its baseline and does not introduce worse execution risk.
+6. Manage and utilize the shared backtest cache:
    - Save backtest results in the shared directory `platform/results/backtest_cache/` in JSON format with a `timestamp`.
    - Before running a backtest, check if a valid cache exists.
    - If a data sync (`sync_platform_data.py`) was triggered due to outdated data during the task, mark all existing cache entries generated before the sync timestamp as expired, and rebuild/update them.
-4. Verify raw artifacts exist under `platform/results/`.
-5. Verify standardized artifacts exist under `platform/reports/`.
-6. Read generated metrics from `platform/reports/experiments/<strategy>/<timestamp>/metrics.json`; do not infer them from memory.
-7. Confirm the report includes hypothesis, files changed, exact commands, metrics delta for all configurations/algorithms, turnover, trade count, and recommendation.
+7. Verify raw artifacts exist under `platform/results/`.
+8. Verify standardized artifacts exist under `platform/reports/`.
+9. Read generated metrics from `platform/reports/experiments/<strategy>/<timestamp>/metrics.json`; do not infer them from memory.
+10. Confirm the report includes hypothesis, files changed, exact commands, metrics delta for all configurations/algorithms, start-date sensitivity results, final test-sample metrics, turnover, trade count, and recommendation.
 
 ## Research Summary History
 
@@ -115,4 +130,3 @@ Before claiming success:
      - `--codes <code1> <code2> ...`: 直接指定一个或多个标的代码。
      - `--data-dir <path>` (默认值: `data`): 本地市场数据存储目录。
      - 例如: `.\env\python.exe platform/scripts/get_common_date_range.py --codes 510300 518880 511260`
-

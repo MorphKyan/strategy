@@ -58,19 +58,27 @@ class PlatformBacktestEngine:
                 fundamental_report = fundamental_store.sync_financial_indicators(list(self.assets.values()), fetch=True)
                 self.data_quality_notes.extend(fundamental_report.notes)
             self.fundamentals = PointInTimeFundamentals(fundamentals_dir)
-        fee_config = config.get("execution", {}).get("fee", {})
+        execution_config = config.get("execution", {})
+        fee_config = execution_config.get("fee", {})
+        slippage_config = execution_config.get("slippage", {})
         self.execution = ExecutionEngine(
             ExecutionConfig(
                 fee_profile=FeeProfile(
                     rate=float(fee_config.get("rate", 0.0002)),
                     min_fee=float(fee_config.get("min_fee", 0.0)),
                 ),
-                price_field=config.get("execution", {}).get("execution_price_field", "open_close_mid"),
-                weight_tolerance=float(config.get("execution", {}).get("weight_tolerance", 0.0005)),
-                unfilled_policy=config.get("execution", {}).get("unfilled_policy", "retry_next_day"),
-                cash_buffer_pct=float(config.get("execution", {}).get("cash_buffer_pct", 0.0)),
-                skip_below_lot=bool(config.get("execution", {}).get("skip_below_lot", True)),
-                order_priority=config.get("execution", {}).get("order_priority", "asset_id"),
+                price_field=execution_config.get("execution_price_field", "open_close_mid"),
+                weight_tolerance=float(execution_config.get("weight_tolerance", 0.0005)),
+                unfilled_policy=execution_config.get("unfilled_policy", "retry_next_day"),
+                cash_buffer_pct=float(execution_config.get("cash_buffer_pct", 0.0)),
+                skip_below_lot=bool(execution_config.get("skip_below_lot", True)),
+                order_priority=execution_config.get("order_priority", "asset_id"),
+                slippage_bps=float(slippage_config.get("default_bps", execution_config.get("slippage_bps", 2.0))),
+                qdii_commodity_slippage_bps=float(
+                    slippage_config.get("qdii_commodity_bps", execution_config.get("qdii_commodity_slippage_bps", 6.0))
+                ),
+                slippage_by_asset_id=slippage_config.get("asset_bps"),
+                slippage_by_code=slippage_config.get("code_bps"),
             )
         )
         run_name = config.get("platform", {}).get("run_name", "platform_backtest")
@@ -325,6 +333,8 @@ class PlatformBacktestEngine:
             f"- 结束日期：{metrics.get('end_date')}",
             f"- 累计收益率：{metrics.get('total_return', 0.0) * 100:.2f}%",
             f"- 最大回撤：{metrics.get('max_drawdown', 0.0) * 100:.2f}%",
+            f"- 年化金额换手率：{metrics.get('annualized_turnover_amount', metrics.get('annualized_turnover', 0.0)) * 100:.2f}%",
+            f"- 年化数量换手：{metrics.get('annualized_turnover_quantity', 0.0):.4f}",
             f"- 成交笔数：{metrics.get('trade_count', 0)}",
             f"- 期末待执行意图数：{metrics.get('pending_intent_count', 0)}",
             "",
@@ -345,6 +355,14 @@ class PlatformBacktestEngine:
         if not nav_rows:
             return {"trade_count": len(trade_rows)}
         net_values = [float(row["net_value"]) for row in nav_rows]
+        total_values = [float(row.get("total_value", 0.0)) for row in nav_rows]
+        average_total_value = sum(total_values) / len(total_values) if total_values else 0.0
+        years = len(nav_rows) / 252 if nav_rows else 0.0
+        turnover_amount_total = sum(abs(float(row.get("trade_value", 0.0))) for row in trade_rows)
+        turnover_quantity_total = sum(abs(float(row.get("quantity", 0.0))) for row in trade_rows)
+        turnover_amount_ratio = turnover_amount_total / average_total_value if average_total_value > 0 else 0.0
+        annualized_turnover_amount = turnover_amount_ratio / years if years else turnover_amount_ratio
+        annualized_turnover_quantity = turnover_quantity_total / years if years else turnover_quantity_total
         peak = net_values[0]
         max_drawdown = 0.0
         for value in net_values:
@@ -358,7 +376,13 @@ class PlatformBacktestEngine:
             "total_return": net_values[-1] / net_values[0] - 1 if net_values[0] else 0.0,
             "max_drawdown": max_drawdown,
             "trade_count": len(trade_rows),
-            "turnover_total": sum(abs(float(row.get("trade_value", 0.0))) for row in trade_rows),
+            "turnover_total": turnover_amount_total,
+            "annualized_turnover": annualized_turnover_amount,
+            "turnover_amount_total": turnover_amount_total,
+            "turnover_amount_ratio": turnover_amount_ratio,
+            "annualized_turnover_amount": annualized_turnover_amount,
+            "turnover_quantity_total": turnover_quantity_total,
+            "annualized_turnover_quantity": annualized_turnover_quantity,
             "pending_intent_count": int(nav_rows[-1].get("pending_intent_count", 0)),
         }
 

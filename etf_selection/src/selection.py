@@ -16,6 +16,8 @@ import yaml
 
 
 PRICE_COLUMNS = ["close", "close_price", "close_price_adjusted", "nav", "acc_nav"]
+DEFAULT_TRAIN_END_DATE = "2025-06-30"
+DEFAULT_TEST_START_DATE = "2025-07-01"
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,19 @@ def write_json(path: str | Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2)
+
+
+def sample_split(config: dict[str, Any]) -> tuple[pd.Timestamp, pd.Timestamp]:
+    selection = config.get("selection", {})
+    train_end = pd.Timestamp(selection.get("train_end_date", DEFAULT_TRAIN_END_DATE))
+    test_start = pd.Timestamp(selection.get("test_start_date", DEFAULT_TEST_START_DATE))
+    if test_start <= train_end:
+        raise ValueError("selection.test_start_date must be later than selection.train_end_date.")
+    return train_end, test_start
+
+
+def until_train(series: pd.Series, train_end: pd.Timestamp) -> pd.Series:
+    return series[series.index <= train_end]
 
 
 def first_column(frame: pd.DataFrame, candidates: list[str]) -> str | None:
@@ -140,6 +155,7 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
     paths = config.get("paths", {})
     data_dir = paths.get("data_dir", "platform/data")
     min_history_years = float(selection.get("min_history_years", 3))
+    train_end, test_start = sample_split(config)
     candidates: dict[str, CandidateData] = {}
     rows: list[dict[str, Any]] = []
 
@@ -150,11 +166,14 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
         try:
             data = load_adjusted_price(data_dir, item, allow_raw_prices=allow_raw_prices)
             candidates[code] = data
-            returns = data.price.pct_change().dropna()
-            observations = len(data.price)
+            train_price = until_train(data.price, train_end)
+            train_amount = until_train(data.amount, train_end)
+            train_volume = until_train(data.volume, train_end)
+            returns = train_price.pct_change().dropna()
+            observations = len(train_price)
             history_years = observations / 252
-            avg_amount = float(data.amount.tail(252).mean()) if len(data.amount) else 0.0
-            suspension_ratio = float((data.volume <= 0).mean()) if len(data.volume) else 1.0
+            avg_amount = float(train_amount.tail(252).mean()) if len(train_amount) else 0.0
+            suspension_ratio = float((train_volume <= 0).mean()) if len(train_volume) else 1.0
             volatility = float(returns.std() * math.sqrt(252)) if len(returns) > 1 else 0.0
             eligible = history_years >= min_history_years
             reason = "" if eligible else f"history_years<{min_history_years}"
@@ -166,6 +185,7 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
                 df = data.raw_df
                 if df is not None and "nav" in df.columns and "acc_nav" in df.columns:
                     df = df.copy()
+                    df = df[pd.to_datetime(df["trade_date"]) <= train_end]
                     df['premium'] = df['close'] / df['nav'] - 1
                     premium_std = float(df['premium'].std())
                     ter = float(item.get("ter", 0.006))
@@ -187,8 +207,12 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
                     "name": item.get("name", code),
                     "sleeve": item["sleeve"],
                     "subtype": item.get("subtype", ""),
-                    "start_date": data.price.index.min().strftime("%Y-%m-%d") if observations else None,
-                    "end_date": data.price.index.max().strftime("%Y-%m-%d") if observations else None,
+                    "start_date": train_price.index.min().strftime("%Y-%m-%d") if observations else None,
+                    "end_date": train_price.index.max().strftime("%Y-%m-%d") if observations else None,
+                    "full_start_date": data.price.index.min().strftime("%Y-%m-%d") if len(data.price) else None,
+                    "full_end_date": data.price.index.max().strftime("%Y-%m-%d") if len(data.price) else None,
+                    "train_end_date": train_end.strftime("%Y-%m-%d"),
+                    "test_start_date": test_start.strftime("%Y-%m-%d"),
                     "observations": observations,
                     "history_years": history_years,
                     "avg_amount_252d": avg_amount,
@@ -223,7 +247,7 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
     frame["peer_representative_corr"] = 0.0
     for sleeve, group in eligible_frame.groupby("sleeve"):
         codes = group["code"].tolist()
-        prices = pd.concat([candidates[code].price for code in codes], axis=1, join="inner")
+        prices = pd.concat([until_train(candidates[code].price, train_end) for code in codes], axis=1, join="inner")
         matrix = corr_matrix(prices)
         sleeve_corrs[str(sleeve)] = matrix
         for code in codes:
@@ -309,6 +333,7 @@ def build_baskets(
     top_k = int(selection.get("top_k_per_sleeve", 3))
     max_baskets = int(selection.get("max_baskets", 20))
     required_sleeves = list(selection.get("required_sleeves", ["gold", "hs300", "commodity", "bond"]))
+    train_end, test_start = sample_split(config)
     eligible = ranking[ranking["eligible"] == True].copy()
     options_by_sleeve: dict[str, list[list[str]]] = {}
     for sleeve in required_sleeves:
@@ -332,7 +357,7 @@ def build_baskets(
     basket_weights = selection.get("scoring", {}).get("basket", {})
     for index, option_tuple in enumerate(itertools.product(*(options_by_sleeve[sleeve] for sleeve in required_sleeves)), start=1):
         codes = list(dict.fromkeys(itertools.chain.from_iterable(option_tuple)))
-        prices = pd.concat([candidates[code].price for code in codes], axis=1, join="inner")
+        prices = pd.concat([until_train(candidates[code].price, train_end) for code in codes], axis=1, join="inner")
         if prices.empty:
             continue
         returns = prices.pct_change().dropna()
@@ -348,7 +373,7 @@ def build_baskets(
         weights = inv_vol / inv_vol.sum() if len(inv_vol) else pd.Series(dtype=float)
         hhi = float((weights**2).sum()) if len(weights) else 1.0
         common_years = len(prices) / 252
-        liquidity = float(pd.Series([candidates[code].amount.tail(252).mean() for code in codes]).mean())
+        liquidity = float(pd.Series([until_train(candidates[code].amount, train_end).tail(252).mean() for code in codes]).mean())
         sleeve_scores = ranking.set_index("code").loc[codes, "sleeve_score"].mean()
         history_score = min(common_years / 10.0, 1.0)
         corr_score = 1 - min(avg_abs_corr, 1.0)
@@ -369,6 +394,8 @@ def build_baskets(
                 "asset_ids": ",".join(candidates[code].meta["asset_id"] for code in codes),
                 "common_start": prices.index.min().strftime("%Y-%m-%d"),
                 "common_end": prices.index.max().strftime("%Y-%m-%d"),
+                "train_end_date": train_end.strftime("%Y-%m-%d"),
+                "test_start_date": test_start.strftime("%Y-%m-%d"),
                 "common_observations": len(prices),
                 "common_history_years": common_years,
                 "avg_abs_corr": avg_abs_corr,
@@ -420,13 +447,19 @@ def generate_platform_configs(
         config.setdefault("platform", {})["run_name"] = f"platform_basket_{'_'.join(codes)}"
         config["assets"] = [platform_asset(candidates[code].meta) for code in codes]
         start_date = row["common_start"]
-        config.setdefault("backtest", {})["start_date"] = start_date
+        backtest_config = config.setdefault("backtest", {})
+        backtest_config["start_date"] = start_date
+        backtest_config["end_date"] = row.get("train_end_date", DEFAULT_TRAIN_END_DATE)
         for segment in config.setdefault("strategies", {}).setdefault("segments", []):
             segment["start_date"] = start_date
             segment.setdefault("params", {})["universe"] = [candidates[code].meta["asset_id"] for code in codes]
         config["selection_metadata"] = {
             "basket_id": row["basket_id"],
             "codes": codes,
+            "sample_split": {
+                "train_end_date": row.get("train_end_date", DEFAULT_TRAIN_END_DATE),
+                "test_start_date": row.get("test_start_date", DEFAULT_TEST_START_DATE),
+            },
             "score": round(float(row["basket_score"]), 6),
             "avg_abs_corr": round(float(row["avg_abs_corr"]), 6),
             "max_abs_corr": round(float(row["max_abs_corr"]), 6),
@@ -446,8 +479,10 @@ def write_report(
     basket_frame: pd.DataFrame,
     basket_corrs: dict[str, pd.DataFrame],
     generated_configs: list[Path],
+    config: dict[str, Any] | None = None,
 ) -> None:
     output_dir = Path(output_dir)
+    train_end, test_start = sample_split(config or {})
     corr_dir = output_dir / "correlations"
     corr_dir.mkdir(parents=True, exist_ok=True)
     ranking.to_csv(output_dir / "sleeve_rankings.csv", index=False)
@@ -460,6 +495,8 @@ def write_report(
         output_dir / "summary.json",
         {
             "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "train_end_date": train_end.strftime("%Y-%m-%d"),
+            "test_start_date": test_start.strftime("%Y-%m-%d"),
             "generated_configs": [str(path) for path in generated_configs],
             "eligible_count": int((ranking["eligible"] == True).sum()) if not ranking.empty else 0,
             "basket_count": int(len(basket_frame)),
@@ -472,6 +509,8 @@ def write_report(
         "- 本流程按袖子独立筛选 ETF，再构建跨袖子候选篮子。",
         "- 历史长度是硬性限制，默认至少 3 年。",
         "- 商品袖子优先使用宽基商品 ETF；如果没有合格宽基商品 ETF，可以使用多个单商品 ETF。",
+        f"- ETF 筛选、相关性、流动性和篮子评分只使用训练样本，训练样本截止：`{train_end.strftime('%Y-%m-%d')}`。",
+        f"- `{test_start.strftime('%Y-%m-%d')}`（含）之后数据保留为最终测试样本，不参与筛选和打分。",
         "",
         "## 袖子内排名",
     ]

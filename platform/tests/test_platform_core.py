@@ -34,6 +34,26 @@ def test_fee_profile_applies_minimum_fee():
     assert fee.calculate(10000) == 10
 
 
+def test_execution_applies_default_and_qdii_commodity_slippage():
+    bar = Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10)
+    engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0)))
+
+    normal_asset = Asset(asset_id="A", code="510300", name="沪深300ETF", lot_size=1)
+    state = PortfolioState(cash=1000)
+    _, trades = engine.apply_target(date(2024, 1, 1), state, {"A": normal_asset}, {"A": bar}, TargetPortfolio({"A": 0.5}))
+    assert trades[0].price == pytest.approx(10.002)
+
+    qdii_asset = Asset(asset_id="A", code="513100", name="纳指ETF", lot_size=1)
+    state = PortfolioState(cash=1000)
+    _, trades = engine.apply_target(date(2024, 1, 1), state, {"A": qdii_asset}, {"A": bar}, TargetPortfolio({"A": 0.5}))
+    assert trades[0].price == pytest.approx(10.006)
+
+    commodity_asset = Asset(asset_id="A", code="159985", name="豆粕ETF", lot_size=1)
+    state = PortfolioState(cash=1000)
+    _, trades = engine.apply_target(date(2024, 1, 1), state, {"A": commodity_asset}, {"A": bar}, TargetPortfolio({"A": 0.5}))
+    assert trades[0].price == pytest.approx(10.006)
+
+
 def test_execution_rejects_price_limits_and_suspension():
     asset = Asset(asset_id="A", code="A", name="A", lot_size=1)
     state = PortfolioState(cash=1000)
@@ -64,7 +84,7 @@ def test_pending_retry_does_not_liquidate_filled_positions():
         "B": Asset(asset_id="B", code="B", name="B", lot_size=1),
     }
     state = PortfolioState(cash=1000)
-    engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), weight_tolerance=0.0001))
+    engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), weight_tolerance=0.0001, slippage_bps=0.0))
 
     day1_bars = {
         "A": Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10),
@@ -108,7 +128,7 @@ def test_unfilled_policy_cancel_and_mark_failed():
     suspended = Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10, is_suspended=True)
 
     cancel_state = PortfolioState(cash=1000)
-    cancel_engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), unfilled_policy="cancel"))
+    cancel_engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), unfilled_policy="cancel", slippage_bps=0.0))
     orders, trades = cancel_engine.apply_target(date(2024, 1, 1), cancel_state, {"A": asset}, {"A": suspended}, TargetPortfolio({"A": 1.0}))
     assert orders[0].status == "REJECTED"
     assert not trades
@@ -116,7 +136,7 @@ def test_unfilled_policy_cancel_and_mark_failed():
     assert "_execution_failed_intents" not in cancel_state.strategy_state
 
     failed_state = PortfolioState(cash=1000)
-    failed_engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), unfilled_policy="mark_failed"))
+    failed_engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), unfilled_policy="mark_failed", slippage_bps=0.0))
     orders, trades = failed_engine.apply_target(date(2024, 1, 1), failed_state, {"A": asset}, {"A": suspended}, TargetPortfolio({"A": 1.0}))
     assert orders[0].status == "REJECTED"
     assert not trades
@@ -136,6 +156,7 @@ def test_execution_skips_below_lot_residual_without_pending():
             fee_profile=FeeProfile(rate=0.0),
             weight_tolerance=0.0001,
             skip_below_lot=True,
+            slippage_bps=0.0,
         )
     )
 
@@ -167,6 +188,7 @@ def test_execution_cash_buffer_and_gap_priority():
             fee_profile=FeeProfile(rate=0.0),
             cash_buffer_pct=0.01,
             order_priority="target_gap_desc",
+            slippage_bps=0.0,
         )
     )
 
@@ -303,7 +325,7 @@ def test_platform_backtest_executes_signal_next_day_at_open_close_midpoint(tmp_p
     assert orders[0]["signal_date"] == "2024-01-02"
     assert trades[0]["date"] == "2024-01-03"
     assert trades[0]["signal_date"] == "2024-01-02"
-    assert float(trades[0]["price"]) == pytest.approx(12.0)
+    assert float(trades[0]["price"]) == pytest.approx(12.0024)
     assert float(trades[0]["quantity"]) == pytest.approx(83.0)
 
 

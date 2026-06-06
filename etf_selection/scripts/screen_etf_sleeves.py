@@ -49,7 +49,7 @@ def main() -> int:
         basket_frame=basket_frame,
         candidates=candidates,
     )
-    write_report(report_dir, ranking, sleeve_corrs, basket_frame, basket_corrs, generated_configs)
+    write_report(report_dir, ranking, sleeve_corrs, basket_frame, basket_corrs, generated_configs, config=config)
 
     if args.run_experiments and generated_configs:
         experiment_results = run_platform_experiments(

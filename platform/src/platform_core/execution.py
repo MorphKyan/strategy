@@ -27,6 +27,10 @@ class ExecutionConfig:
     cash_buffer_pct: float = 0.0
     skip_below_lot: bool = True
     order_priority: str = "asset_id"
+    slippage_bps: float = 2.0
+    qdii_commodity_slippage_bps: float = 6.0
+    slippage_by_asset_id: dict[str, float] | None = None
+    slippage_by_code: dict[str, float] | None = None
 
 
 class ExecutionEngine:
@@ -79,9 +83,9 @@ class ExecutionEngine:
                 continue
             asset = assets[asset_id]
             bar = bars[asset_id]
-            price = prices[asset_id]
+            valuation_price = prices[asset_id]
             position = state.position(asset_id)
-            current_value = position.quantity * price
+            current_value = position.quantity * valuation_price
             target_weight = effective_weights.get(asset_id, 0.0)
             target_value = target_weight * state_value
             diff_value = target_value - current_value
@@ -90,10 +94,11 @@ class ExecutionEngine:
                 continue
 
             side = "BUY" if diff_value > 0 else "SELL"
-            quantity = self._round_quantity(abs(diff_value) / price, asset.lot_size)
+            execution_price = self._execution_price(valuation_price, side, asset)
+            quantity = self._round_quantity(abs(diff_value) / valuation_price, asset.lot_size)
             if side == "SELL":
                 quantity = min(quantity, self._round_quantity(position.quantity, asset.lot_size))
-            one_lot_value = price * max(1, int(asset.lot_size))
+            one_lot_value = execution_price * max(1, int(asset.lot_size))
             if self.config.skip_below_lot and quantity <= 0 and abs(diff_value) < one_lot_value:
                 state.pending_intents.pop(asset_id, None)
                 continue
@@ -103,7 +108,7 @@ class ExecutionEngine:
                 asset_id=asset_id,
                 side=side,
                 quantity=quantity,
-                price=price,
+                price=execution_price,
                 target_weight=target_weight,
                 signal_date=self._signal_date_for(asset_id, current_date, state, signal_dates),
             )
@@ -118,7 +123,7 @@ class ExecutionEngine:
 
             if side == "BUY":
                 buy_cash = self._available_buy_cash(state.cash, state_value)
-                quantity = self._cap_buy_quantity(quantity, price, buy_cash, asset.lot_size)
+                quantity = self._cap_buy_quantity(quantity, execution_price, buy_cash, asset.lot_size)
                 order.quantity = quantity
             if quantity <= 0:
                 if self.config.skip_below_lot and side == "BUY" and self._available_buy_cash(state.cash, state_value) < one_lot_value:
@@ -130,7 +135,7 @@ class ExecutionEngine:
                 self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason, order.signal_date)
                 continue
 
-            trade_value = quantity * price
+            trade_value = quantity * execution_price
             fee = self.config.fee_profile.calculate(trade_value)
             if side == "BUY":
                 total_cost = trade_value + fee
@@ -168,7 +173,7 @@ class ExecutionEngine:
                 asset_id=asset_id,
                 side=side,
                 quantity=quantity,
-                price=price,
+                price=execution_price,
                 trade_value=trade_value,
                 fee=fee,
                 cash_after=state.cash,
@@ -178,7 +183,7 @@ class ExecutionEngine:
 
             post_prices = {item_id: self._price_for_bar(item_bar) for item_id, item_bar in bars.items()}
             post_value = state.total_value(post_prices)
-            post_weight = position.quantity * price / post_value if post_value > 0 else 0.0
+            post_weight = position.quantity * valuation_price / post_value if post_value > 0 else 0.0
             if abs(post_weight - target_weight) <= self.config.weight_tolerance:
                 state.pending_intents.pop(asset_id, None)
             else:
@@ -191,6 +196,59 @@ class ExecutionEngine:
         if field in {"open_close_mid", "oc_mid", "open_close_midpoint"}:
             return (float(bar.open) + float(bar.close)) / 2.0
         return float(getattr(bar, field))
+
+    def _execution_price(self, valuation_price: float, side: str, asset: Asset) -> float:
+        slippage = self._slippage_rate(asset)
+        if side == "BUY":
+            return valuation_price * (1.0 + slippage)
+        return valuation_price * (1.0 - slippage)
+
+    def _slippage_rate(self, asset: Asset) -> float:
+        slippage_bps = self._slippage_bps(asset)
+        return max(0.0, float(slippage_bps)) / 10000.0
+
+    def _slippage_bps(self, asset: Asset) -> float:
+        if self.config.slippage_by_asset_id:
+            asset_overrides = {str(key): value for key, value in self.config.slippage_by_asset_id.items()}
+            if asset.asset_id in asset_overrides:
+                return float(asset_overrides[asset.asset_id])
+        if self.config.slippage_by_code:
+            code_overrides = {str(key): value for key, value in self.config.slippage_by_code.items()}
+            if str(asset.code) in code_overrides:
+                return float(code_overrides[str(asset.code)])
+        if self._is_qdii_or_commodity(asset):
+            return float(self.config.qdii_commodity_slippage_bps)
+        return float(self.config.slippage_bps)
+
+    @staticmethod
+    def _is_qdii_or_commodity(asset: Asset) -> bool:
+        asset_type = asset.asset_type.lower()
+        if asset_type in {"qdii", "commodity", "commodity_etf", "qdii_etf"}:
+            return True
+
+        code = str(asset.code)
+        if code.startswith("513") or code in {"159920", "159941", "159980", "159981", "159985", "518880"}:
+            return True
+
+        name = asset.name.lower()
+        keywords = [
+            "qdii",
+            "纳指",
+            "标普",
+            "恒生",
+            "港股",
+            "日经",
+            "德国",
+            "法国",
+            "海外",
+            "黄金",
+            "豆粕",
+            "能源化工",
+            "商品",
+            "有色",
+            "原油",
+        ]
+        return any(keyword in name for keyword in keywords)
 
     @staticmethod
     def _signal_date_for(

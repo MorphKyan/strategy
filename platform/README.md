@@ -48,6 +48,14 @@ The platform scripts change their working directory to `platform/`, so relative 
 
 All generated markdown reports should be written in Chinese. Keep exact config paths, commands, CSV column names, and metric keys unchanged when they are used as machine-readable identifiers.
 
+## Research Validation Rules
+
+- `2025-07-01` and later data is the fixed final test sample. Research, parameter selection, ETF basket selection, candidate filtering, and recommendation writing must use only data up to `2025-06-30`.
+- Before a platform strategy or ETF basket can be submitted as a research result, run start-date sensitivity on the training/research sample. Generate one `start_date` every 2 calendar months from the earliest common available trading date through the training end date, with the backtest end date capped at `2025-06-30`.
+- The sensitivity report must show whether Sharpe, annualized return, max drawdown, turnover, trade count, rejected order count, and candidate-vs-baseline ranking remain stable across start dates.
+- After the candidate strategy, parameters, ETF basket, rebalance rules, and acceptance thresholds are frozen, run the final test stage on `2025-07-01` and later data. Do not modify the candidate after seeing final test results.
+- A candidate may be recommended for merge only if it passes training-sample comparisons, start-date sensitivity, and final test-sample validation. Otherwise mark it as Failed or research-only.
+
 ## Implemented Capabilities
 
 - Daily event loop with per-day checkpoints.

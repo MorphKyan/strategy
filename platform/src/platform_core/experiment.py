@@ -98,7 +98,9 @@ def recommendation(candidate: dict[str, Any], baseline: dict[str, Any] | None) -
         return "复核"
     sharpe_up = (candidate.get("sharpe_ratio") or 0) > (baseline.get("sharpe_ratio") or 0)
     drawdown_ok = (candidate.get("max_drawdown") or 0) >= (baseline.get("max_drawdown") or 0)
-    turnover_ok = (candidate.get("annualized_turnover") or 0) <= (baseline.get("annualized_turnover") or 0) * 1.2
+    candidate_turnover = candidate.get("annualized_turnover_amount", candidate.get("annualized_turnover")) or 0
+    baseline_turnover = baseline.get("annualized_turnover_amount", baseline.get("annualized_turnover")) or 0
+    turnover_ok = candidate_turnover <= baseline_turnover * 1.2
     execution_ok = (candidate.get("rejected_order_count") or 0) <= (baseline.get("rejected_order_count") or 0)
     return "接受" if sharpe_up and drawdown_ok and turnover_ok and execution_ok else "继续改进"
 
@@ -134,7 +136,11 @@ def build_report(
             f"- 年化波动率：{pct_or_na(c.get('annualized_volatility'))}",
             f"- 最大回撤：{pct_or_na(c.get('max_drawdown'))}",
             f"- 夏普比率：{num_or_na(c.get('sharpe_ratio'))}",
-            f"- 年化换手：{num_or_na(c.get('annualized_turnover'))}",
+            f"- 成交金额合计：{num_or_na(c.get('turnover_amount_total'))}",
+            f"- 金额换手率：{pct_or_na(c.get('turnover_amount_ratio'))}",
+            f"- 年化金额换手率：{pct_or_na(c.get('annualized_turnover_amount', c.get('annualized_turnover')))}",
+            f"- 成交数量合计：{num_or_na(c.get('turnover_quantity_total'))}",
+            f"- 年化数量换手：{num_or_na(c.get('annualized_turnover_quantity'))}",
             f"- 成交笔数：{c.get('trade_count')}",
             f"- 订单数：{c.get('order_count')}",
             f"- 拒单数：{c.get('rejected_order_count')}",
@@ -157,7 +163,11 @@ def build_report(
             "annualized_volatility_delta": "年化波动率差值",
             "max_drawdown_delta": "最大回撤差值",
             "sharpe_ratio_delta": "夏普比率差值",
-            "annualized_turnover_delta": "年化换手差值",
+            "turnover_amount_total_delta": "成交金额合计差值",
+            "turnover_amount_ratio_delta": "金额换手率差值",
+            "annualized_turnover_amount_delta": "年化金额换手率差值",
+            "turnover_quantity_total_delta": "成交数量合计差值",
+            "annualized_turnover_quantity_delta": "年化数量换手差值",
             "trade_count_delta": "成交笔数差值",
             "order_count_delta": "订单数差值",
             "rejected_order_count_delta": "拒单数差值",

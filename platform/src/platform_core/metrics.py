@@ -59,6 +59,11 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
                 "sharpe_ratio": None,
                 "turnover_total": 0.0,
                 "annualized_turnover": 0.0,
+                "turnover_amount_total": 0.0,
+                "turnover_amount_ratio": 0.0,
+                "annualized_turnover_amount": 0.0,
+                "turnover_quantity_total": 0.0,
+                "annualized_turnover_quantity": 0.0,
                 "trade_count": int(len(trades)),
                 "order_count": int(len(orders)),
                 "filled_order_count": 0,
@@ -87,12 +92,29 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
     max_drawdown = drawdown.min() if not drawdown.empty else 0.0
     sharpe_ratio = annualized_return / annualized_volatility if annualized_volatility else 0.0
 
-    turnover_total = (
+    average_total_value = None
+    if "total_value" in nav.columns:
+        total_value_series = pd.to_numeric(nav["total_value"], errors="coerce").dropna()
+        if not total_value_series.empty:
+            average_total_value = safe_float(total_value_series.mean())
+
+    turnover_amount_total = (
         pd.to_numeric(trades.get("trade_value", pd.Series(dtype=float)), errors="coerce").abs().sum()
         if not trades.empty
         else 0.0
     )
-    annualized_turnover = turnover_total / years if years else turnover_total
+    turnover_quantity_total = (
+        pd.to_numeric(trades.get("quantity", pd.Series(dtype=float)), errors="coerce").abs().sum()
+        if not trades.empty
+        else 0.0
+    )
+    turnover_amount_ratio = (
+        turnover_amount_total / average_total_value
+        if average_total_value and average_total_value > 0
+        else 0.0
+    )
+    annualized_turnover_amount = turnover_amount_ratio / years if years else turnover_amount_ratio
+    annualized_turnover_quantity = turnover_quantity_total / years if years else turnover_quantity_total
 
     status_counts = {}
     rejection_reason_counts = {}
@@ -125,8 +147,13 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
             "annualized_volatility": safe_float(annualized_volatility),
             "max_drawdown": safe_float(max_drawdown),
             "sharpe_ratio": safe_float(sharpe_ratio),
-            "turnover_total": safe_float(turnover_total),
-            "annualized_turnover": safe_float(annualized_turnover),
+            "turnover_total": safe_float(turnover_amount_total),
+            "annualized_turnover": safe_float(annualized_turnover_amount),
+            "turnover_amount_total": safe_float(turnover_amount_total),
+            "turnover_amount_ratio": safe_float(turnover_amount_ratio),
+            "annualized_turnover_amount": safe_float(annualized_turnover_amount),
+            "turnover_quantity_total": safe_float(turnover_quantity_total),
+            "annualized_turnover_quantity": safe_float(annualized_turnover_quantity),
             "trade_count": int(len(trades)),
             "order_count": int(len(orders)),
             "filled_order_count": int(status_counts.get("FILLED", 0)),
@@ -159,7 +186,11 @@ def comparison_metrics(candidate: dict[str, Any], baseline: dict[str, Any] | Non
         "annualized_volatility",
         "max_drawdown",
         "sharpe_ratio",
-        "annualized_turnover",
+        "turnover_amount_total",
+        "turnover_amount_ratio",
+        "annualized_turnover_amount",
+        "turnover_quantity_total",
+        "annualized_turnover_quantity",
         "trade_count",
         "order_count",
         "rejected_order_count",

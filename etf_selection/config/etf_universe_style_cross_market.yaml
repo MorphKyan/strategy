@@ -1,4 +1,6 @@
 selection:
+  train_end_date: '2025-06-30'
+  test_start_date: '2025-07-01'
   min_history_years: 3
   top_k_per_sleeve: 3
   max_baskets: 30
