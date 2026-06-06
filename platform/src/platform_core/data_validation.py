@@ -38,7 +38,7 @@ def load_platform_close_series(platform_data_dir: str | Path, code: str, start: 
     data = LocalCsvBarData(platform_data_dir, [asset], start_date=start, end_date=end)
     frame = data.frames[code].copy()
     frame.index = pd.to_datetime(frame.index)
-    return frame["close"].dropna().sort_index()
+    return frame["adj_close"].dropna().sort_index()
 
 
 def compare_hfq_data(

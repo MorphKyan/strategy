@@ -294,7 +294,7 @@ def test_platform_backtest_executes_signal_next_day_at_open_close_midpoint(tmp_p
         "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None}],
         "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
         "backtest": {"start_date": "2024-01-02", "end_date": "2024-01-04"},
-        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001, "execution_price_field": "open_close_mid"},
         "strategies": {
             "segments": [
                 {

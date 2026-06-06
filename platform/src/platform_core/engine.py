@@ -67,7 +67,7 @@ class PlatformBacktestEngine:
                     rate=float(fee_config.get("rate", 0.0002)),
                     min_fee=float(fee_config.get("min_fee", 0.0)),
                 ),
-                price_field=execution_config.get("execution_price_field", "open_close_mid"),
+                price_field=execution_config.get("execution_price_field", "open"),
                 weight_tolerance=float(execution_config.get("weight_tolerance", 0.0005)),
                 unfilled_policy=execution_config.get("unfilled_policy", "retry_next_day"),
                 cash_buffer_pct=float(execution_config.get("cash_buffer_pct", 0.0)),

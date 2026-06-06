@@ -21,7 +21,7 @@ class FeeProfile:
 @dataclass(frozen=True)
 class ExecutionConfig:
     fee_profile: FeeProfile
-    price_field: str = "open_close_mid"
+    price_field: str = "open"
     weight_tolerance: float = 0.0005
     unfilled_policy: str = "retry_next_day"
     cash_buffer_pct: float = 0.0

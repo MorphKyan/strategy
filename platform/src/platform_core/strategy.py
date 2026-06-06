@@ -188,6 +188,8 @@ class RiskParityStrategy(Strategy):
         return self._inverse_vol_target(context, universe)
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np
+        
         rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
         min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
         use_nav = bool(context.params.get("use_nav", False))
@@ -206,7 +208,179 @@ class RiskParityStrategy(Strategy):
         if price_frame.empty:
             return None
             
-        # Convert index to DatetimeIndex for resampling
+        price_frame.index = pd.to_datetime(price_frame.index)
+        
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+
+        if len(price_frame) < min_p + 1:
+            return None
+            
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+            
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+            
+        Sigma = np.cov(X, rowvar=False)
+        if N == 1:
+            Sigma = np.array([[Sigma]])
+            
+        try:
+            weights = self._solve_risk_parity(Sigma)
+        except Exception:
+            weights = np.ones(N) / N
+            
+        return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
+
+    def _solve_risk_parity(self, Sigma: np.ndarray) -> np.ndarray:
+        import numpy as np
+        N = Sigma.shape[0]
+        
+        try:
+            min_eig = np.min(np.real(np.linalg.eigvals(Sigma)))
+            if min_eig < 1e-6:
+                Sigma = Sigma + (1e-6 - min_eig) * np.eye(N)
+        except Exception:
+            Sigma = Sigma + 1e-6 * np.eye(N)
+            
+        diag_var = np.diag(Sigma)
+        x = 1.0 / np.sqrt(np.maximum(diag_var, 1e-8))
+        
+        max_iter = 100
+        tol = 1e-6
+        for _ in range(max_iter):
+            x_old = x.copy()
+            for i in range(N):
+                b = np.dot(Sigma[i], x) - Sigma[i, i] * x[i]
+                a = Sigma[i, i]
+                if a <= 1e-8:
+                    a = 1e-8
+                
+                discriminant = b**2 + 4 * a
+                if discriminant < 0:
+                    discriminant = 0.0
+                x[i] = (-b + np.sqrt(discriminant)) / (2 * a)
+                
+            if np.max(np.abs(x - x_old)) < tol:
+                break
+                
+        w = x / np.maximum(x.sum(), 1e-8)
+        return w
+
+    @staticmethod
+    def _calendar_index(context: StrategyContext) -> int:
+        try:
+            return context.data.calendar.index(context.date)
+        except ValueError:
+            return -1
+
+    @staticmethod
+    def _is_rebalance_day(context: StrategyContext) -> bool:
+        idx = RiskParityStrategy._calendar_index(context)
+        if idx < 0:
+            return False
+        if idx == len(context.data.calendar) - 1:
+            return True
+        current = context.date
+        next_date = context.data.calendar[idx + 1]
+        
+        freq = context.runtime.get("rebalance_frequency", "quarterly")
+        if freq == "semiannually":
+            current_q = (current.month - 1) // 3
+            next_q = (next_date.month - 1) // 3
+            return current_q != next_q and current_q in (0, 2)
+        elif freq == "monthly":
+            return current.year != next_date.year or current.month != next_date.month
+        else: # quarterly
+            current_quarter = (current.month - 1) // 3
+            next_quarter = (next_date.month - 1) // 3
+            return current.year != next_date.year or current_quarter != next_quarter
+
+
+class InverseVolatilityStrategy(Strategy):
+    name = "inverse_volatility"
+    version = "0.1.0"
+
+    def initialize(self, context: StrategyContext) -> None:
+        context.runtime["opened"] = context.params.get("init_mode", "calculate") == "manual"
+        context.runtime["rebalance_frequency"] = context.params.get("rebalance_frequency", "quarterly")
+
+    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+        universe = context.params.get("universe") or context.available_asset_ids()
+        universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
+        if not universe:
+            return None
+
+        if not bool(context.runtime.get("opened", False)):
+            target = self._initial_target(context, universe)
+            if target is None:
+                return None
+            context.runtime["opened"] = True
+            return target
+
+        if not self._is_rebalance_day(context):
+            return None
+
+        target = self._inverse_vol_target(context, universe)
+        if target is None:
+            return None
+
+        prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
+        current_weights = context.state.weights(prices)
+        threshold = float(context.params.get("rebalance_threshold", 0.05))
+        for asset_id, target_weight in target.weights.items():
+            if abs(current_weights.get(asset_id, 0.0) - target_weight) > threshold:
+                return target
+        return None
+
+    def _initial_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        init_mode = context.params.get("init_mode", "calculate")
+        if init_mode == "manual":
+            weights = context.params.get("initial_weights", [])
+            if len(weights) != len(universe):
+                raise ValueError("initial_weights length must match risk parity universe length.")
+            return TargetPortfolio({asset_id: float(weight) for asset_id, weight in zip(universe, weights)})
+
+        init_calc_days = int(context.params.get("init_calc_days", 30))
+        if self._calendar_index(context) < init_calc_days:
+            return None
+        return self._inverse_vol_target(context, universe)
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+            
         price_frame.index = pd.to_datetime(price_frame.index)
         
         if estimation_freq == "weekly":
@@ -243,7 +417,7 @@ class RiskParityStrategy(Strategy):
 
     @staticmethod
     def _is_rebalance_day(context: StrategyContext) -> bool:
-        idx = RiskParityStrategy._calendar_index(context)
+        idx = InverseVolatilityStrategy._calendar_index(context)
         if idx < 0:
             return False
         if idx == len(context.data.calendar) - 1:
@@ -253,7 +427,6 @@ class RiskParityStrategy(Strategy):
         
         freq = context.runtime.get("rebalance_frequency", "quarterly")
         if freq == "semiannually":
-            # Rebalance at the end of Q1 (March) and Q3 (September) to align with research "2QE" resampling
             current_q = (current.month - 1) // 3
             next_q = (next_date.month - 1) // 3
             return current_q != next_q and current_q in (0, 2)
@@ -577,32 +750,6 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
             delta = 0.1
             Sigma = delta * F + (1.0 - delta) * S
             return Sigma
-
-    def _solve_risk_parity(self, Sigma: np.ndarray) -> np.ndarray:
-        import numpy as np
-        N = Sigma.shape[0]
-        diag_var = np.diag(Sigma)
-        
-        # 初始权重设置为逆波动率
-        x = 1.0 / np.sqrt(np.maximum(diag_var, 1e-8))
-        
-        max_iter = 100
-        tol = 1e-6
-        for _ in range(max_iter):
-            x_old = x.copy()
-            for i in range(N):
-                b = np.dot(Sigma[i], x) - Sigma[i, i] * x[i]
-                a = Sigma[i, i]
-                if a <= 1e-8:
-                    a = 1e-8
-                x[i] = (-b + np.sqrt(b**2 + 4 * a)) / (2 * a)
-                
-            if np.max(np.abs(x - x_old)) < tol:
-                break
-                
-        weights = x / np.sum(x)
-        return weights
-
 
 
 
@@ -1627,6 +1774,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
     FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
     DriftRebalanceFixedWeightStrategy.name: DriftRebalanceFixedWeightStrategy,
+    InverseVolatilityStrategy.name: InverseVolatilityStrategy,
     RiskParityStrategy.name: RiskParityStrategy,
     RiskParityEWMAStrategy.name: RiskParityEWMAStrategy,
     RiskParityEWMADrawdownRecoveryStrategy.name: RiskParityEWMADrawdownRecoveryStrategy,
