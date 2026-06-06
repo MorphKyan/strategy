@@ -65,7 +65,7 @@ class PlatformBacktestEngine:
                     rate=float(fee_config.get("rate", 0.0002)),
                     min_fee=float(fee_config.get("min_fee", 0.0)),
                 ),
-                price_field=config.get("execution", {}).get("price_field", "close"),
+                price_field=config.get("execution", {}).get("execution_price_field", "open_close_mid"),
                 weight_tolerance=float(config.get("execution", {}).get("weight_tolerance", 0.0005)),
                 unfilled_policy=config.get("execution", {}).get("unfilled_policy", "retry_next_day"),
                 cash_buffer_pct=float(config.get("execution", {}).get("cash_buffer_pct", 0.0)),
@@ -129,7 +129,7 @@ class PlatformBacktestEngine:
                 active_segment_key = self._segment_key(segment)
 
             state.decrement_cooldowns()
-            pending_target = self._target_from_pending(state)
+            pending_target = self._target_from_pending(state, current_date)
             if pending_target is not None:
                 orders, trades = self.execution.apply_target(
                     current_date=current_date,
@@ -139,6 +139,7 @@ class PlatformBacktestEngine:
                     target=pending_target,
                     cooldown_days=int(active_strategy_runtime.get("cooldown_days", 0)),
                     close_absent_positions=False,
+                    signal_dates=self._signal_dates_from_pending(state, current_date),
                 )
                 order_rows.extend(order.to_row() for order in orders)
                 trade_rows.extend(trade.to_row() for trade in trades)
@@ -158,16 +159,6 @@ class PlatformBacktestEngine:
             if target is not None:
                 self._validate_target_assets(target)
                 self._replace_pending(state, target, current_date)
-                orders, trades = self.execution.apply_target(
-                    current_date=current_date,
-                    state=state,
-                    assets=self.assets,
-                    bars=bars,
-                    target=target,
-                    cooldown_days=int(active_strategy_runtime.get("cooldown_days", 0)),
-                )
-                order_rows.extend(order.to_row() for order in orders)
-                trade_rows.extend(trade.to_row() for trade in trades)
 
             prices = {asset_id: bar.close for asset_id, bar in bars.items()}
             total_value = state.total_value(prices)
@@ -268,16 +259,38 @@ class PlatformBacktestEngine:
         )
 
     @staticmethod
-    def _target_from_pending(state: PortfolioState) -> TargetPortfolio | None:
-        if not state.pending_intents:
+    def _target_from_pending(state: PortfolioState, current_date: date) -> TargetPortfolio | None:
+        due = {
+            asset_id: intent.target_weight
+            for asset_id, intent in state.pending_intents.items()
+            if intent.created_date < current_date
+        }
+        if not due:
             return None
-        return TargetPortfolio({asset_id: intent.target_weight for asset_id, intent in state.pending_intents.items()})
+        return TargetPortfolio(due)
+
+    @staticmethod
+    def _signal_dates_from_pending(state: PortfolioState, current_date: date) -> dict[str, date]:
+        return {
+            asset_id: intent.signal_date or intent.created_date
+            for asset_id, intent in state.pending_intents.items()
+            if intent.created_date < current_date
+        }
 
     @staticmethod
     def _replace_pending(state: PortfolioState, target: TargetPortfolio, current_date: date) -> None:
+        target_weights = dict(target.weights)
+        for asset_id, position in state.positions.items():
+            if position.quantity > 1e-9 and asset_id not in target_weights:
+                target_weights[asset_id] = 0.0
         state.pending_intents = {
-            asset_id: PendingIntent(asset_id=asset_id, target_weight=weight, created_date=current_date)
-            for asset_id, weight in target.weights.items()
+            asset_id: PendingIntent(
+                asset_id=asset_id,
+                target_weight=weight,
+                created_date=current_date,
+                signal_date=current_date,
+            )
+            for asset_id, weight in target_weights.items()
         }
 
     def _validate_target_assets(self, target: TargetPortfolio) -> None:
@@ -294,6 +307,10 @@ class PlatformBacktestEngine:
             "run_id": self.run_id,
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "engine": "platform_core.daily_event",
+            "execution_model": {
+                "signal_execution_lag_days": 1,
+                "execution_price_field": self.execution.config.price_field,
+            },
             "metrics": metrics,
             "data_quality_notes": self.data.quality.notes + self.data_quality_notes,
         }
@@ -313,6 +330,8 @@ class PlatformBacktestEngine:
             "",
             "## 说明",
             "- 该 M0-M2 引擎使用日频 K 线和目标权重策略。",
+            "- 策略目标在信号日收盘后入队，最早于下一交易日执行。",
+            "- 默认成交价使用执行日开盘价与收盘价的中间价代理。",
             "- 未成交的再平衡意图会在后续交易日继续重试。",
         ]
         quality_notes = self.data.quality.notes + self.data_quality_notes

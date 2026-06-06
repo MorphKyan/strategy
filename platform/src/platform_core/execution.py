@@ -21,7 +21,7 @@ class FeeProfile:
 @dataclass(frozen=True)
 class ExecutionConfig:
     fee_profile: FeeProfile
-    price_field: str = "close"
+    price_field: str = "open_close_mid"
     weight_tolerance: float = 0.0005
     unfilled_policy: str = "retry_next_day"
     cash_buffer_pct: float = 0.0
@@ -44,8 +44,9 @@ class ExecutionEngine:
         target: TargetPortfolio,
         cooldown_days: int = 0,
         close_absent_positions: bool = True,
+        signal_dates: dict[str, date] | None = None,
     ) -> tuple[list[Order], list[Trade]]:
-        prices = {asset_id: getattr(bar, self.config.price_field) for asset_id, bar in bars.items()}
+        prices = {asset_id: self._price_for_bar(bar) for asset_id, bar in bars.items()}
         state_value = state.total_value(prices)
         orders: list[Order] = []
         trades: list[Trade] = []
@@ -104,6 +105,7 @@ class ExecutionEngine:
                 quantity=quantity,
                 price=price,
                 target_weight=target_weight,
+                signal_date=self._signal_date_for(asset_id, current_date, state, signal_dates),
             )
 
             failure = self._validate_order(order, bar)
@@ -111,7 +113,7 @@ class ExecutionEngine:
                 order.status = "REJECTED"
                 order.reason = failure
                 orders.append(order)
-                self._handle_unfilled(state, asset_id, target_weight, current_date, failure)
+                self._handle_unfilled(state, asset_id, target_weight, current_date, failure, order.signal_date)
                 continue
 
             if side == "BUY":
@@ -125,7 +127,7 @@ class ExecutionEngine:
                 order.status = "REJECTED"
                 order.reason = "insufficient_cash_or_lot"
                 orders.append(order)
-                self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason)
+                self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason, order.signal_date)
                 continue
 
             trade_value = quantity * price
@@ -136,7 +138,7 @@ class ExecutionEngine:
                     order.status = "REJECTED"
                     order.reason = "insufficient_cash"
                     orders.append(order)
-                    self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason)
+                    self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason, order.signal_date)
                     continue
                 old_value = position.quantity * position.cost_basis
                 state.cash -= total_cost
@@ -147,7 +149,7 @@ class ExecutionEngine:
                     order.status = "REJECTED"
                     order.reason = "insufficient_position"
                     orders.append(order)
-                    self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason)
+                    self._handle_unfilled(state, asset_id, target_weight, current_date, order.reason, order.signal_date)
                     continue
                 state.cash += trade_value - fee
                 position.quantity -= quantity
@@ -170,18 +172,39 @@ class ExecutionEngine:
                 trade_value=trade_value,
                 fee=fee,
                 cash_after=state.cash,
+                signal_date=order.signal_date,
             )
             trades.append(trade)
 
-            post_prices = {item_id: getattr(item_bar, self.config.price_field) for item_id, item_bar in bars.items()}
+            post_prices = {item_id: self._price_for_bar(item_bar) for item_id, item_bar in bars.items()}
             post_value = state.total_value(post_prices)
             post_weight = position.quantity * price / post_value if post_value > 0 else 0.0
             if abs(post_weight - target_weight) <= self.config.weight_tolerance:
                 state.pending_intents.pop(asset_id, None)
             else:
-                self._handle_unfilled(state, asset_id, target_weight, current_date, "partial_fill")
+                self._handle_unfilled(state, asset_id, target_weight, current_date, "partial_fill", order.signal_date)
 
         return orders, trades
+
+    def _price_for_bar(self, bar: Bar) -> float:
+        field = self.config.price_field
+        if field in {"open_close_mid", "oc_mid", "open_close_midpoint"}:
+            return (float(bar.open) + float(bar.close)) / 2.0
+        return float(getattr(bar, field))
+
+    @staticmethod
+    def _signal_date_for(
+        asset_id: str,
+        current_date: date,
+        state: PortfolioState,
+        signal_dates: dict[str, date] | None,
+    ) -> date:
+        if signal_dates and asset_id in signal_dates:
+            return signal_dates[asset_id]
+        intent = state.pending_intents.get(asset_id)
+        if intent is not None:
+            return intent.signal_date or intent.created_date
+        return current_date
 
     def _available_buy_cash(self, cash: float, state_value: float) -> float:
         reserve = max(0.0, min(1.0, float(self.config.cash_buffer_pct))) * state_value
@@ -221,10 +244,18 @@ class ExecutionEngine:
             return "limit_down"
         return None
 
-    def _handle_unfilled(self, state: PortfolioState, asset_id: str, target_weight: float, current_date: date, reason: str) -> None:
+    def _handle_unfilled(
+        self,
+        state: PortfolioState,
+        asset_id: str,
+        target_weight: float,
+        current_date: date,
+        reason: str,
+        signal_date: date | None = None,
+    ) -> None:
         policy = self.config.unfilled_policy
         if policy == "retry_next_day":
-            self._keep_pending(state, asset_id, target_weight, current_date, reason)
+            self._keep_pending(state, asset_id, target_weight, current_date, reason, signal_date)
             return
         state.pending_intents.pop(asset_id, None)
         if policy == "mark_failed":
@@ -243,12 +274,26 @@ class ExecutionEngine:
         raise ValueError(f"Unknown unfilled_policy: {policy}")
 
     @staticmethod
-    def _keep_pending(state: PortfolioState, asset_id: str, target_weight: float, current_date: date, reason: str) -> None:
+    def _keep_pending(
+        state: PortfolioState,
+        asset_id: str,
+        target_weight: float,
+        current_date: date,
+        reason: str,
+        signal_date: date | None = None,
+    ) -> None:
         intent = state.pending_intents.get(asset_id)
         if intent is None:
-            intent = PendingIntent(asset_id=asset_id, target_weight=target_weight, created_date=current_date)
+            intent = PendingIntent(
+                asset_id=asset_id,
+                target_weight=target_weight,
+                created_date=signal_date or current_date,
+                signal_date=signal_date or current_date,
+            )
             state.pending_intents[asset_id] = intent
         intent.target_weight = target_weight
+        if signal_date is not None:
+            intent.signal_date = intent.signal_date or signal_date
         intent.last_attempt_date = current_date
         intent.attempts += 1
         intent.reason = reason

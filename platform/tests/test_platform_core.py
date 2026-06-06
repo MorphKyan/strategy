@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import csv
 from datetime import date
 from pathlib import Path
 
@@ -249,6 +250,61 @@ def test_platform_backtest_outputs_and_checkpoint_resume(tmp_path: Path):
     manifest = json.loads((result.output_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["engine"] == "platform_core.daily_event"
     assert reference_count == 1
+
+
+def test_platform_backtest_executes_signal_next_day_at_open_close_midpoint(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor",
+                "AAA,2024-01-02,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-03,10,14,10,14,1000,12000,1",
+                "AAA,2024-01-04,20,20,20,20,1000,20000,1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config = {
+        "platform": {"run_name": "next_day_midpoint"},
+        "data": {"data_dir": str(data_dir)},
+        "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None}],
+        "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
+        "backtest": {"start_date": "2024-01-02", "end_date": "2024-01-04"},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "strategies": {
+            "segments": [
+                {
+                    "start_date": "2024-01-02",
+                    "end_date": None,
+                    "strategy_name": "monthly_equal_weight",
+                    "strategy_version_id": None,
+                    "params": {"universe": ["A"], "rebalance_on_start": True},
+                }
+            ]
+        },
+        "output": {"results_dir": str(tmp_path / "results")},
+    }
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+    finally:
+        store.close()
+
+    with (result.output_dir / "orders.csv").open(newline="", encoding="utf-8") as handle:
+        orders = list(csv.DictReader(handle))
+    with (result.output_dir / "trades.csv").open(newline="", encoding="utf-8") as handle:
+        trades = list(csv.DictReader(handle))
+
+    assert len(orders) == 1
+    assert len(trades) == 1
+    assert orders[0]["date"] == "2024-01-03"
+    assert orders[0]["signal_date"] == "2024-01-02"
+    assert trades[0]["date"] == "2024-01-03"
+    assert trades[0]["signal_date"] == "2024-01-02"
+    assert float(trades[0]["price"]) == pytest.approx(12.0)
+    assert float(trades[0]["quantity"]) == pytest.approx(83.0)
 
 
 class DummySource:

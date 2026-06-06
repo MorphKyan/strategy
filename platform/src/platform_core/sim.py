@@ -47,7 +47,7 @@ class SimPortfolio:
         self.execution = ExecutionEngine(
             ExecutionConfig(
                 fee_profile=FeeProfile(rate=float(fee_config.get("rate", 0.0002)), min_fee=float(fee_config.get("min_fee", 0.0))),
-                price_field=config.get("execution", {}).get("price_field", "close"),
+                price_field=config.get("execution", {}).get("execution_price_field", "open_close_mid"),
                 weight_tolerance=float(config.get("execution", {}).get("weight_tolerance", 0.0005)),
                 unfilled_policy=config.get("execution", {}).get("unfilled_policy", "retry_next_day"),
                 cash_buffer_pct=float(config.get("execution", {}).get("cash_buffer_pct", 0.0)),
@@ -134,7 +134,7 @@ class SimPortfolio:
                 active_segment_key = self._segment_key(segment)
 
             self.state.decrement_cooldowns()
-            pending_target = self._target_from_pending()
+            pending_target = self._target_from_pending(current_date)
             if pending_target is not None:
                 orders, trades = self.execution.apply_target(
                     current_date=current_date,
@@ -144,6 +144,7 @@ class SimPortfolio:
                     target=pending_target,
                     cooldown_days=int(active_strategy_runtime.get("cooldown_days", 0)),
                     close_absent_positions=False,
+                    signal_dates=self._signal_dates_from_pending(current_date),
                 )
                 order_rows.extend(order.to_row() for order in orders)
                 trade_rows.extend(trade.to_row() for trade in trades)
@@ -163,16 +164,6 @@ class SimPortfolio:
             )
             if target is not None:
                 self._replace_pending(target, current_date)
-                orders, trades = self.execution.apply_target(
-                    current_date=current_date,
-                    state=self.state,
-                    assets=self.assets,
-                    bars=bars,
-                    target=target,
-                    cooldown_days=int(active_strategy_runtime.get("cooldown_days", 0)),
-                )
-                order_rows.extend(order.to_row() for order in orders)
-                trade_rows.extend(trade.to_row() for trade in trades)
 
             prices = {asset_id: bar.close for asset_id, bar in bars.items()}
             total_value = self.state.total_value(prices)
@@ -206,6 +197,10 @@ class SimPortfolio:
                 "portfolio_id": self.portfolio_id,
                 "source_checkpoint": str(self.source_checkpoint),
                 "generated_at": datetime.now().isoformat(timespec="seconds"),
+                "execution_model": {
+                    "signal_execution_lag_days": 1,
+                    "execution_price_field": self.execution.config.price_field,
+                },
                 "metrics": metrics,
             },
         )
@@ -271,15 +266,36 @@ class SimPortfolio:
             ]
         )
 
-    def _target_from_pending(self) -> TargetPortfolio | None:
-        if not self.state.pending_intents:
+    def _target_from_pending(self, current_date) -> TargetPortfolio | None:
+        due = {
+            asset_id: intent.target_weight
+            for asset_id, intent in self.state.pending_intents.items()
+            if intent.created_date < current_date
+        }
+        if not due:
             return None
-        return TargetPortfolio({asset_id: intent.target_weight for asset_id, intent in self.state.pending_intents.items()})
+        return TargetPortfolio(due)
+
+    def _signal_dates_from_pending(self, current_date) -> dict[str, Any]:
+        return {
+            asset_id: intent.signal_date or intent.created_date
+            for asset_id, intent in self.state.pending_intents.items()
+            if intent.created_date < current_date
+        }
 
     def _replace_pending(self, target: TargetPortfolio, current_date) -> None:
+        target_weights = dict(target.weights)
+        for asset_id, position in self.state.positions.items():
+            if position.quantity > 1e-9 and asset_id not in target_weights:
+                target_weights[asset_id] = 0.0
         self.state.pending_intents = {
-            asset_id: PendingIntent(asset_id=asset_id, target_weight=weight, created_date=current_date)
-            for asset_id, weight in target.weights.items()
+            asset_id: PendingIntent(
+                asset_id=asset_id,
+                target_weight=weight,
+                created_date=current_date,
+                signal_date=current_date,
+            )
+            for asset_id, weight in target_weights.items()
         }
 
     def _write_state(self, path: Path) -> None:

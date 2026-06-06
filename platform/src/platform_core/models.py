@@ -61,6 +61,7 @@ class PendingIntent:
     asset_id: str
     target_weight: float
     created_date: date
+    signal_date: date | None = None
     last_attempt_date: date | None = None
     attempts: int = 0
     reason: str = "pending"
@@ -70,6 +71,7 @@ class PendingIntent:
             "asset_id": self.asset_id,
             "target_weight": self.target_weight,
             "created_date": date_str(self.created_date),
+            "signal_date": date_str(self.signal_date or self.created_date),
             "last_attempt_date": date_str(self.last_attempt_date),
             "attempts": self.attempts,
             "reason": self.reason,
@@ -81,6 +83,7 @@ class PendingIntent:
             asset_id=payload["asset_id"],
             target_weight=float(payload["target_weight"]),
             created_date=parse_date(payload["created_date"]),
+            signal_date=parse_date(payload["signal_date"]) if payload.get("signal_date") else parse_date(payload["created_date"]),
             last_attempt_date=parse_date(payload["last_attempt_date"]) if payload.get("last_attempt_date") else None,
             attempts=int(payload.get("attempts", 0)),
             reason=payload.get("reason", "pending"),
@@ -202,6 +205,7 @@ class Order:
     status: str = "CREATED"
     reason: str = ""
     target_weight: float | None = None
+    signal_date: date | None = None
 
     @property
     def trade_value(self) -> float:
@@ -219,6 +223,7 @@ class Order:
             "status": self.status,
             "reason": self.reason,
             "target_weight": self.target_weight,
+            "signal_date": date_str(self.signal_date),
         }
 
 
@@ -234,6 +239,7 @@ class Trade:
     trade_value: float
     fee: float
     cash_after: float
+    signal_date: date | None = None
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -247,4 +253,5 @@ class Trade:
             "trade_value": self.trade_value,
             "fee": self.fee,
             "cash_after": self.cash_after,
+            "signal_date": date_str(self.signal_date),
         }
