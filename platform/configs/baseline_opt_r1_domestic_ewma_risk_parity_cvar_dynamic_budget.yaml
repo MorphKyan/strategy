@@ -46,7 +46,7 @@ execution:
 output:
   results_dir: results/backtests
 platform:
-  run_name: optimal_baseline_r1_domestic_ewma_risk_parity_cvar_dynamic_budget
+  run_name: baseline_opt_r1_domestic_ewma_risk_parity_cvar_dynamic_budget
 portfolio:
   initial_cash: 1000000.0
   initial_equity: 1000000.0

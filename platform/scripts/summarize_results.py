@@ -60,7 +60,7 @@ def main():
     df = pd.DataFrame(rows)
     
     # Sort configs: baseline first, then optimal
-    df["type"] = df["Config"].apply(lambda x: 0 if x.startswith("baseline_") else 1)
+    df["type"] = df["Config"].apply(lambda x: 0 if (x.startswith("baseline_") and "_opt_" not in x) else 1)
     df = df.sort_values(by=["type", "Config"]).drop(columns=["type"])
     
     # Write to summary_table.md

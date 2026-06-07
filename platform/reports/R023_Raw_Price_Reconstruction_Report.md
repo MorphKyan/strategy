@@ -93,14 +93,14 @@
 | **baseline_risk_parity_hrp** | 2.688 | 2.858 | 2.294 | 6.44% | -2.00% | 39.64% | 7 | 2.792 | 0.539 |
 | **baseline_risk_parity_lw_cov** | 2.896 | 3.121 | 2.595 | 10.97% | -3.57% | 54.66% | 15 | 3.039 | 0.235 |
 | **baseline_us_blend_ewma** | 1.507 | 1.402 | 2.175 | 4.14% | -3.39% | 50.28% | 52 | 1.950 | 0.470 |
-| **optimal_baseline_mvp_equal_weight** | 3.368 | 3.622 | 2.880 | 13.60% | -2.73% | 108.02% | 51 | 3.501 | 0.265 |
-| **optimal_baseline_r1_domestic_ewma** | 1.860 | 1.637 | 2.966 | 2.93% | -1.70% | 23.77% | 33 | 2.359 | 0.586 |
-| **optimal_baseline_r1_domestic_low_vol_ewma** | 1.666 | 1.599 | 2.077 | 2.60% | -1.77% | 19.06% | 17 | 2.299 | 0.562 |
-| **optimal_baseline_r2_global_dividend_ewma** | 1.806 | 1.672 | 2.564 | 3.04% | -2.34% | 21.41% | 26 | 2.338 | 0.527 |
-| **optimal_baseline_r2_global_ewma** | 1.869 | 1.786 | 2.432 | 3.35% | -1.99% | 25.80% | 40 | 2.478 | 0.557 |
-| **optimal_baseline_r3_global_nasdaq_all_weather_ewma** | 2.434 | 2.239 | 2.974 | 5.67% | -1.97% | 48.92% | 51 | 2.453 | 0.536 |
+| **baseline_opt_mvp_equal_weight_risk_parity_ewma** | 3.368 | 3.622 | 2.880 | 13.60% | -2.73% | 108.02% | 51 | 3.501 | 0.265 |
+| **baseline_opt_r1_domestic_ewma_risk_parity_cvar_dynamic_budget** | 1.860 | 1.637 | 2.966 | 2.93% | -1.70% | 23.77% | 33 | 2.359 | 0.586 |
+| **baseline_opt_r1_domestic_low_vol_ewma_risk_parity_cvar_dynamic_budget** | 1.666 | 1.599 | 2.077 | 2.60% | -1.77% | 19.06% | 17 | 2.299 | 0.562 |
+| **baseline_opt_r2_global_dividend_ewma_risk_parity_cvar_dynamic_budget** | 1.806 | 1.672 | 2.564 | 3.04% | -2.34% | 21.41% | 26 | 2.338 | 0.527 |
+| **baseline_opt_r2_global_ewma_risk_parity_cvar_dynamic_budget** | 1.869 | 1.786 | 2.432 | 3.35% | -1.99% | 25.80% | 40 | 2.478 | 0.557 |
+| **baseline_opt_r3_global_nasdaq_all_weather_ewma_risk_parity_cvar_dynamic_budget** | 2.434 | 2.239 | 2.974 | 5.67% | -1.97% | 48.92% | 51 | 2.453 | 0.536 |
 
-*(注：其他优化基准如 r5, r6, hrp, lw_cov 等的 optimal 配置均共享相同的底层最优权重映射，因此展现了与 `optimal_baseline_mvp_equal_weight` 相同的计算数据)*
+*(注：其他优化基准如 r5, r6, hrp, lw_cov 等的 optimal 配置均共享相同的底层最优权重映射，因此展现了与 `baseline_opt_mvp_equal_weight_risk_parity_ewma` 相同的计算数据)*
 
 ### 4.2 关键差异与表现归因 (Key Findings)
 1. **现金拖累与收益率修正**：
@@ -108,7 +108,7 @@
 2. **夏普比率的变化**：
    重构后，部分组合（如 `baseline_r5_cvar_dynamic_budget`）依然维持了极高的稳健性，夏普比率在训练集（IS Sharpe = 3.454）和测试集（OOS Sharpe = 2.809）中均非常稳健。这证明该策略通过条件尾部风险（CVaR）优化和波动率目标控制，在外推到全无复权价格真实建模环境后，依然具备出色的稳健防御能力。
 3. **敏感性稳定性**：
-   在起点敏感性测试（每隔 2 个月起跑一个回测）中，大部分组合如 `optimal_baseline_mvp_equal_weight` 展现出了极窄的夏普标准差（`Sens Sharpe Std` = 0.265），均值（3.501）非常接近全样本夏普，这强力排除了特定起跑日期对策略表现造成的偶发影响。
+   在起点敏感性测试（每隔 2 个月起跑一个回测）中，大部分组合如 `baseline_opt_mvp_equal_weight_risk_parity_ewma` 展现出了极窄的夏普标准差（`Sens Sharpe Std` = 0.265），均值（3.501）非常接近全样本夏普，这强力排除了特定起跑日期对策略表现造成的偶发影响。
 
 ---
 

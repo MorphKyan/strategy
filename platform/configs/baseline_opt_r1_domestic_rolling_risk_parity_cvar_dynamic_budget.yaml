@@ -15,14 +15,6 @@ assets:
   lot_size: 100
   name: 红利低波ETF
   price_limit_pct: 0.1
-- asset_id: CN_ETF:513100.SH
-  asset_type: etf
-  code: '513100'
-  currency: CNY
-  exchange: SH
-  lot_size: 100
-  name: 纳指ETF
-  price_limit_pct: 0.1
 - asset_id: CN_ETF:518880.SH
   asset_type: etf
   code: '518880'
@@ -39,25 +31,9 @@ assets:
   lot_size: 100
   name: 十年国债ETF
   price_limit_pct: 0.1
-- asset_id: CN_ETF:159985.SZ
-  asset_type: etf
-  code: '159985'
-  currency: CNY
-  exchange: SZ
-  lot_size: 100
-  name: 豆粕ETF
-  price_limit_pct: 0.1
-- asset_id: CN_ETF:159981.SZ
-  asset_type: etf
-  code: '159981'
-  currency: CNY
-  exchange: SZ
-  lot_size: 100
-  name: 能源化工ETF
-  price_limit_pct: 0.1
 backtest:
   end_date: '2026-06-01'
-  start_date: '2022-05-31'
+  start_date: '2019-02-28'
 data:
   data_dir: data
 execution:
@@ -70,7 +46,7 @@ execution:
 output:
   results_dir: results/backtests
 platform:
-  run_name: optimal_baseline_r3_global_nasdaq_all_weather_ewma_risk_parity_cvar_dynamic_budget
+  run_name: baseline_opt_r1_domestic_rolling_risk_parity_cvar_dynamic_budget
 portfolio:
   initial_cash: 1000000.0
   initial_equity: 1000000.0
@@ -90,12 +66,9 @@ strategies:
       universe:
       - CN_ETF:510300.SH
       - CN_ETF:512890.SH
-      - CN_ETF:513100.SH
       - CN_ETF:518880.SH
       - CN_ETF:511260.SH
-      - CN_ETF:159985.SZ
-      - CN_ETF:159981.SZ
       volatility_target: 0.08
-    start_date: '2022-05-31'
+    start_date: '2019-02-28'
     strategy_name: risk_parity_cvar_dynamic_budget
     strategy_version_id: null

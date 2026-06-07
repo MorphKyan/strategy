@@ -25,20 +25,10 @@ assets:
   price_limit_pct: 0.1
 backtest:
   enable_checkpoints: false
-  end_date: '2026-05-19'
+  end_date: '2026-06-01'
   start_date: '2017-08-24'
 data:
   data_dir: data
-  fetch: false
-  fundamental_fields:
-  - pe
-  - pb
-  - roe
-  - debt_to_asset
-  - dividend_yield
-  fundamentals_dir: data/platform_fundamentals
-  market_store_dir: null
-  source: finshare
 execution:
   fee:
     min_fee: 5.0
@@ -48,9 +38,8 @@ execution:
   weight_tolerance: 0.0005
 output:
   results_dir: results/backtests
-  sim_dir: results/sim_portfolios
 platform:
-  run_name: optimal_baseline_risk_parity_gerber_risk_parity_lw_cov
+  run_name: baseline_opt_mvp_equal_weight_risk_parity_ewma
 portfolio:
   initial_cash: 1000000.0
   initial_equity: 1000000.0
@@ -60,19 +49,7 @@ strategies:
   - cancel_pending_on_start: false
     end_date: null
     params:
-      cooldown_days: 20
-      fundamental_rules:
-        descending: true
-        limit: 3
-        max:
-          pb: 5
-          pe: 30
-        min:
-          roe: 0
-        required:
-        - pe
-        - pb
-        sort_by: dividend_yield
+      ewma_lambda: 0.94
       min_periods: 20
       rebalance_frequency: monthly
       rebalance_threshold: 0.05
@@ -82,5 +59,5 @@ strategies:
       - CN_ETF:518880.SH
       - CN_ETF:511260.SH
     start_date: '2017-08-24'
-    strategy_name: risk_parity_lw_cov
+    strategy_name: risk_parity_ewma
     strategy_version_id: null

@@ -275,7 +275,7 @@ def run_single_config(config_path):
     result_data = {
         "config_name": config_path.name,
         "is_baseline": config_path.name.startswith("baseline_"),
-        "is_optimal": config_path.name.startswith("optimal_"),
+        "is_optimal": config_path.name.startswith("optimal_") or "_opt_" in config_path.name,
         "start_date": start_date,
         "end_date": end_date,
         "full_metrics": full_metrics,

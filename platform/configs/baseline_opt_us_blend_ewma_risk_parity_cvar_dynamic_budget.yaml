@@ -21,7 +21,15 @@ assets:
   currency: CNY
   exchange: SH
   lot_size: 100
-  name: 标谱500ETF
+  name: 标普500ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:513100.SH
+  asset_type: etf
+  code: '513100'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 纳指ETF
   price_limit_pct: 0.1
 - asset_id: CN_ETF:518880.SH
   asset_type: etf
@@ -54,7 +62,7 @@ execution:
 output:
   results_dir: results/backtests
 platform:
-  run_name: optimal_baseline_r2_global_ewma_risk_parity_cvar_dynamic_budget
+  run_name: baseline_opt_us_blend_ewma_risk_parity_cvar_dynamic_budget
 portfolio:
   initial_cash: 1000000.0
   initial_equity: 1000000.0
@@ -75,6 +83,7 @@ strategies:
       - CN_ETF:510300.SH
       - CN_ETF:512890.SH
       - CN_ETF:513500.SH
+      - CN_ETF:513100.SH
       - CN_ETF:518880.SH
       - CN_ETF:511260.SH
       volatility_target: 0.08

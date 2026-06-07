@@ -244,13 +244,14 @@ def main():
                 matching.append(cand)
                 
         # Also include existing optimal config as a candidate if its assets match
-        opt_path = CONFIGS_DIR / f"optimal_{bp.name}"
-        if opt_path.exists():
+        stem_suffix = bp.stem[len("baseline_"):] if bp.name.startswith("baseline_") else bp.stem
+        existing_opt_files = list(CONFIGS_DIR.glob(f"baseline_opt_{stem_suffix}_*.yaml"))
+        for opt_file in existing_opt_files:
             try:
-                opt_cfg = read_yaml(opt_path)
+                opt_cfg = read_yaml(opt_file)
                 if get_asset_codes(opt_cfg) == b_assets and get_strategy_name(opt_cfg) in BUILTIN_STRATEGIES:
                     matching.append({
-                        "path": opt_path,
+                        "path": opt_file,
                         "config": opt_cfg,
                         "strategy_name": get_strategy_name(opt_cfg),
                         "assets": b_assets,
@@ -261,9 +262,9 @@ def main():
                 
         if not matching:
             print("No valid candidates with the same asset universe found. Deleting optimal config if it exists.")
-            if opt_path.exists():
-                opt_path.unlink()
-                print(f"Deleted {opt_path.name}")
+            for opt_file in existing_opt_files:
+                opt_file.unlink()
+                print(f"Deleted {opt_file.name}")
             continue
             
         print(f"Found {len(matching)} matching candidates. Evaluating...")
@@ -291,10 +292,13 @@ def main():
                 
         if best_candidate:
             c_name = best_candidate["path"].name
-            print(f"Result: Candidate {c_name} outperforms baseline. Saving as optimal_{bp.name}")
+            new_strat = best_candidate["strategy_name"]
+            new_opt_name = f"baseline_opt_{stem_suffix}_{new_strat}.yaml"
+            new_opt_path = CONFIGS_DIR / new_opt_name
+            print(f"Result: Candidate {c_name} outperforms baseline. Saving as {new_opt_name}")
             # Ensure output results dir is standard
             opt_cfg_to_save = copy.deepcopy(best_candidate["config"])
-            opt_cfg_to_save["platform"]["run_name"] = f"optimal_{bp.stem}_{best_candidate['strategy_name']}"
+            opt_cfg_to_save["platform"]["run_name"] = f"baseline_opt_{stem_suffix}_{new_strat}"
             opt_cfg_to_save["output"]["results_dir"] = "results/backtests"
             # Ensure backtest dates match standard range (back to original range)
             opt_cfg_to_save["backtest"]["start_date"] = b_cfg["backtest"]["start_date"]
@@ -303,13 +307,19 @@ def main():
                 opt_cfg_to_save["strategies"]["segments"][0]["start_date"] = b_cfg["strategies"]["segments"][0]["start_date"]
                 opt_cfg_to_save["strategies"]["segments"][0]["end_date"] = b_cfg["strategies"]["segments"][0]["end_date"]
             
-            write_yaml(opt_path, opt_cfg_to_save)
-            print(f"Saved {opt_path.name}")
+            # Delete any other existing optimal configs for this baseline to prevent duplicates
+            for opt_file in existing_opt_files:
+                if opt_file != new_opt_path:
+                    opt_file.unlink()
+                    print(f"Deleted outdated optimal config: {opt_file.name}")
+            
+            write_yaml(new_opt_path, opt_cfg_to_save)
+            print(f"Saved {new_opt_path.name}")
         else:
             print("Result: No candidate outperforms the baseline in-sample. Deleting optimal config if it exists.")
-            if opt_path.exists():
-                opt_path.unlink()
-                print(f"Deleted {opt_path.name}")
+            for opt_file in existing_opt_files:
+                opt_file.unlink()
+                print(f"Deleted {opt_file.name}")
 
 if __name__ == "__main__":
     main()

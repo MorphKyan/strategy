@@ -47,7 +47,8 @@ for config_file, best_strat in mapping.items():
     # Update run_name to specify it is the optimal runner
     if "platform" not in cfg:
         cfg["platform"] = {}
-    cfg["platform"]["run_name"] = f"optimal_{config_file.replace('.yaml', '')}_{best_strat}"
+    stem_suffix = config_file.replace('.yaml', '').replace('baseline_', '')
+    cfg["platform"]["run_name"] = f"baseline_opt_{stem_suffix}_{best_strat}"
     
     # Update backtest end date to align with latest available data
     if "backtest" in cfg:
@@ -66,8 +67,15 @@ for config_file, best_strat in mapping.items():
                 segment["params"]["universe"] = universe
                 
     # Save as optimal prefix config
-    dest_file = f"optimal_{config_file}"
+    dest_file = f"baseline_opt_{stem_suffix}_{best_strat}.yaml"
     dest_path = configs_dir / dest_file
+    
+    # Clean up any other existing optimal configs for this baseline to prevent duplicates
+    for old_opt in configs_dir.glob(f"baseline_opt_{stem_suffix}_*.yaml"):
+        if old_opt != dest_path:
+            old_opt.unlink()
+            print(f"Deleted outdated optimal config: {old_opt.name}")
+            
     with open(dest_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(cfg, f, allow_unicode=True)
     print(f"Generated optimal config: {dest_file}")
