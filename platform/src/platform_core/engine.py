@@ -185,10 +185,14 @@ class PlatformBacktestEngine:
                     state.pending_intents.clear()
                 strategy_cls = get_strategy_class(segment["strategy_name"])
                 version_id = segment.get("strategy_version_id")
+                if version_id is not None:
+                    try:
+                        self.store.get_strategy_version(int(version_id))
+                    except KeyError:
+                        version_id = None
                 if version_id is None:
                     version_id = self.store.ensure_builtin_version(strategy_cls, segment.get("params", {}))
                     segment["strategy_version_id"] = version_id
-                self.store.get_strategy_version(int(version_id))
                 self.store.add_strategy_reference(int(version_id), "backtest", str(backtest_id))
                 active_strategy = strategy_cls()
                 active_strategy_runtime = {}
