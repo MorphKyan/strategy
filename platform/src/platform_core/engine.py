@@ -11,7 +11,7 @@ from typing import Any
 import yaml
 
 from src.platform_core.data import LocalCsvBarData
-from src.platform_core.data_store import FundamentalStore, MarketDataStore, PointInTimeFundamentals
+from src.platform_core.data_store import MarketDataStore
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
 from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
 from src.platform_core.storage import SQLiteStore
@@ -50,14 +50,7 @@ class PlatformBacktestEngine:
             start_date=backtest_config.get("start_date"),
             end_date=backtest_config.get("end_date"),
         )
-        self.fundamentals: PointInTimeFundamentals | None = None
-        fundamentals_dir = data_config.get("fundamentals_dir")
-        if fundamentals_dir:
-            if data_fetch:
-                fundamental_store = FundamentalStore(fundamentals_dir, fields=data_config.get("fundamental_fields"))
-                fundamental_report = fundamental_store.sync_financial_indicators(list(self.assets.values()), fetch=True)
-                self.data_quality_notes.extend(fundamental_report.notes)
-            self.fundamentals = PointInTimeFundamentals(fundamentals_dir)
+
         execution_config = config.get("execution", {})
         fee_config = execution_config.get("fee", {})
         slippage_config = execution_config.get("slippage", {})
@@ -204,7 +197,6 @@ class PlatformBacktestEngine:
                     data=self.data,
                     params=segment.get("params", {}),
                     runtime=active_strategy_runtime,
-                    fundamental_provider=self.fundamentals,
                 )
                 active_strategy.initialize(init_context)
                 active_strategy_version_id = int(version_id)
@@ -235,7 +227,6 @@ class PlatformBacktestEngine:
                 data=self.data,
                 params=segment.get("params", {}),
                 runtime=active_strategy_runtime,
-                fundamental_provider=self.fundamentals,
             )
             target = active_strategy.generate_targets(context)
             if target is not None:
@@ -269,12 +260,12 @@ class PlatformBacktestEngine:
                 )
 
             state.last_date = current_date
-            if self.config.get("backtest", {}).get("enable_checkpoints", True):
+            if self.config.get("backtest", {}).get("enable_checkpoints", False):
                 checkpoint_path = self.checkpoint_dir / f"{date_str(current_date)}.json"
                 self._write_json(checkpoint_path, state.to_dict())
                 self.store.add_checkpoint(self.run_id, date_str(current_date), checkpoint_path)
 
-        if not self.config.get("backtest", {}).get("enable_checkpoints", True) and self.data.calendar:
+        if not self.config.get("backtest", {}).get("enable_checkpoints", False) and self.data.calendar:
             last_date = self.data.calendar[-1]
             checkpoint_path = self.checkpoint_dir / f"{date_str(last_date)}.json"
             self._write_json(checkpoint_path, state.to_dict())

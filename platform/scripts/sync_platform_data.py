@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from src.platform_core.data_store import FundamentalStore, MarketDataStore, assets_from_config
+from src.platform_core.data_store import MarketDataStore, assets_from_config
 
 
 def load_config(path: Path) -> dict:
@@ -20,7 +20,7 @@ def load_config(path: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Sync platform market/fundamental data into the local standard store.")
-    parser.add_argument("--config", default="configs/baseline_m3m4_fundamental.yaml", help="Platform YAML config path.")
+    parser.add_argument("--config", default="configs/baseline_mvp_equal_weight.yaml", help="Platform YAML config path.")
     parser.add_argument("--fetch", action="store_true", help="Call Finshare. Without this flag, only validate local standard data.")
     args = parser.parse_args()
 
@@ -31,7 +31,6 @@ def main() -> int:
     backtest = config.get("backtest", {})
 
     market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
-    fundamental_dir = data_config.get("fundamentals_dir")
 
     market_report = MarketDataStore(market_dir).sync_assets(
         assets,
@@ -42,15 +41,6 @@ def main() -> int:
     print(f"Market data checked: {market_dir}")
     for note in market_report.notes:
         print(f"- {note}")
-
-    if fundamental_dir:
-        fundamental_report = FundamentalStore(fundamental_dir, fields=data_config.get("fundamental_fields")).sync_financial_indicators(
-            assets,
-            fetch=args.fetch,
-        )
-        print(f"Fundamental data checked: {fundamental_dir}")
-        for note in fundamental_report.notes:
-            print(f"- {note}")
     return 0
 
 

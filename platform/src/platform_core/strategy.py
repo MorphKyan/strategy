@@ -6,7 +6,6 @@ from typing import Any
 import pandas as pd
 
 from src.platform_core.data import LocalCsvBarData
-from src.platform_core.data_store import PointInTimeFundamentals
 from src.platform_core.models import Asset, Bar, PortfolioState, TargetPortfolio
 
 
@@ -19,7 +18,6 @@ class StrategyContext:
     data: LocalCsvBarData
     params: dict[str, Any]
     runtime: dict[str, Any] = field(default_factory=dict)
-    fundamental_provider: PointInTimeFundamentals | None = None
 
     def set_cooldown(self, days: int) -> None:
         self.runtime["cooldown_days"] = max(0, int(days))
@@ -40,15 +38,7 @@ class StrategyContext:
     def is_month_end(self) -> bool:
         return self.data.is_month_end(self.date)
 
-    def fundamentals(self, asset_id: str) -> dict[str, float]:
-        if self.fundamental_provider is None:
-            return {}
-        return self.fundamental_provider.get(asset_id, self.date)
 
-    def filter_by_fundamentals(self, asset_ids: list[str], rules: dict[str, Any]) -> list[str]:
-        if self.fundamental_provider is None:
-            return []
-        return self.fundamental_provider.filter(asset_ids, self.date, rules)
 
 
 class Strategy:
@@ -78,27 +68,6 @@ class MonthlyEqualWeightStrategy(Strategy):
 
         universe = context.params.get("universe") or context.available_asset_ids()
         universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
-        return TargetPortfolio.equal_weight(universe)
-
-
-class FundamentalValueEqualWeightStrategy(Strategy):
-    name = "fundamental_value_equal_weight"
-    version = "0.1.0"
-
-    def initialize(self, context: StrategyContext) -> None:
-        context.set_cooldown(int(context.params.get("cooldown_days", 0)))
-        context.set_rebalance_frequency(context.params.get("rebalance_frequency", "monthly"))
-
-    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
-        frequency = context.runtime.get("rebalance_frequency", "monthly")
-        if context.state.last_date is not None and frequency == "monthly" and not context.is_month_end():
-            return None
-
-        universe = context.params.get("universe") or context.available_asset_ids()
-        universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
-        rules = context.params.get("fundamental_rules", {})
-        if rules:
-            universe = context.filter_by_fundamentals(universe, rules)
         return TargetPortfolio.equal_weight(universe)
 
 
@@ -1772,7 +1741,6 @@ class QDIIPremiumFactorRotationRiskParityStrategy(RiskParityLWCovStrategy):
 
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,
-    FundamentalValueEqualWeightStrategy.name: FundamentalValueEqualWeightStrategy,
     DriftRebalanceFixedWeightStrategy.name: DriftRebalanceFixedWeightStrategy,
     InverseVolatilityStrategy.name: InverseVolatilityStrategy,
     RiskParityStrategy.name: RiskParityStrategy,

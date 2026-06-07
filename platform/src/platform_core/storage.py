@@ -236,3 +236,167 @@ class SQLiteStore:
     @staticmethod
     def _now() -> str:
         return datetime.now().isoformat(timespec="seconds")
+
+
+class InMemoryStore:
+    def __init__(self, *args, **kwargs):
+        self.drafts: dict[int, dict[str, Any]] = {}
+        self.versions: dict[int, dict[str, Any]] = {}
+        self.backtests: dict[int, dict[str, Any]] = {}
+        self.strategy_references: list[dict[str, Any]] = []
+        self.checkpoints: list[dict[str, Any]] = []
+        self.sim_portfolios: dict[str, dict[str, Any]] = {}
+        self.sim_portfolio_runs: dict[int, dict[str, Any]] = {}
+        self.sim_portfolio_events: list[dict[str, Any]] = []
+        self.portfolio_references: list[dict[str, Any]] = []
+        self._next_draft_id = 1
+        self._next_version_id = 1
+        self._next_backtest_id = 1
+        self._next_sim_portfolio_id = 1
+        self._next_sim_run_id = 1
+
+    def close(self) -> None:
+        pass
+
+    def initialize(self) -> None:
+        pass
+
+    def create_draft(self, name: str, source_code: str, params: dict[str, Any] | None = None) -> int:
+        draft_id = self._next_draft_id
+        self._next_draft_id += 1
+        self.drafts[draft_id] = {
+            "id": draft_id,
+            "name": name,
+            "source_code": source_code,
+            "params_json": json.dumps(params or {}),
+            "created_at": self._now(),
+            "updated_at": self._now(),
+        }
+        return draft_id
+
+    def publish_version(self, draft_id: int | None, name: str, version: str, source_code: str, params: dict[str, Any] | None = None) -> int:
+        params_json = self._json(params or {})
+        source_hash = stable_hash(source_code)
+        params_hash = stable_hash(params_json)
+        for v_id, v in self.versions.items():
+            if v["name"] == name and v["source_hash"] == source_hash and v["params_hash"] == params_hash:
+                return v_id
+        
+        version_id = self._next_version_id
+        self._next_version_id += 1
+        self.versions[version_id] = {
+            "id": version_id,
+            "draft_id": draft_id,
+            "name": name,
+            "version": version,
+            "source_hash": source_hash,
+            "params_hash": params_hash,
+            "source_code": source_code,
+            "params_json": params_json,
+            "created_at": self._now(),
+            "immutable": 1,
+        }
+        return version_id
+
+    def ensure_builtin_version(self, strategy_cls: type, params: dict[str, Any] | None = None) -> int:
+        source_code = inspect.getsource(strategy_cls)
+        return self.publish_version(
+            draft_id=None,
+            name=strategy_cls.name,
+            version=strategy_cls.version,
+            source_code=source_code,
+            params=params or {},
+        )
+
+    def get_strategy_version(self, version_id: int) -> dict[str, Any]:
+        if version_id not in self.versions:
+            raise KeyError(f"Strategy version not found: {version_id}")
+        return self.versions[version_id]
+
+    def record_backtest(self, run_id: str, config_payload: dict[str, Any], output_dir: str | Path) -> int:
+        backtest_id = self._next_backtest_id
+        self._next_backtest_id += 1
+        self.backtests[backtest_id] = {
+            "id": backtest_id,
+            "run_id": run_id,
+            "config_hash": stable_hash(self._json(config_payload)),
+            "output_dir": str(output_dir),
+            "created_at": self._now(),
+        }
+        return backtest_id
+
+    def add_strategy_reference(self, strategy_version_id: int, ref_type: str, ref_id: str) -> None:
+        self.strategy_references.append({
+            "strategy_version_id": strategy_version_id,
+            "ref_type": ref_type,
+            "ref_id": ref_id,
+            "created_at": self._now(),
+        })
+
+    def add_checkpoint(self, run_id: str, date_value: str, path: str | Path) -> None:
+        self.checkpoints = [
+            c for c in self.checkpoints
+            if not (c["run_id"] == run_id and c["date"] == date_value)
+        ]
+        self.checkpoints.append({
+            "run_id": run_id,
+            "date": date_value,
+            "path": str(path),
+            "created_at": self._now(),
+        })
+
+    def create_sim_portfolio(self, portfolio_id: str, source_checkpoint: str | Path, state_path: str | Path, config_payload: dict[str, Any]) -> int:
+        self.sim_portfolios[portfolio_id] = {
+            "portfolio_id": portfolio_id,
+            "source_checkpoint": str(source_checkpoint),
+            "state_path": str(state_path),
+            "config_hash": stable_hash(self._json(config_payload)),
+            "created_at": self._now(),
+            "updated_at": self._now(),
+        }
+        return 1
+
+    def record_sim_run(self, portfolio_id: str, asof_date: str, output_dir: str | Path) -> int:
+        run_id = self._next_sim_run_id
+        self._next_sim_run_id += 1
+        self.sim_portfolio_runs[run_id] = {
+            "portfolio_id": portfolio_id,
+            "asof_date": asof_date,
+            "output_dir": str(output_dir),
+            "created_at": self._now(),
+        }
+        return run_id
+
+    def add_sim_event(self, portfolio_id: str, event_type: str, payload: dict[str, Any]) -> None:
+        self.sim_portfolio_events.append({
+            "portfolio_id": portfolio_id,
+            "event_type": event_type,
+            "payload_json": self._json(payload),
+            "created_at": self._now(),
+        })
+
+    def add_portfolio_reference(self, strategy_version_id: int, portfolio_id: str) -> None:
+        self.portfolio_references.append({
+            "strategy_version_id": strategy_version_id,
+            "portfolio_id": portfolio_id,
+            "created_at": self._now(),
+        })
+
+    def delete_strategy_version(self, version_id: int) -> None:
+        for ref in self.strategy_references:
+            if ref["strategy_version_id"] == version_id:
+                raise ValueError(f"Strategy version {version_id} is referenced and cannot be deleted.")
+        for ref in self.portfolio_references:
+            if ref["strategy_version_id"] == version_id:
+                raise ValueError(f"Strategy version {version_id} is referenced and cannot be deleted.")
+        if version_id in self.versions:
+            del self.versions[version_id]
+
+    @staticmethod
+    def _now() -> str:
+        return datetime.now().isoformat(timespec="seconds")
+
+    @staticmethod
+    def _json(payload: dict[str, Any]) -> str:
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+

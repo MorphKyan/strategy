@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.platform_core.data_store import FundamentalStore, MarketDataStore, PointInTimeFundamentals
+from src.platform_core.data_store import MarketDataStore
 from src.platform_core.data_validation import compare_hfq_data
 from src.platform_core.engine import PlatformBacktestEngine, load_checkpoint
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
@@ -15,8 +15,8 @@ from src.platform_core.experiment import run_platform_experiment
 from src.platform_core.metrics import build_platform_metrics
 from src.platform_core.models import Asset, Bar, PortfolioState, TargetPortfolio
 from src.platform_core.sim import SimPortfolio
-from src.platform_core.storage import SQLiteStore
-from src.platform_core.strategy import FundamentalValueEqualWeightStrategy, MonthlyEqualWeightStrategy
+from src.platform_core.storage import SQLiteStore, InMemoryStore
+from src.platform_core.strategy import MonthlyEqualWeightStrategy
 from src.platform_core.strategy import get_strategy_class
 from src.platform_core.visualization import render_platform_charts
 
@@ -218,6 +218,27 @@ def test_strategy_version_delete_is_blocked_when_referenced(tmp_path: Path):
         store.close()
 
 
+def test_in_memory_store_operations():
+    store = InMemoryStore()
+    version_id = store.ensure_builtin_version(MonthlyEqualWeightStrategy, {"x": 1})
+    assert version_id == 1
+    
+    # Check idempotency
+    version_id_2 = store.ensure_builtin_version(MonthlyEqualWeightStrategy, {"x": 1})
+    assert version_id_2 == 1
+    
+    backtest_id = store.record_backtest("run_1", {"x": 1}, "out_dir")
+    assert backtest_id == 1
+    
+    store.add_strategy_reference(version_id, "backtest", str(backtest_id))
+    
+    version_data = store.get_strategy_version(version_id)
+    assert version_data["name"] == "monthly_equal_weight"
+    
+    with pytest.raises(ValueError):
+        store.delete_strategy_version(version_id)
+
+
 def test_platform_backtest_outputs_and_checkpoint_resume(tmp_path: Path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -238,7 +259,7 @@ def test_platform_backtest_outputs_and_checkpoint_resume(tmp_path: Path):
         "data": {"data_dir": str(data_dir)},
         "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": 0.1}],
         "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
-        "backtest": {"start_date": "2024-01-29", "end_date": "2024-02-01"},
+        "backtest": {"start_date": "2024-01-29", "end_date": "2024-02-01", "enable_checkpoints": True},
         "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
         "strategies": {
             "segments": [
@@ -345,146 +366,6 @@ class DummySource:
                 }
             ]
         )
-
-    def fetch_financial_indicators(self, code, ann_date=None):
-        return __import__("pandas").DataFrame(
-            [
-                {
-                    "report_period": "2023-12-31",
-                    "announcement_date": "2024-01-10",
-                    "pe": 12,
-                    "pb": 1.2,
-                    "roe": 0.12,
-                    "debt_to_asset": 0.4,
-                    "dividend_yield": 0.03,
-                }
-            ]
-        )
-
-
-def test_market_and_fundamental_stores_sync_with_mock_source(tmp_path: Path):
-    asset = Asset(asset_id="A", code="AAA", name="AAA", lot_size=1)
-    market = MarketDataStore(tmp_path / "market", source=DummySource())
-    market.sync_assets([asset], "2024-01-01", "2024-01-01", fetch=True)
-    market_csv = tmp_path / "market" / "AAA.csv"
-    assert market_csv.exists()
-    assert "close" in market_csv.read_text(encoding="utf-8")
-
-    fundamentals = FundamentalStore(tmp_path / "fundamentals", source=DummySource())
-    fundamentals.sync_financial_indicators([asset], fetch=True)
-    fundamental_csv = tmp_path / "fundamentals" / "AAA.csv"
-    assert fundamental_csv.exists()
-    point_in_time = PointInTimeFundamentals(tmp_path / "fundamentals")
-    assert point_in_time.get("A", "2024-01-09") == {}
-    assert point_in_time.get("A", "2024-01-10")["pe"] == 12
-
-
-def test_fundamental_filter_rules_are_point_in_time(tmp_path: Path):
-    fund_dir = tmp_path / "fundamentals"
-    fund_dir.mkdir()
-    (fund_dir / "AAA.csv").write_text(
-        "\n".join(
-            [
-                "asset_id,report_period,announcement_date,asof_date,field,value,source,updated_at",
-                "A,2023-12-31,2024-01-10,2024-01-10,pe,10,csv,now",
-                "A,2023-12-31,2024-01-10,2024-01-10,pb,1,csv,now",
-                "B,2023-12-31,2024-01-20,2024-01-20,pe,8,csv,now",
-                "B,2023-12-31,2024-01-20,2024-01-20,pb,0.8,csv,now",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    pit = PointInTimeFundamentals(fund_dir)
-    rules = {"required": ["pe", "pb"], "max": {"pe": 12, "pb": 2}, "sort_by": "pe"}
-    assert pit.filter(["A", "B"], "2024-01-15", rules) == ["A"]
-    assert pit.filter(["A", "B"], "2024-01-25", rules) == ["B", "A"]
-
-
-def test_fundamental_strategy_backtest_and_sim_portfolio(tmp_path: Path):
-    market_dir = tmp_path / "market"
-    fund_dir = tmp_path / "fundamentals"
-    market_dir.mkdir()
-    fund_dir.mkdir()
-    for code in ["AAA", "BBB"]:
-        (market_dir / f"{code}.csv").write_text(
-            "\n".join(
-                [
-                    "trade_date,open,high,low,close,volume,amount,adjust_factor,source,updated_at",
-                    "2024-01-29,10,10,10,10,1000,10000,1,csv,now",
-                    "2024-01-30,10,10,10,10,1000,10000,1,csv,now",
-                    "2024-01-31,10,10,10,10,1000,10000,1,csv,now",
-                    "2024-02-01,10,10,10,10,1000,10000,1,csv,now",
-                    "2024-02-02,10,10,10,10,1000,10000,1,csv,now",
-                ]
-            ),
-            encoding="utf-8",
-        )
-    (fund_dir / "AAA.csv").write_text(
-        "\n".join(
-            [
-                "asset_id,report_period,announcement_date,asof_date,field,value,source,updated_at",
-                "A,2023-12-31,2024-01-01,2024-01-01,pe,10,csv,now",
-                "A,2023-12-31,2024-01-01,2024-01-01,pb,1,csv,now",
-                "A,2023-12-31,2024-01-01,2024-01-01,roe,0.1,csv,now",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    (fund_dir / "BBB.csv").write_text(
-        "\n".join(
-            [
-                "asset_id,report_period,announcement_date,asof_date,field,value,source,updated_at",
-                "B,2023-12-31,2024-01-01,2024-01-01,pe,40,csv,now",
-                "B,2023-12-31,2024-01-01,2024-01-01,pb,8,csv,now",
-                "B,2023-12-31,2024-01-01,2024-01-01,roe,0.1,csv,now",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    config = {
-        "platform": {"run_name": "fundamental"},
-        "data": {"market_store_dir": str(market_dir), "fundamentals_dir": str(fund_dir), "fetch": False},
-        "assets": [
-            {"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": 0.1},
-            {"asset_id": "B", "code": "BBB", "name": "BBB", "lot_size": 1, "price_limit_pct": 0.1},
-        ],
-        "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
-        "backtest": {"start_date": "2024-01-29", "end_date": "2024-02-02"},
-        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
-        "strategies": {
-            "segments": [
-                {
-                    "start_date": "2024-01-29",
-                    "end_date": None,
-                    "strategy_name": "fundamental_value_equal_weight",
-                    "strategy_version_id": None,
-                    "params": {
-                        "universe": ["A", "B"],
-                        "fundamental_rules": {"required": ["pe", "pb"], "max": {"pe": 20, "pb": 2}},
-                    },
-                }
-            ]
-        },
-        "output": {"results_dir": str(tmp_path / "results"), "sim_dir": str(tmp_path / "sim")},
-    }
-    store = SQLiteStore(tmp_path / "platform.sqlite3")
-    try:
-        result = PlatformBacktestEngine(config, store).run()
-        checkpoint = result.output_dir / "checkpoints" / "2024-01-31.json"
-        portfolio = SimPortfolio.create_from_checkpoint(checkpoint, config, store, portfolio_id="sim_test")
-        sim_result = portfolio.advance("2024-02-02")
-        version_id = config["strategies"]["segments"][0]["strategy_version_id"]
-        with pytest.raises(ValueError):
-            store.delete_strategy_version(version_id)
-    finally:
-        store.close()
-
-    assert checkpoint.exists()
-    assert (sim_result.output_dir / "portfolio_state.json").exists()
-    assert (sim_result.output_dir / "suggested_orders.csv").exists()
-    assert (sim_result.output_dir / "trades.csv").exists()
-    assert (sim_result.output_dir / "nav.csv").exists()
-    assert (sim_result.output_dir / "manifest.json").exists()
 
 
 def test_platform_risk_parity_strategy_runs(tmp_path: Path):

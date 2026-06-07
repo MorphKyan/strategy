@@ -25,11 +25,6 @@ STRATEGY_PARAMS = {
         "cooldown_days": 0,
         "rebalance_on_start": True
     },
-    "fundamental_value_equal_weight": {
-        "cooldown_days": 0,
-        "rebalance_frequency": "monthly",
-        "fundamental_rules": {}
-    },
     "balanced": {
         "cooldown_days": 0,
         "rebalance_threshold": 0.05
@@ -89,7 +84,6 @@ STRATEGY_PARAMS = {
 # Only run unique configurations to avoid redundant heavy computation
 unique_configs = [
     "baseline_mvp_equal_weight.yaml",
-    "baseline_m3m4_fundamental.yaml",
     "baseline_r1_domestic_rolling.yaml",
     "baseline_r1_domestic_low_vol_ewma.yaml",
     "baseline_r2_global_ewma.yaml",
@@ -122,7 +116,6 @@ def make_test_config(base_config, strategy_name, recommended_params):
             segment["strategy_name"] = strategy_name
             orig_params = segment.get("params", {})
             universe = orig_params.get("universe")
-            fundamental_rules = orig_params.get("fundamental_rules")
             
             segment["params"] = copy.deepcopy(recommended_params)
             if universe:
@@ -131,12 +124,7 @@ def make_test_config(base_config, strategy_name, recommended_params):
             # Force monthly rebalancing to dramatically speed up backtests (20x speedup)
             segment["params"]["rebalance_frequency"] = "monthly"
             
-            if strategy_name == "fundamental_value_equal_weight":
-                if fundamental_rules:
-                    segment["params"]["fundamental_rules"] = fundamental_rules
-                else:
-                    segment["params"]["fundamental_rules"] = {}
-            elif strategy_name == "balanced":
+            if strategy_name == "balanced":
                 if universe:
                     segment["params"]["initial_weights"] = [1.0 / len(universe)] * len(universe)
     return cfg
@@ -286,8 +274,7 @@ def main():
     summary_md.append("\n### 2.2 自适应风险偏离再平衡 (adaptive_risk_deviation) 换手阻尼验证")
     summary_md.append("- 在所有配置下，自适应调仓偏离阈值策略都展现出**极其惊人的换手率和交易笔数缩减能力**。相较于经典 ERP/EWMA 的频繁高频调仓，该策略能将交易笔数削减 50% 到 80%。它通过短期/长期波动比率动态提供调仓阻尼，高噪市不轻易调仓，成功锁定了收益，避免了 whipsaw 磨损，在各类组合中表现都极其稳健。")
     
-    summary_md.append("\n### 2.3 传统等权与基本面等权的表现差异")
-    summary_md.append("- **基本面估值等权 (fundamental_value_equal_weight)**：在 `baseline_m3m4_fundamental.yaml` 专属配置下表现极为优秀，能基于 pe 等估值规则自动精简组合，但在**缺乏财务基本面数据的境外 ETF (如标普500、纳指) 或黄金、商品 ETF** 组合中，如果配置了错误的过滤条件，极易因“资产被过滤空”而不产生任何交易，从而导致踏空或失效。")
+
     
     summary_md.append("\n### 2.4 部分策略表现较差的原因剖析 (如 balanced 策略与经典 RP 的拖累)")
     summary_md.append("- **固定权重再平衡 (balanced / fixed_weight)**：在权益和黄金单边上涨行情下（如 2026 年初美股反弹），由于其固定配比硬性限制（必须调回等权），策略会强制卖出上涨最猛的资产（如纳指），买入滞涨或下跌资产，表现出“逆趋势”钝化，导致夏普显著低于自适应平价策略。")

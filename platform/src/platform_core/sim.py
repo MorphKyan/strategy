@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.platform_core.data import LocalCsvBarData
-from src.platform_core.data_store import FundamentalStore, MarketDataStore, PointInTimeFundamentals
+from src.platform_core.data_store import MarketDataStore
 from src.platform_core.engine import load_checkpoint
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
 from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
@@ -41,7 +41,6 @@ class SimPortfolio:
         data_config = config.get("data", {})
         self.data_fetch = bool(data_config.get("fetch", False))
         self.market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
-        self.fundamentals_dir = data_config.get("fundamentals_dir")
 
         execution_config = config.get("execution", {})
         fee_config = execution_config.get("fee", {})
@@ -126,7 +125,6 @@ class SimPortfolio:
             start_date=date_str(self.state.last_date) if self.state.last_date else self.config.get("backtest", {}).get("start_date"),
             end_date=date_str(target_date),
         )
-        fundamentals = PointInTimeFundamentals(self.fundamentals_dir) if self.fundamentals_dir else None
 
         run_dir = self.portfolio_dir / "runs" / f"{date_str(target_date)}_{datetime.now().strftime('%H%M%S')}"
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -204,7 +202,6 @@ class SimPortfolio:
                         data=data,
                         params=segment.get("params", {}),
                         runtime=active_strategy_runtime,
-                        fundamental_provider=fundamentals,
                     )
                 )
                 active_strategy_version_id = int(version_id)
@@ -236,7 +233,6 @@ class SimPortfolio:
                     data=data,
                     params=segment.get("params", {}),
                     runtime=active_strategy_runtime,
-                    fundamental_provider=fundamentals,
                 )
             )
             if target is not None:
@@ -295,7 +291,6 @@ class SimPortfolio:
         return target
 
     def _sync_data_if_requested(self, target_date) -> None:
-        data_config = self.config.get("data", {})
         if self.data_fetch:
             market_store = MarketDataStore(self.market_dir)
             market_store.sync_assets(
@@ -304,9 +299,6 @@ class SimPortfolio:
                 end=date_str(target_date),
                 fetch=True,
             )
-            if self.fundamentals_dir:
-                fundamental_store = FundamentalStore(self.fundamentals_dir, fields=data_config.get("fundamental_fields"))
-                fundamental_store.sync_financial_indicators(list(self.assets.values()), fetch=True)
 
     def _load_assets(self, payload: list[dict[str, Any]]) -> dict[str, Asset]:
         assets: dict[str, Asset] = {}

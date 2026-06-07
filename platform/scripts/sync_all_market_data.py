@@ -25,7 +25,7 @@ def resolve_path(path_str: str, root_dir: Path, orig_cwd: Path) -> Path:
         return root_dir.parent / p
     return root_dir / p
 
-from src.platform_core.data_store import FundamentalStore, MarketDataStore, assets_from_config
+from src.platform_core.data_store import MarketDataStore, assets_from_config
 
 ALL_ASSETS_DICT = [
     {"asset_id": "CN_ETF:510300.SH", "code": "510300", "name": "沪深300ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
@@ -46,13 +46,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Sync all market data for all 12 assets in the universe.")
     parser.add_argument("--start-date", default="2010-01-01", help="Sync start date.")
     parser.add_argument("--data-dir", default="data", help="Local data directory.")
-    parser.add_argument("--fundamentals-dir", default="data/platform_fundamentals", help="Local fundamentals directory.")
-    parser.add_argument("--no-fundamentals", action="store_true", help="Skip fundamental data sync.")
     args = parser.parse_args()
 
     assets = assets_from_config(ALL_ASSETS_DICT)
     data_dir = resolve_path(args.data_dir, ROOT, ORIG_CWD)
-    fundamentals_dir = resolve_path(args.fundamentals_dir, ROOT, ORIG_CWD)
 
     print("Syncing market data for all 12 universe assets from Finshare...")
     from datetime import datetime
@@ -66,16 +63,6 @@ def main() -> int:
     for note in market_report.notes:
         print(f"- {note}")
 
-    if not args.no_fundamentals:
-        print("\nSyncing fundamental data indicator fields...")
-        fields = ["pe", "pb", "roe", "debt_to_asset", "dividend_yield"]
-        fundamental_report = FundamentalStore(fundamentals_dir, fields=fields).sync_financial_indicators(
-            assets,
-            fetch=True
-        )
-        print("Fundamental data synced:")
-        for note in fundamental_report.notes:
-            print(f"- {note}")
     return 0
 
 if __name__ == "__main__":
