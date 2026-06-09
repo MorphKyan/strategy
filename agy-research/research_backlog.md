@@ -7,7 +7,6 @@
 ## 1. 正在进行中的研究 (In-Progress / Running)
 | 任务ID | 研究课题方向 | 领用子Agent ID | 启动时间 | 预估完成时间 | 当前状态/最新日志 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| - | 暂无 | - | - | - | - |
 
 ---
 
@@ -22,6 +21,7 @@
 ## 3. 已完成研究历史 (Completed / Finished)
 | 任务ID | 研究课题方向 | 领用子Agent ID | 结束时间 | 核心实验表现 (Sharpe/MDD/换手率) | 结论及推荐动作 | 实验报告链接 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| R025 | 基于 Huber M-估计稳健协方差与自适应收缩的风险平价策略 | af9e8cda-3dec-4dec-baf7-306d6f1bd703 | 2026-06-09 22:50 | R1 Domestic Rolling IS Sharpe: 0.925->1.102 (+0.177), OOS: 1.489->1.613 (+0.124); MVP IS Sharpe: 0.952->1.528, OOS: 1.299->1.992; R2 Global Dividend/EWMA & US Blend Sharpe 退化约 -0.08~-0.14 | Huber M-估计定点迭代在单边趋势中易将连续极值误判为离群值调降权重，且常数相关收缩目标（LW）不适用于分化的跨境多资产相关结构，造成境外与黄金踏空退化。判定为差异不大/局部优势，物理拒绝。 | [中文实验报告](file:///C:/Users/morph/.gemini/antigravity/brain/0194b654-b91a-43fa-a4cc-a7f5951b1eb5/.system_generated/worktrees/subagent-Huber-Covariance-Risk-Parity-Researcher--R025--quant-researcher-dee6e7ca/platform/reports/r025_huber_shrinkage_risk_parity_report.md) |
 | R020 | 基于 Gerber 稳健统计量相关性过滤的风险平价策略 | a1fe5151-8296-4437-b989-d77f612a2cb0 | 2026-06-05 14:14 | MVP Sharpe 1.938->2.960, MDD -11.14%->-3.21%; Nasdaq Sharpe 1.753->2.123, MDD -3.66%->-2.30%; 换手全线大幅缩减 40%~50% | Gerber 统计量动态过滤了白噪声，在 11 个测试配置下全线提升夏普并显著收窄回撤，震荡与下行市中降噪防 whipsaw 调仓磨损效果极佳。物理合入主干并固化专属配置。 | [中文实验报告](file:///D:/strategy/platform/reports/r020_gerber_risk_parity_report.md) |
 | R022 | 基于折溢价风险控制与多因子打分的 QDII ETF 轮动风险平价策略 | 7eb8af6e-b746-41ee-89fc-ab444a5d32e5 | 2026-06-05 14:06 | 跨境多资产基准 Sharpe 2.774->3.242, MDD -3.37%->-2.43%; 年化换手微增 29.39% 通过审计 | 引入 QDII 折溢价率均值回归过滤与动量/低波综合轮动打分，有效避免溢价虚高后溢价收敛的亏损。波动风险分配搭配权重平滑阻尼运作优良。物理合入主干并绑定配套配置。 | [中文实验报告](file:///D:/strategy/platform/reports/R022_QDII_Premium_Rotation_Risk_Parity_Report.md) |
 | R019 | 基于聚类代表性与切换阻尼的渐进式 ETF 筛选与轮动风险平价策略 | a5fbf143-10d3-48b1-a422-cb50d53c163b | 2026-06-05 08:12 | 扩充6资产基准 Sharpe 1.369 -> CRD 1.736, MDD -5.41% -> -4.47%, 换手率及摩擦优化 | CRD 聚类代表性渐进筛选极其有效。双重阻尼模式有效将年化换手削减 36.8%~53.7%，平滑 whipsaw 损耗。无样本外过拟合，物理合入主干并固化 yaml。 | [中文实验报告](file:///D:/strategy/platform/reports/R019_Cluster_Representative_Damped_Rotational_Report.md) |
