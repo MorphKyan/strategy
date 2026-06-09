@@ -75,7 +75,7 @@ class PlatformBacktestEngine:
             )
         )
         run_name = config.get("platform", {}).get("run_name", "platform_backtest")
-        self.run_id = f"{run_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        self.run_id = f"{run_name}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         configured_output = output_dir or config.get("output", {}).get("results_dir", "results/platform")
         self.output_dir = Path(configured_output) / self.run_id
         self.checkpoint_dir = self.output_dir / "checkpoints"
