@@ -1,1 +1,0 @@
-D:\strategy\platform\results\backtests\etf_selection_20260531_000612_execopt\20260531_004517\risk_parity\platform_basket_518880_510300_159985_159981_511260_candidate_20260531_004517

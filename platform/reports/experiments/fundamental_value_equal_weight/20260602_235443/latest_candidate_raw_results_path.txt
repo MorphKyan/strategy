@@ -1,1 +1,0 @@
-results\backtests\fundamental_value_equal_weight\20260602_235443\fundamental_value_equal_weight\fundamental_baseline_candidate_20260602_235443
