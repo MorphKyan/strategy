@@ -45,11 +45,14 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 5. Do not run unrestricted parameter searches, silent optimizer sweeps, or broad benchmark changes.
 6. Preserve transaction-cost handling and trade reporting. If backtest artifacts exist, report turnover and trade count.
 7. Do not overwrite generated historical results, reports, or configs unless the user explicitly asks.
-8. 回测时如果发现数据与当前日期差距有一周以上请先获取数据再进行回测（同步数据时需使用与该课题/选定 ETF 组合匹配的配置文件，不一定是固定的 `baseline_mvp_equal_weight.yaml`）。
-9. QuantResearcher 认领课题时，应按照看板中的顺序由上至下依次认领第一个处于 Todo 状态的课题，不需自行挑选。
-10. 研究阶段必须固定样本切分：`2025-07-01`（含）之后的数据为最终测试样本；策略构思、ETF 选择、参数选择、阈值设定、候选筛选、缓存复用和报告中的研究结论不得使用测试样本信息。
-11. 所有平台研究在提交前必须执行起点敏感性测试：在不触碰最终测试样本的前提下，从该配置/组合的最早可用交易日开始，到训练样本末日（最晚 `2025-06-30`）为止，每隔 2 个月生成一个 `start_date`，逐一起跑回测并报告核心指标是否稳定。
-12. 只有在训练样本内研究通过、起点敏感性测试稳定，并且固定后的策略/组合在 `2025-07-01`（含）之后最终测试样本中仍表现良好时，QuantResearcher 才允许提交成果；否则必须标记为“Failed”或“仅研究观察”，不得合入或注册为可投策略。
+8. 需要使用数据时，必须先检查所需标的数据是否已对齐，且截止日期距当前日期不超过一周；如数据陈旧，先拉取全部需要的数据并重新对齐。若拉取或对齐失败，必须直接终止任务并提示用户，不得继续回测或输出配置。
+9. 只有训练样本长度大于三年时，才允许输出或提交平台配置；如果组合最早共同有行情日期至训练样本末日（最晚 `2025-06-30`）不满三年，直接拒绝整个配置。
+10. QuantResearcher 认领课题时，应按照看板中的顺序由上至下依次认领第一个处于 Todo 状态的课题，不需自行挑选。
+11. 研究阶段必须固定样本切分：`2025-07-01`（含）之后的数据为最终测试样本；策略构思、ETF 选择、参数选择、阈值设定、候选筛选、缓存复用和报告中的研究结论不得使用测试样本信息。
+12. 所有平台研究在提交前必须执行起点敏感性测试：在不触碰最终测试样本的前提下，从该配置/组合的最早可用共同交易日开始，到训练样本末日（最晚 `2025-06-30`）为止，每隔 2 个月生成一个 `start_date`，逐一起跑回测并报告核心指标是否稳定。
+13. 回测时委托、订单、成交、持仓路径、NAV、拒单原因等执行相关原始数据不得删除；报告可以汇总，但不能替代可复核的原始交易产物。
+14. 临时使用的脚本如果没有明确的重复利用价值，使用后必须删除；保留脚本时要能说明稳定入口、适用场景和维护责任。
+15. 只有在训练样本内研究通过、起点敏感性测试稳定，并且固定后的策略/组合在 `2025-07-01`（含）之后最终测试样本中仍表现良好时，QuantResearcher 才允许提交成果；否则必须标记为“Failed”或“仅研究观察”，不得合入或注册为可投策略。
 
 ## Preferred Research Scope
 
@@ -90,6 +93,7 @@ Before claiming success:
    - **For ETF sleeve expansion**: Run backtests for the expanded portfolio using **multiple strategy algorithms** (e.g., `risk_parity`, `risk_parity_ewma`, `risk_parity_ewma_dd_recovery`) and compare all results.
 4. Run start-date sensitivity:
    - For each candidate/baseline configuration or algorithm, generate start dates from the earliest available common date to the training-sample end date, stepping by 2 calendar months.
+   - The common training history must be longer than three years; otherwise reject the whole candidate configuration before writing it.
    - Run or reuse valid cached backtests for each start date, keeping the end date capped at `2025-06-30`.
    - Report whether ranking, Sharpe, max drawdown, turnover, trade count, and rejection count materially change across start dates.
 5. Run the final test stage only after the candidate is frozen:

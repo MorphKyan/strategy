@@ -1,1 +1,0 @@
-D:\strategy\platform\results\backtests\baseline_r1_domestic_ewma_exp\20260603_154506\risk_parity_ewma\baseline_r1_domestic_ewma_baseline_20260603_154520

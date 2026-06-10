@@ -1,1 +1,0 @@
-D:\strategy\platform\results\backtests\baseline_mvp_equal_weight_exp\20260603_154301\monthly_equal_weight\baseline_mvp_equal_weight_baseline_20260603_154302

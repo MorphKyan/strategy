@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-import shutil
 import json
 import yaml
 import math
@@ -233,10 +232,6 @@ def run_single_config(config_path):
             print(f"  Failed sensitivity run for start_date {temp_start_date}: {e}")
         finally:
             temp_store.close()
-            # Clean up temp run directory
-            run_dir = temp_results_dir / f"sens_{config_path.stem}_{temp_start_date}"
-            if run_dir.exists():
-                shutil.rmtree(run_dir, ignore_errors=True)
                 
     # Calculate sensitivity statistics
     if sensitivity_runs:
@@ -263,13 +258,6 @@ def run_single_config(config_path):
             "return_mean": 0.0, "return_std": 0.0, "drawdown_mean": 0.0, "drawdown_std": 0.0, "turnover_mean": 0.0
         }
         
-    # Clean up temp sensitivity dir
-    if temp_results_dir.exists():
-        try:
-            shutil.rmtree(temp_results_dir)
-        except Exception:
-            pass
-
     full_metrics = calculate_metrics_for_subset(nav_df, trades_df, start_date, end_date)
     
     result_data = {

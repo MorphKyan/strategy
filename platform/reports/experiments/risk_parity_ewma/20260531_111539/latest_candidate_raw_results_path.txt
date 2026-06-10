@@ -1,1 +1,0 @@
-D:\strategy\platform\results\backtests\risk_parity_ewma\20260531_111539\risk_parity_ewma\platform_risk_parity_ewma_candidate_20260531_111539

@@ -1,0 +1,9 @@
+{
+  "cash": 1000000.0,
+  "positions": {},
+  "pending_intents": {},
+  "cooldown_pool": {},
+  "strategy_state": {},
+  "last_date": null,
+  "dividend_receivables": []
+}

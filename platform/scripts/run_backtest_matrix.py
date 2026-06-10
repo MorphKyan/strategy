@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-import shutil
 import json
 import yaml
 import traceback
@@ -19,15 +18,11 @@ from src.platform_core.engine import PlatformBacktestEngine
 from src.platform_core.storage import SQLiteStore
 from src.platform_core.metrics import build_platform_metrics
 
-# 10 active strategies registered in BUILTIN_STRATEGIES
+# Active strategies registered in BUILTIN_STRATEGIES.
 STRATEGY_PARAMS = {
     "monthly_equal_weight": {
         "cooldown_days": 0,
         "rebalance_on_start": True
-    },
-    "balanced": {
-        "cooldown_days": 0,
-        "rebalance_threshold": 0.05
     },
     "risk_parity": {
         "rolling_window": 120,
@@ -124,9 +119,6 @@ def make_test_config(base_config, strategy_name, recommended_params):
             # Force monthly rebalancing to dramatically speed up backtests (20x speedup)
             segment["params"]["rebalance_frequency"] = "monthly"
             
-            if strategy_name == "balanced":
-                if universe:
-                    segment["params"]["initial_weights"] = [1.0 / len(universe)] * len(universe)
     return cfg
 
 def main():
@@ -200,11 +192,6 @@ def main():
                 }
             finally:
                 store.close()
-                if engine and engine.output_dir.exists():
-                    try:
-                        shutil.rmtree(engine.output_dir)
-                    except Exception as clean_err:
-                        print(f"    (Failed to clean output dir {engine.output_dir}: {clean_err})")
 
     # Map duplicate configuration results
     matrix_results = {}
@@ -276,8 +263,7 @@ def main():
     
 
     
-    summary_md.append("\n### 2.4 部分策略表现较差的原因剖析 (如 balanced 策略与经典 RP 的拖累)")
-    summary_md.append("- **固定权重再平衡 (balanced / fixed_weight)**：在权益和黄金单边上涨行情下（如 2026 年初美股反弹），由于其固定配比硬性限制（必须调回等权），策略会强制卖出上涨最猛的资产（如纳指），买入滞涨或下跌资产，表现出“逆趋势”钝化，导致夏普显著低于自适应平价策略。")
+    summary_md.append("\n### 2.4 部分策略表现较差的原因剖析 (如经典 RP 的拖累)")
     summary_md.append("- **经典风险平价 (risk_parity)**：在 120天 短窗口估计下，由于采用样本协方差矩阵，没有收缩去噪，导致对历史噪声极其敏感。在大跌见底反弹初期产生 whipsaw 效应，且由于其“风险贡献均等”原则，在资产跌势明显时容易盲目加仓，导致阶段性回撤超限。")
 
     # Save Markdown Summary

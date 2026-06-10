@@ -1,1 +1,0 @@
-D:\strategy\platform\results\backtests\baseline_r2_global_ewma_exp\20260603_154537\risk_parity_ewma\baseline_r2_global_ewma_baseline_20260603_154558

@@ -333,6 +333,7 @@ def build_baskets(
     top_k = int(selection.get("top_k_per_sleeve", 3))
     max_baskets = int(selection.get("max_baskets", 20))
     required_sleeves = list(selection.get("required_sleeves", ["gold", "hs300", "commodity", "bond"]))
+    min_common_history_years = float(selection.get("min_common_history_years", 3.0))
     train_end, test_start = sample_split(config)
     eligible = ranking[ranking["eligible"] == True].copy()
     options_by_sleeve: dict[str, list[list[str]]] = {}
@@ -373,6 +374,8 @@ def build_baskets(
         weights = inv_vol / inv_vol.sum() if len(inv_vol) else pd.Series(dtype=float)
         hhi = float((weights**2).sum()) if len(weights) else 1.0
         common_years = len(prices) / 252
+        if common_years <= min_common_history_years:
+            continue
         liquidity = float(pd.Series([until_train(candidates[code].amount, train_end).tail(252).mean() for code in codes]).mean())
         sleeve_scores = ranking.set_index("code").loc[codes, "sleeve_score"].mean()
         history_score = min(common_years / 10.0, 1.0)
@@ -443,6 +446,8 @@ def generate_platform_configs(
     paths: list[Path] = []
     for _, row in basket_frame.iterrows():
         codes = row["codes"].split(",")
+        if float(row.get("common_history_years", 0.0)) <= 3.0:
+            continue
         config = copy.deepcopy(base_config)
         config.setdefault("platform", {})["run_name"] = f"platform_basket_{'_'.join(codes)}"
         config["assets"] = [platform_asset(candidates[code].meta) for code in codes]
