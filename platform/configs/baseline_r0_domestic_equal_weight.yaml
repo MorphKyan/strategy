@@ -1,5 +1,5 @@
 platform:
-  run_name: "baseline_mvp_equal_weight"
+  run_name: "baseline_r0_domestic_equal_weight"
 
 data:
   data_dir: "data"
@@ -51,9 +51,9 @@ execution:
 strategies:
   segments:
     - start_date: "2017-08-24"
-      end_date: null
+      end_date:
       strategy_name: "monthly_equal_weight"
-      strategy_version_id: null
+      strategy_version_id:
       cancel_pending_on_start: false
       params:
         rebalance_on_start: true
