@@ -33,7 +33,7 @@ portfolio:
   initial_positions: []
 backtest:
   start_date: '2017-08-24'
-  end_date: '2026-05-19'
+  end_date: '2026-06-10'
 execution:
   price_field: close
   weight_tolerance: 0.0005

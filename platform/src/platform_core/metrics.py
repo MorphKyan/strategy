@@ -82,8 +82,8 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
     years = days / 252 if days else 0
     total_return = net_value.iloc[-1] / net_value.iloc[0] - 1 if days and net_value.iloc[0] else None
     annualized_return = (
-        (net_value.iloc[-1] / net_value.iloc[0]) ** (252 / max(len(daily_returns), 1)) - 1
-        if len(daily_returns) > 0 and net_value.iloc[0]
+        (net_value.iloc[-1] / net_value.iloc[0]) ** (252 / max(len(net_value), 1)) - 1
+        if len(net_value) > 0 and net_value.iloc[0]
         else 0.0
     )
     annualized_volatility = daily_returns.std() * math.sqrt(252) if len(daily_returns) > 1 else 0.0
@@ -109,12 +109,12 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
         else 0.0
     )
     turnover_amount_ratio = (
-        turnover_amount_total / average_total_value
+        turnover_amount_total / (2 * average_total_value)
         if average_total_value and average_total_value > 0
         else 0.0
     )
     annualized_turnover_amount = turnover_amount_ratio / years if years else turnover_amount_ratio
-    annualized_turnover_quantity = turnover_quantity_total / years if years else turnover_quantity_total
+    annualized_turnover_quantity = (turnover_quantity_total / 2) / years if years else (turnover_quantity_total / 2)
 
     status_counts = {}
     rejection_reason_counts = {}

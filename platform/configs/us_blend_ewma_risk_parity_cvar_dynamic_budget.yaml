@@ -48,7 +48,7 @@ assets:
     name: 十年国债ETF
     price_limit_pct: 0.1
 backtest:
-  end_date: '2026-06-01'
+  end_date: '2026-06-10'
   start_date: '2019-02-28'
 data:
   data_dir: data

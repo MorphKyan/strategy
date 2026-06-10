@@ -126,6 +126,20 @@ class MarketDataStore:
             elif not path.exists():
                 raise FileNotFoundError(f"Standard market data missing for {asset.asset_id}: {path}. Run sync with --fetch or import CSV first.")
             self.quality.extend(self.validate_file(path, asset.asset_id))
+            
+            # Enforce 7-day data staleness check (skip under pytest)
+            import sys
+            if "pytest" not in sys.modules:
+                from datetime import date
+                today = date.today()
+                frame = pd.read_csv(path)
+                if "trade_date" in frame.columns:
+                    max_date = pd.to_datetime(frame["trade_date"]).max().date()
+                    if (today - max_date).days > 7:
+                        raise RuntimeError(
+                            f"Stale market data detected for {asset.asset_id} in {path}. "
+                            f"Latest trade date is {max_date}, which is older than 7 days from today ({today})."
+                        )
         self._write_manifest()
         return self.quality
 

@@ -60,6 +60,17 @@ class LocalCsvBarData:
                 raise ValueError(f"`trade_date` column is required in {path}")
 
             raw["trade_date"] = pd.to_datetime(raw["trade_date"]).dt.date
+            
+            # 校验数据陈旧性（距当前日期不能超过一周，即 7 天；单元测试 pytest 下跳过校验）
+            import sys
+            if "pytest" not in sys.modules:
+                from datetime import date
+                today = date.today()
+                max_date = raw["trade_date"].max()
+                if max_date is not None and (today - max_date).days > 7:
+                    raise RuntimeError(
+                        f"Stale data for {asset.asset_id} in {path}: latest date is {max_date}, which is older than 7 days from today ({today})."
+                    )
             factor_col = _first_column(raw, ["hfq_factor", "adjust_factor", "qfq_factor"])
             sidecar_factor = self._sidecar_hfq_factor(asset, raw["trade_date"])
             if not isinstance(sidecar_factor, float):
@@ -111,8 +122,8 @@ class LocalCsvBarData:
                 normalized["limit_up"] = None
                 normalized["limit_down"] = None
             else:
-                normalized["limit_up"] = previous_close * (1 + asset.price_limit_pct)
-                normalized["limit_down"] = previous_close * (1 - asset.price_limit_pct)
+                normalized["limit_up"] = (previous_close * (1 + asset.price_limit_pct)).round(2)
+                normalized["limit_down"] = (previous_close * (1 - asset.price_limit_pct)).round(2)
             normalized["is_suspended"] = normalized["volume"].fillna(0.0) <= 0
             frames[asset.asset_id] = normalized.set_index("date", drop=False)
         return frames

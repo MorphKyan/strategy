@@ -1271,9 +1271,9 @@ class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
                 w_targ = target.weights.get(asset_id, 0.0)
                 damped_weights[asset_id] = (1.0 - damping_factor) * w_curr + damping_factor * w_targ
                 
-            # 归一化以确保总权重为 1.0
+            # 仅在总权重超出 100% 时进行比例缩减归一化，以保留可能存在的现金占款 (如 Volatility Targeting)
             total_w = sum(damped_weights.values())
-            if total_w > 0:
+            if total_w > 1.0 + 1e-9:
                 damped_weights = {asset_id: w / total_w for asset_id, w in damped_weights.items()}
             return TargetPortfolio(damped_weights)
             

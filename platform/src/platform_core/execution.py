@@ -57,7 +57,12 @@ class ExecutionEngine:
         if state_value <= 0:
             return orders, trades
 
-        buffer_scale = max(0.0, min(1.0, 1.0 - float(self.config.cash_buffer_pct)))
+        target_sum = sum(target.weights.values())
+        cash_buffer = float(self.config.cash_buffer_pct)
+        if target_sum > 1.0 - cash_buffer:
+            buffer_scale = min(1.0, (1.0 - cash_buffer) / target_sum)
+        else:
+            buffer_scale = 1.0
         effective_weights = {asset_id: weight * buffer_scale for asset_id, weight in target.weights.items()}
 
         for asset_id, target_weight in effective_weights.items():
@@ -95,6 +100,10 @@ class ExecutionEngine:
 
             side = "BUY" if diff_value > 0 else "SELL"
             execution_price = self._execution_price(valuation_price, side, asset)
+            if side == "BUY" and bar.limit_up is not None:
+                execution_price = min(execution_price, bar.limit_up)
+            elif side == "SELL" and bar.limit_down is not None:
+                execution_price = max(execution_price, bar.limit_down)
             quantity = self._round_quantity(abs(diff_value) / valuation_price, asset.lot_size)
             if side == "SELL":
                 quantity = min(quantity, self._round_quantity(position.quantity, asset.lot_size))
@@ -113,7 +122,7 @@ class ExecutionEngine:
                 signal_date=self._signal_date_for(asset_id, current_date, state, signal_dates),
             )
 
-            failure = self._validate_order(order, bar)
+            failure = self._validate_order(order, bar, valuation_price)
             if failure:
                 order.status = "REJECTED"
                 order.reason = failure
@@ -271,7 +280,7 @@ class ExecutionEngine:
             return sorted(trade_plan, key=lambda item: (item[1] > 0, -abs(item[1]), -item[2], item[0]))
         if self.config.order_priority == "price_desc":
             return sorted(trade_plan, key=lambda item: (item[1] > 0, -item[2], -abs(item[1]), item[0]))
-        return sorted(trade_plan, key=lambda item: item[0])
+        return sorted(trade_plan, key=lambda item: (item[1] > 0, item[0]))
 
     @staticmethod
     def _round_quantity(quantity: float, lot_size: int) -> float:
@@ -291,12 +300,12 @@ class ExecutionEngine:
         return float(min(quantity, max_qty))
 
     @staticmethod
-    def _validate_order(order: Order, bar: Bar) -> str | None:
+    def _validate_order(order: Order, bar: Bar, valuation_price: float) -> str | None:
         if bar.is_suspended:
             return "suspended"
-        if order.side == "BUY" and bar.limit_up is not None and order.price >= bar.limit_up * (1 - 1e-9):
+        if order.side == "BUY" and bar.limit_up is not None and valuation_price >= bar.limit_up * (1 - 1e-9):
             return "limit_up"
-        if order.side == "SELL" and bar.limit_down is not None and order.price <= bar.limit_down * (1 + 1e-9):
+        if order.side == "SELL" and bar.limit_down is not None and valuation_price <= bar.limit_down * (1 + 1e-9):
             return "limit_down"
         return None
 

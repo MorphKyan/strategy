@@ -48,7 +48,7 @@ assets:
   name: 标普500ETF
   price_limit_pct: 0.1
 backtest:
-  end_date: '2026-06-01'
+  end_date: '2026-06-10'
   start_date: '2024-03-28'
 data:
   data_dir: data

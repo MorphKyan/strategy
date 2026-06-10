@@ -33,7 +33,7 @@ portfolio:
   initial_positions: []
 backtest:
   start_date: '2017-08-24'
-  end_date: '2026-06-01'
+  end_date: '2026-06-10'
   enable_checkpoints: false
 execution:
   price_field: close

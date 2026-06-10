@@ -425,9 +425,9 @@ class PlatformBacktestEngine:
         years = len(nav_rows) / 252 if nav_rows else 0.0
         turnover_amount_total = sum(abs(float(row.get("trade_value", 0.0))) for row in trade_rows)
         turnover_quantity_total = sum(abs(float(row.get("quantity", 0.0))) for row in trade_rows)
-        turnover_amount_ratio = turnover_amount_total / average_total_value if average_total_value > 0 else 0.0
+        turnover_amount_ratio = (turnover_amount_total / 2) / average_total_value if average_total_value > 0 else 0.0
         annualized_turnover_amount = turnover_amount_ratio / years if years else turnover_amount_ratio
-        annualized_turnover_quantity = turnover_quantity_total / years if years else turnover_quantity_total
+        annualized_turnover_quantity = (turnover_quantity_total / 2) / years if years else (turnover_quantity_total / 2)
         peak = net_values[0]
         max_drawdown = 0.0
         for value in net_values:
@@ -441,12 +441,12 @@ class PlatformBacktestEngine:
             "total_return": net_values[-1] / net_values[0] - 1 if net_values[0] else 0.0,
             "max_drawdown": max_drawdown,
             "trade_count": len(trade_rows),
-            "turnover_total": turnover_amount_total,
+            "turnover_total": turnover_amount_total / 2,
             "annualized_turnover": annualized_turnover_amount,
-            "turnover_amount_total": turnover_amount_total,
+            "turnover_amount_total": turnover_amount_total / 2,
             "turnover_amount_ratio": turnover_amount_ratio,
             "annualized_turnover_amount": annualized_turnover_amount,
-            "turnover_quantity_total": turnover_quantity_total,
+            "turnover_quantity_total": turnover_quantity_total / 2,
             "annualized_turnover_quantity": annualized_turnover_quantity,
             "pending_intent_count": int(nav_rows[-1].get("pending_intent_count", 0)),
         }
