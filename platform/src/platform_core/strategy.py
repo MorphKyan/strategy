@@ -101,8 +101,11 @@ class RiskParityStrategy(Strategy):
         prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
         current_weights = context.state.weights(prices)
         threshold = float(context.params.get("rebalance_threshold", 0.05))
-        for asset_id, target_weight in target.weights.items():
-            if abs(current_weights.get(asset_id, 0.0) - target_weight) > threshold:
+        all_assets = set(target.weights.keys()) | set(current_weights.keys())
+        for asset_id in all_assets:
+            target_weight = target.weights.get(asset_id, 0.0)
+            curr_weight = current_weights.get(asset_id, 0.0)
+            if abs(curr_weight - target_weight) > threshold:
                 return target
         return None
 
@@ -1034,10 +1037,13 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
         vol_trigger_ratio = float(context.params.get("vol_trigger_ratio", 2.0))
         crisis_triggered = vol_ratio > vol_trigger_ratio
         
-        # 8. 计算实际持仓偏离度 (基于最大单资产权重绝对偏离)
+        # 8. 计算实际持仓偏离度 (基于最大单资产权重绝对偏离，考虑 target.weights 和 current_weights 并集)
         max_deviation = 0.0
-        for asset_id, target_weight in target.weights.items():
-            dev = abs(current_weights.get(asset_id, 0.0) - target_weight)
+        all_assets = set(target.weights.keys()) | set(current_weights.keys())
+        for asset_id in all_assets:
+            target_weight = target.weights.get(asset_id, 0.0)
+            curr_weight = current_weights.get(asset_id, 0.0)
+            dev = abs(curr_weight - target_weight)
             if dev > max_deviation:
                 max_deviation = dev
                 
@@ -1250,11 +1256,14 @@ class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
         # 如果当前持仓的资产组合与筛选出来的资产组合不同，则必须触发调仓
         portfolio_changed = set(last_selected) != set(current_selected)
         
-        # 或者是权重绝对偏离度超标
+        # 或者是权重绝对偏离度超标 (考虑 target.weights 和 current_weights 并集)
         deviation_triggered = False
         threshold = float(context.params.get("rebalance_threshold", 0.05))
-        for asset_id, target_weight in target.weights.items():
-            if abs(current_weights.get(asset_id, 0.0) - target_weight) > threshold:
+        all_assets = set(target.weights.keys()) | set(current_weights.keys())
+        for asset_id in all_assets:
+            target_weight = target.weights.get(asset_id, 0.0)
+            curr_weight = current_weights.get(asset_id, 0.0)
+            if abs(curr_weight - target_weight) > threshold:
                 deviation_triggered = True
                 break
                 

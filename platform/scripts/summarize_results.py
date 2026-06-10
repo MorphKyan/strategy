@@ -25,6 +25,14 @@ def main():
         results = json.load(f)
 
     # Let's organize the data
+    if not results:
+        print("No evaluation results to summarize.")
+        output_path = ROOT / "results" / "summary_table.md"
+        with open(output_path, "w", encoding="utf-8") as f_out:
+            f_out.write("## Platform Configs Evaluation Results Summary\n\nNo configs evaluated (all rejected due to short training sample).\n")
+        print(f"Summary table successfully written to {output_path}")
+        return
+
     rows = []
     for r in results:
         name = r["config_name"]

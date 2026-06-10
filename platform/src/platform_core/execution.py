@@ -135,9 +135,6 @@ class ExecutionEngine:
                 quantity = self._cap_buy_quantity(quantity, execution_price, buy_cash, asset.lot_size)
                 order.quantity = quantity
             if quantity <= 0:
-                if self.config.skip_below_lot and side == "BUY" and self._available_buy_cash(state.cash, state_value) < one_lot_value:
-                    state.pending_intents.pop(asset_id, None)
-                    continue
                 order.status = "REJECTED"
                 order.reason = "insufficient_cash_or_lot"
                 orders.append(order)

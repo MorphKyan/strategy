@@ -122,7 +122,7 @@ class SimPortfolio:
         data = LocalCsvBarData(
             data_dir=self.market_dir,
             assets=self.assets.values(),
-            start_date=date_str(self.state.last_date) if self.state.last_date else self.config.get("backtest", {}).get("start_date"),
+            start_date=self.config.get("backtest", {}).get("start_date"),
             end_date=date_str(target_date),
         )
 

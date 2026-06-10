@@ -63,6 +63,14 @@ def main() -> int:
     for note in market_report.notes:
         print(f"- {note}")
 
+    print("\nFetching and syncing ETF dividend and split histories...")
+    try:
+        from scripts.fetch_etf_dividends import main as sync_dividends
+        sync_dividends()
+        print("ETF dividend and split data synced successfully.")
+    except Exception as e:
+        print(f"Warning: Failed to fetch ETF dividend/split data: {e}")
+
     return 0
 
 if __name__ == "__main__":

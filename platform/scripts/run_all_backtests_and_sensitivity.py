@@ -162,6 +162,19 @@ def run_single_config(config_path):
     
     # 2. In-sample (IS) subset (up to 2025-06-30)
     is_end_date = min("2025-06-30", end_date)
+    
+    try:
+        from datetime import datetime
+        dt_start = datetime.strptime(start_date, "%Y-%m-%d")
+        dt_is_end = datetime.strptime(is_end_date, "%Y-%m-%d")
+        is_days = (dt_is_end - dt_start).days
+    except Exception:
+        is_days = 0
+        
+    if is_days < 1095:
+        print(f"Rejecting {config_path.name} due to short training sample window ({is_days} days < 1095 days / 3 years).")
+        return None
+        
     is_metrics = calculate_metrics_for_subset(nav_df, trades_df, start_date, is_end_date)
     
     # 3. Out-of-sample (OOS) subset (from 2025-07-01 to end)
