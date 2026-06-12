@@ -167,6 +167,12 @@ class RiskParityStrategy(Strategy):
         if len(returns) < min_p:
             return None
             
+        vol_multipliers = context.params.get("vol_multipliers", {})
+        if vol_multipliers:
+            for col, mult in vol_multipliers.items():
+                if col in returns.columns:
+                    returns[col] = returns[col] * float(mult)
+            
         X = returns.values
         T, N = X.shape
         if N == 0:
@@ -290,6 +296,11 @@ class RiskParityEWMAStrategy(RiskParityStrategy):
         if len(price_frame) < min_p + 1:
             return None
         returns = price_frame.pct_change()
+        vol_multipliers = context.params.get("vol_multipliers", {})
+        if vol_multipliers:
+            for col, mult in vol_multipliers.items():
+                if col in returns.columns:
+                    returns[col] = returns[col] * float(mult)
         volatility = returns.ewm(span=span, min_periods=min_p, adjust=False).std().iloc[-1]
         volatility = volatility[volatility > 0]
         if len(volatility) != len(universe):
@@ -350,6 +361,11 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
         if len(price_frame) < min_p + 1:
             return None
         returns = price_frame.pct_change()
+        vol_multipliers = context.params.get("vol_multipliers", {})
+        if vol_multipliers:
+            for col, mult in vol_multipliers.items():
+                if col in returns.columns:
+                    returns[col] = returns[col] * float(mult)
         volatility = returns.ewm(span=span, min_periods=min_p, adjust=False).std().iloc[-1]
         volatility = volatility[volatility > 0]
         if len(volatility) != len(universe):

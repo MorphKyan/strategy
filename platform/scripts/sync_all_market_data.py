@@ -32,6 +32,7 @@ ALL_ASSETS_DICT = [
     {"asset_id": "CN_ETF:513500.SH", "code": "513500", "name": "标普500ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
     {"asset_id": "CN_ETF:518880.SH", "code": "518880", "name": "黄金ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
     {"asset_id": "CN_ETF:511260.SH", "code": "511260", "name": "十年国债ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:511090.SH", "code": "511090", "name": "30年国债ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
     {"asset_id": "CN_ETF:159985.SZ", "code": "159985", "name": "豆粕ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
     {"asset_id": "CN_ETF:159981.SZ", "code": "159981", "name": "能源化工ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
     {"asset_id": "CN_ETF:512890.SH", "code": "512890", "name": "红利低波ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
