@@ -31,13 +31,13 @@ assets:
     lot_size: 100
     name: 黄金ETF
     price_limit_pct: 0.1
-  - asset_id: CN_ETF:511260.SH
+  - asset_id: CN_ETF:511260_3X.SH
     asset_type: etf
-    code: '511260'
+    code: '511260_3X'
     currency: CNY
     exchange: SH
     lot_size: 100
-    name: 十年国债ETF
+    name: 模拟30年国债期货
     price_limit_pct: 0.1
   - asset_id: CN_ETF:159985.SZ
     asset_type: etf
@@ -92,7 +92,7 @@ strategies:
           - CN_ETF:512890.SH
           - CN_ETF:513100.SH
           - CN_ETF:518880.SH
-          - CN_ETF:511260.SH
+          - CN_ETF:511260_3X.SH
           - CN_ETF:159985.SZ
           - CN_ETF:159981.SZ
         volatility_target: 0.08
