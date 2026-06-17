@@ -72,6 +72,14 @@ def main() -> int:
     except Exception as e:
         print(f"Warning: Failed to fetch ETF dividend/split data: {e}")
 
+    print("\nGenerating simulated 30-year bond futures (3x leveraged 10-year Treasury ETF)...")
+    try:
+        from scripts.generate_leveraged_etf import generate_3x_etf
+        generate_3x_etf()
+        print("Simulated 30-year bond futures generated successfully.")
+    except Exception as e:
+        print(f"Warning: Failed to generate simulated 30-year bond futures: {e}")
+
     return 0
 
 if __name__ == "__main__":
