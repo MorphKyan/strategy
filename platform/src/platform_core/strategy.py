@@ -1445,3 +1445,111 @@ class RiskParityGerberStrategy(RiskParityLWCovStrategy):
         return TargetPortfolio({asset_id: float(weights[idx]) for idx, asset_id in enumerate(universe)})
 
 BUILTIN_STRATEGIES[RiskParityGerberStrategy.name] = RiskParityGerberStrategy
+
+
+class RiskParityEWMACovStrategy(RiskParityLWCovStrategy):
+    """
+    基于 EWMA 指数加权全协方差矩阵的风险平价策略 (RiskParityEWMACovStrategy)
+
+    传统风险平价（risk_parity / risk_parity_lw_cov）在滚动窗口内对所有历史观测等权
+    估计协方差，对近期的市场状态切换反应迟钝；而 risk_parity_ewma 虽对波动率做了
+    EWMA 指数衰减加权，却仅用逆波动率（inverse-vol）配权，完全丢弃了资产间相关性信息。
+
+    本策略采用经典 RiskMetrics 思路，对滚动窗口内的收益率施加指数时间衰减权重，
+    同时估计**方差与相关性**构成的全协方差矩阵 Σ（近端观测权重更高），再叠加少量对角
+    收缩以保证数值正定性，最后用 Cyclical Coordinate Descent (CCD) 求解等风险贡献权重。
+    相比 Ledoit-Wolf，它对近期相关性结构变化更敏感；相比纯 EWMA 逆波动率，它保留了
+    分散化所依赖的相关性结构。
+    """
+    name = "risk_parity_ewma_cov"
+    version = "0.1.0"
+
+    def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        import numpy as np
+
+        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 250)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
+        use_nav = bool(context.params.get("use_nav", False))
+        estimation_freq = context.params.get("estimation_freq", "daily")
+        # EWMA 协方差的有效记忆跨度（span），span 越小越偏向近端观测
+        ewma_cov_span = int(context.params.get("ewma_cov_span", context.params.get("ewma_span", 90)))
+        # 对角收缩强度，保证 Σ 的数值正定与稳定（0 表示不收缩）
+        shrinkage = float(context.params.get("ewma_cov_shrinkage", 0.1))
+
+        closes = {}
+        for asset_id in universe:
+            frame = context.data.frames.get(asset_id)
+            if frame is None:
+                return None
+            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
+            history = frame[frame.index <= context.date][col]
+            closes[asset_id] = history
+
+        price_frame = pd.DataFrame(closes).dropna()
+        if price_frame.empty:
+            return None
+
+        price_frame.index = pd.to_datetime(price_frame.index)
+
+        if estimation_freq == "weekly":
+            price_frame = price_frame.resample("W").last().dropna()
+            window = max(2, int(rolling_window / 5))
+            min_p = max(2, int(min_periods / 5))
+            span = max(2, int(ewma_cov_span / 5))
+        elif estimation_freq == "monthly":
+            try:
+                price_frame = price_frame.resample("ME").last().dropna()
+            except Exception:
+                price_frame = price_frame.resample("M").last().dropna()
+            window = max(2, int(rolling_window / 20))
+            min_p = max(2, int(min_periods / 20))
+            span = max(2, int(ewma_cov_span / 20))
+        else:
+            window = rolling_window
+            min_p = min_periods
+            span = ewma_cov_span
+
+        if len(price_frame) < min_p + 1:
+            return None
+
+        returns = price_frame.pct_change().dropna().tail(window)
+        if len(returns) < min_p:
+            return None
+
+        X = returns.values
+        T, N = X.shape
+        if N == 0:
+            return None
+
+        # 1. 构造指数时间衰减权重（最近的观测权重最高）。span -> lambda 的标准换算。
+        lam = 1.0 - 2.0 / (span + 1.0)
+        lam = min(max(lam, 0.0), 0.9999)
+        ages = np.arange(T - 1, -1, -1)  # 最旧观测 age 最大，权重最小
+        w = lam ** ages
+        w_sum = w.sum()
+        if w_sum <= 0:
+            w = np.ones(T) / T
+        else:
+            w = w / w_sum
+
+        # 2. 加权去均值并估计 EWMA 全协方差矩阵 Σ = (X-μ)' diag(w) (X-μ)
+        mu = np.average(X, axis=0, weights=w)
+        Xd = X - mu
+        Sigma = (Xd * w[:, None]).T @ Xd
+        Sigma = (Sigma + Sigma.T) / 2.0  # 数值对称化
+
+        # 3. 对角收缩（向各资产自身方差收缩），平滑相关性噪声并保证正定性
+        if shrinkage > 0:
+            D = np.diag(np.diag(Sigma))
+            Sigma = (1.0 - shrinkage) * Sigma + shrinkage * D
+
+        # 4. 用基类 CCD 求解器求解等风险贡献权重（含特征值正定化兜底）
+        try:
+            weights = self._solve_risk_parity(Sigma)
+        except Exception:
+            weights = np.ones(N) / N
+
+        return TargetPortfolio({asset_id: float(weights[idx]) for idx, asset_id in enumerate(universe)})
+
+
+BUILTIN_STRATEGIES[RiskParityEWMACovStrategy.name] = RiskParityEWMACovStrategy
