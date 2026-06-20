@@ -79,6 +79,14 @@ candidates:
   sleeve: bond
   subtype: long_duration_bond
   include: true
+- asset_id: CN_ETF:511260_3X.SH
+  code: '511260_3X'
+  name: 模拟30年国债期货
+  exchange: SH
+  asset_type: etf
+  sleeve: bond
+  subtype: long_duration_bond
+  include: true
 - asset_id: CN_ETF:159985.SZ
   code: '159985'
   name: 豆粕ETF

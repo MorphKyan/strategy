@@ -15,13 +15,13 @@ assets:
     lot_size: 100
     name: 黄金ETF
     price_limit_pct: 0.1
-  - asset_id: CN_ETF:511260.SH
+  - asset_id: CN_ETF:511260_3X.SH
     asset_type: etf
-    code: '511260'
+    code: '511260_3X'
     currency: CNY
     exchange: SH
     lot_size: 100
-    name: 十年国债ETF
+    name: 模拟30年国债期货
     price_limit_pct: 0.1
 backtest:
   enable_checkpoints: false
@@ -80,7 +80,7 @@ strategies:
         universe:
           - CN_ETF:510300.SH
           - CN_ETF:518880.SH
-          - CN_ETF:511260.SH
+          - CN_ETF:511260_3X.SH
       start_date: '2017-08-24'
       strategy_name: risk_parity_lw_cov
       strategy_version_id:
