@@ -109,6 +109,9 @@ data_manifest.json
 /platform/results/backtests/
 /platform/results/sensitivity_raw/
 /platform/results/sim_portfolios/
+/platform/results/backtest_cache/
+/platform/results/backtests_experiments/
+/platform/results/raw_results/
 /research/results/**/backtest_results.csv
 /research/results/**/trade_history.csv
 /research/results/**/*.png
