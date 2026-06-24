@@ -1,0 +1,65 @@
+platform:
+  run_name: baseline_risk_parity_gerber_monthly_thr005_train
+data:
+  data_dir: data
+assets:
+- asset_id: CN_ETF:510300.SH
+  code: '510300'
+  name: 沪深300ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:518880.SH
+  code: '518880'
+  name: 黄金ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511260_3X.SH
+  code: 511260_3X
+  name: 模拟30年国债期货
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+backtest:
+  start_date: '2017-08-24'
+  end_date: '2025-06-30'
+  enable_checkpoints: false
+execution:
+  price_field: close
+  weight_tolerance: 0.0005
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+strategies:
+  segments:
+  - start_date: '2017-08-24'
+    end_date: '2025-06-30'
+    strategy_name: risk_parity_gerber
+    strategy_version_id: null
+    cancel_pending_on_start: false
+    params:
+      rebalance_frequency: monthly
+      rolling_window: 120
+      min_periods: 20
+      rebalance_threshold: 0.05
+      init_mode: calculate
+      init_calc_days: 30
+      gerber_c: 0.5
+      universe:
+      - CN_ETF:510300.SH
+      - CN_ETF:518880.SH
+      - CN_ETF:511260_3X.SH
+output:
+  results_dir: results/backtests
