@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orchestrate Quant Research"
+  short_description: "Coordinate topic, researcher, reviewer agents"
+  default_prompt: "Use $orchestrate-quant-research to explore 4 quant research directions, run parallel researchers, and review the results."
