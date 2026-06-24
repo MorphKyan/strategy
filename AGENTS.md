@@ -55,8 +55,9 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 4. Do not introduce deep learning, reinforcement learning, unrelated factor models, broad architecture rewrites, hidden benchmark changes, or unrestricted parameter searches unless explicitly requested.
 5. Preserve transaction-cost handling and trade reporting. If backtest artifacts exist, report turnover, trade count, order count, and rejection count.
 6. Do not overwrite generated historical results, reports, configs, checkpoints, or raw execution artifacts unless the user explicitly asks.
-7. Temporary scripts without clear reuse value must be deleted after use. Retained scripts must have a stable entrypoint, usage note, and clear maintenance owner.
-8. All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when exactness matters.
+7. Agent-created temporary scripts used for backtests, analysis, or one-off reporting must be deleted before task completion. Submit only necessary code changes, configs, raw artifacts, metrics, and reports.
+8. Only reusable, parameterized tools may be added under `platform/scripts/`. Do not add task-specific backtest scripts, hardcoded config matrices, hardcoded strategy sweeps, or one-off report generators there. A retained script must have a stable CLI, avoid hardcoded research config lists, document its usage, and have a clear maintenance owner.
+9. All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when exactness matters.
 
 ## Data Freshness And Sample Isolation
 
