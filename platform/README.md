@@ -34,17 +34,17 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 Run from the repository root:
 
 ```powershell
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_mvp_equal_weight.yaml
+.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_ewma.yaml
 .\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\validate_hfq_data.py --codes 510300 518880 511260
-.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_mvp_equal_weight.yaml
-.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_mvp_equal_weight.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
+.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
 ```
 
-The platform scripts change their working directory to `platform/`, so relative paths such as `configs/baseline_mvp_equal_weight.yaml`, `data/`, and `results/platform/` are platform-local.
+The platform scripts change their working directory to `platform/`, so relative paths such as `configs/baseline_r1_domestic_rolling.yaml`, `data/`, and `results/platform/` are platform-local.
 
 All generated markdown reports should be written in Chinese. Keep exact config paths, commands, CSV column names, and metric keys unchanged when they are used as machine-readable identifiers.
 
@@ -71,7 +71,7 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 - Standardized experiment reports with optional baseline comparison under `reports/experiments/`.
 - Research-grade metrics: annualized return, volatility, max drawdown, Sharpe, turnover, trade/order counts, rejection counts, pending-intent pressure, and cash drag.
 - CSV-only visualization module for NAV/drawdown, position weights, cash/pending-intent effects, and rejected-order reasons.
-- Start-date sensitivity analysis with default 3-trading-day step and no sample cap.
+- Start-date sensitivity analysis for research submissions should use one start date every 2 calendar months with the sample capped at `2025-06-30`; ad hoc diagnostic runs may use other step sizes when clearly labeled.
 - HFQ validation against the old research data chain.
 
 ## Archive Structure

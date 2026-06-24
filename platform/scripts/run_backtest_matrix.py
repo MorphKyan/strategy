@@ -78,7 +78,7 @@ STRATEGY_PARAMS = {
 
 # Only run unique configurations to avoid redundant heavy computation
 unique_configs = [
-    "baseline_mvp_equal_weight.yaml",
+    "baseline_r0_domestic_equal_weight.yaml",
     "baseline_r1_domestic_rolling.yaml",
     "baseline_r1_domestic_low_vol_ewma.yaml",
     "baseline_r2_global_ewma.yaml",
@@ -89,10 +89,10 @@ unique_configs = [
 
 # Map duplicates (same assets, same timeframe) to avoid recalculation
 duplicate_map = {
-    "baseline_risk_parity_hrp.yaml": "baseline_mvp_equal_weight.yaml",
-    "baseline_risk_parity_lw_cov.yaml": "baseline_mvp_equal_weight.yaml",
-    "baseline_r5_cvar_dynamic_budget.yaml": "baseline_mvp_equal_weight.yaml",
-    "baseline_r6_adaptive_risk_deviation.yaml": "baseline_mvp_equal_weight.yaml",
+    "baseline_risk_parity_hrp.yaml": "baseline_r0_domestic_equal_weight.yaml",
+    "baseline_risk_parity_lw_cov.yaml": "baseline_r0_domestic_equal_weight.yaml",
+    "baseline_r5_cvar_dynamic_budget.yaml": "baseline_r0_domestic_equal_weight.yaml",
+    "baseline_r6_adaptive_risk_deviation.yaml": "baseline_r0_domestic_equal_weight.yaml",
     "baseline_r1_domestic_ewma.yaml": "baseline_r1_domestic_rolling.yaml"
 }
 

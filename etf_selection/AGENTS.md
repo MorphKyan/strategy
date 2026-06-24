@@ -2,27 +2,30 @@
 
 ## Scope
 
-This directory is for ETF universe screening and basket construction. Treat it as a standalone research service that can be owned by a dedicated agent.
+This directory owns ETF universe screening and basket construction. It is a standalone research service that may generate platform configs and optionally call platform CLI commands.
+
+The root `AGENTS.md` remains authoritative for workspace-wide rules, especially data freshness, fixed sample split, report language, cache reuse, and validation gates.
 
 ## Boundaries
 
 - Do not put ETF selection code under `platform/` or `research/`.
-- Do not modify platform engine code when screening ETFs.
-- Do not modify research risk-parity baseline files.
-- The selector may read local market data and may generate platform configs.
-- The selector may call platform CLI commands for backtests, but platform remains an external runtime.
+- Do not modify platform engine or strategy code while screening ETFs.
+- Do not modify platform baseline configs directly. Generated configs must be additive under `etf_selection/generated_configs/<timestamp>/`.
+- The selector may read local platform market data and may call platform backtest commands, but platform remains an external runtime.
+- ETF selection reports belong under `etf_selection/reports/<timestamp>/`.
 
 ## Main Workflow
 
-1. Apply the fixed sample split before screening: `2025-07-01` and later data is the final test sample; ETF screening, ranking, basket construction, and score comparison must use only data up to `2025-06-30`.
-2. Screen ETFs inside each sleeve first.
-3. Validate correlation inside each sleeve to find representative ETFs.
-4. Build cross-sleeve baskets from shortlisted ETFs.
-5. Validate cross-sleeve correlation and inverse-vol concentration.
-6. Write generated platform configs under `etf_selection/generated_configs/`.
-7. Write reports under `etf_selection/reports/`.
-8. Optionally call `platform/scripts/run_platform_experiment.py` to backtest generated configs.
-9. If platform backtests are run, first run training-sample comparisons and start-date sensitivity. Start-date sensitivity must generate one `start_date` every 2 calendar months from the earliest common available trading date through `2025-06-30`; only after the ETF basket and strategy choices are frozen may `2025-07-01` and later data be used for final testing.
+1. Verify data freshness and alignment for every candidate symbol before screening.
+2. Apply the fixed sample split before screening: ETF screening, ranking, basket construction, score comparison, correlations, inverse-vol concentration, and liquidity scores must use only data up to `2025-06-30`.
+3. Screen ETFs inside each sleeve first.
+4. Validate correlation inside each sleeve to find representative ETFs.
+5. Build cross-sleeve baskets from shortlisted ETFs.
+6. Validate cross-sleeve correlation and inverse-vol concentration.
+7. Reject any basket whose common training history through `2025-06-30` is not longer than 3 years.
+8. Write generated platform configs under `etf_selection/generated_configs/<timestamp>/`.
+9. Write reports under `etf_selection/reports/<timestamp>/`.
+10. If platform backtests are run, first run training-sample comparisons and start-date sensitivity. Only after the ETF basket and strategy choices are frozen may `2025-07-01` and later data be used for final testing.
 
 ## Sleeves
 
@@ -41,8 +44,9 @@ Commodity selection rule:
 
 ## Hard Filters
 
-- Minimum local adjusted history is 3 years.
+- Minimum local adjusted history is 3 years through the training-sample end date.
 - Exclude assets with missing price or HFQ factor files unless the user explicitly asks to tolerate raw prices.
+- Do not use `2025-07-01` or later data for research-stage rankings, basket scores, correlations, concentration checks, or acceptance thresholds.
 - Keep all generated configs additive; never overwrite platform baseline configs.
 
 ## Scoring
@@ -63,12 +67,11 @@ Across sleeves, prefer:
 - acceptable liquidity
 - stable execution when platform backtests are run
 
-Do not compute sleeve rankings, basket scores, correlations, inverse-vol concentration, or liquidity scores using `2025-07-01` and later data during research. Those data are reserved for final testing only.
-
 ## Reporting
 
 Reports must be written in Chinese, but keep machine-readable keys, file names, config paths, and metric names in ASCII. Every report should include:
 
+- data freshness and alignment result
 - hard filter results
 - sleeve-level rankings
 - sleeve correlation matrices

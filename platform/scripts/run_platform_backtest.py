@@ -21,7 +21,7 @@ def load_config(path: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run an M0-M2 daily platform backtest.")
-    parser.add_argument("--config", default="configs/baseline_mvp_equal_weight.yaml", help="Platform YAML config path.")
+    parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Platform YAML config path.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
     parser.add_argument("--output-dir", help="Override output root directory.")
     args = parser.parse_args()

@@ -2,12 +2,21 @@
 
 ## Repository Layout
 
-The repository has two separate systems:
+This workspace contains two independent systems:
 
 - `platform/`: daily event-driven retail backtest and simulated-portfolio platform.
 - `etf_selection/`: standalone ETF sleeve screening and basket construction workflow.
 
-Do not mix their source, configs, scripts, reports, or results. Shared workspace-level files are limited to root documentation, dependency files, and `env/`.
+Do not mix their source, configs, scripts, reports, or results. Shared workspace-level files are limited to root documentation, dependency files, agent configuration, and `env/`.
+
+## Canonical Rule Sources
+
+- This file is the canonical workspace rule file.
+- `etf_selection/AGENTS.md` may add ETF-selection-specific rules, but must not weaken this file.
+- `.agents/agents/*/agent.json` and `agy-research/*_prompt.md` are harness prompts. They must summarize or reference these rules instead of introducing conflicting gates.
+- Deprecated or duplicate instruction files should be deleted instead of kept as separate rule sources.
+
+When documents conflict, apply this priority order: user instruction for the current task, this file, subsystem `AGENTS.md`, harness prompts, README files.
 
 ## Platform System Facts
 
@@ -15,15 +24,17 @@ Do not mix their source, configs, scripts, reports, or results. Shared workspace
 - Platform configs: `platform/configs/`
 - Platform docs: `platform/docs/`
 - Platform tests: `platform/tests/`
-- Platform backtest entry: `.\env\python.exe platform\scripts\run_platform_backtest.py --config configs/baseline_mvp_equal_weight.yaml`
-- Platform risk-parity config: `platform/configs/baseline_r1_domestic_rolling.yaml`
-- Platform data sync entry: `.\env\python.exe platform\scripts\sync_platform_data.py --config configs/baseline_mvp_equal_weight.yaml`
-- Platform simulated portfolio entry: `.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs/baseline_mvp_equal_weight.yaml --checkpoint <checkpoint.json> --asof-date <YYYY-MM-DD>`
 - Platform raw artifacts: `platform/results/`
 - Platform reports: `platform/reports/`
 - Platform metadata/data: `platform/data/`
+- Platform backtest entry: `.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml`
+- Platform experiment entry: `.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml`
+- Platform sensitivity entry: `.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml`
+- Platform data sync entry: `.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml`
+- Platform all-market data sync entry: `.\env\python.exe platform\scripts\sync_all_market_data.py`
+- Platform common date range entry: `.\env\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml`
 
-Platform entrypoints resolve relative paths from `platform/`.
+Platform entrypoints resolve relative paths from `platform/`. Do not use commands that reference missing configs.
 
 ## ETF Selection Facts
 
@@ -34,103 +45,65 @@ Platform entrypoints resolve relative paths from `platform/`.
 - Generated platform configs: `etf_selection/generated_configs/<timestamp>/`
 - ETF selection reports: `etf_selection/reports/<timestamp>/`
 
-ETF selection is independent from `platform/`; it may generate platform configs and call platform CLI commands, but platform internals should not depend on ETF selection.
+ETF selection is independent from `platform/`; it may generate platform configs and call platform CLI commands, but platform internals must not depend on ETF selection.
 
 ## Hard Rules
 
-1. Platform strategy work must stay under `platform/` and use the platform `Strategy.generate_targets(context)` API.
-2. Create strategy variants additively under `platform/src/platform_core/strategy.py` or modify the configuration parameter options to fit.
-3. Keep strategy variants registered in `BUILTIN_STRATEGIES` so they can be loaded by the platform engine.
-4. Do not introduce deep learning, reinforcement learning, unrelated factor models, or broad architecture rewrites unless explicitly requested.
-5. Do not run unrestricted parameter searches, silent optimizer sweeps, or broad benchmark changes.
-6. Preserve transaction-cost handling and trade reporting. If backtest artifacts exist, report turnover and trade count.
-7. Do not overwrite generated historical results, reports, or configs unless the user explicitly asks.
-8. 需要使用数据时，必须先检查所需标的数据是否已对齐，且截止日期距当前日期不超过一周；如数据陈旧，先拉取全部需要的数据并重新对齐。若拉取或对齐失败，必须直接终止任务并提示用户，不得继续回测或输出配置。
-9. 只有训练样本长度大于三年时，才允许输出或提交平台配置；如果组合最早共同有行情日期至训练样本末日（最晚 `2025-06-30`）不满三年，直接拒绝整个配置。
-10. QuantResearcher 认领课题时，应按照看板中的顺序由上至下依次认领第一个处于 Todo 状态的课题，不需自行挑选。
-11. 研究阶段必须固定样本切分：`2025-07-01`（含）之后的数据为最终测试样本；策略构思、ETF 选择、参数选择、阈值设定、候选筛选、缓存复用和报告中的研究结论不得使用测试样本信息。
-12. 所有平台研究在提交前必须执行起点敏感性测试：在不触碰最终测试样本的前提下，从该配置/组合的最早可用共同交易日开始，到训练样本末日（最晚 `2025-06-30`）为止，每隔 2 个月生成一个 `start_date`，逐一起跑回测并报告核心指标是否稳定。
-13. 回测时委托、订单、成交、持仓路径、NAV、拒单原因等执行相关原始数据不得删除；报告可以汇总，但不能替代可复核的原始交易产物。
-14. 临时使用的脚本如果没有明确的重复利用价值，使用后必须删除；保留脚本时要能说明稳定入口、适用场景和维护责任。
-15. 只有在训练样本内研究通过、起点敏感性测试稳定，并且固定后的策略/组合在 `2025-07-01`（含）之后最终测试样本中仍表现良好时，QuantResearcher 才允许提交成果；否则必须标记为“Failed”或“仅研究观察”，不得合入或注册为可投策略。
+1. Use `.\env\python.exe` for project Python commands on Windows.
+2. Platform strategy work must stay under `platform/` and use the platform `Strategy.generate_targets(context)` API.
+3. Strategy variants must be additive. Register a strategy in `BUILTIN_STRATEGIES` only when it is intended to be loadable by platform configs. Failed or research-only variants must not remain registered in the submitted diff.
+4. Do not introduce deep learning, reinforcement learning, unrelated factor models, broad architecture rewrites, hidden benchmark changes, or unrestricted parameter searches unless explicitly requested.
+5. Preserve transaction-cost handling and trade reporting. If backtest artifacts exist, report turnover, trade count, order count, and rejection count.
+6. Do not overwrite generated historical results, reports, configs, checkpoints, or raw execution artifacts unless the user explicitly asks.
+7. Temporary scripts without clear reuse value must be deleted after use. Retained scripts must have a stable entrypoint, usage note, and clear maintenance owner.
+8. All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when exactness matters.
 
-## Preferred Research Scope
+## Data Freshness And Sample Isolation
 
-Prefer research ideas adjacent to risk parity:
+1. Before using market data for screening, research, backtests, or generated configs, verify that every required symbol is aligned and that the latest local date is no more than 7 calendar days before the current date.
+2. If data are stale, sync all required symbols and re-check alignment before continuing. If sync or alignment fails, stop the task and report the failure; do not backtest, screen, or output configs.
+3. Fixed sample split:
+   - Training/research sample: data up to `2025-06-30`.
+   - Final test sample: data from `2025-07-01` onward.
+4. Research ideas, ETF selection, parameter choices, thresholds, candidate filtering, cache reuse decisions, and research conclusions must not use final test-sample information.
+5. A platform config or ETF basket may be output or submitted only when the common available history from the earliest shared trading date through `2025-06-30` is longer than 3 years.
+6. Final test results may be run only after the candidate strategy, parameters, ETF basket, rebalance rules, and acceptance thresholds are frozen. Do not modify the candidate after seeing final test results.
+
+## Platform Research Validation
+
+Before claiming a platform research result is successful:
+
+1. Confirm the baseline and candidate configs or algorithms.
+2. Run training-sample comparisons with backtest end date capped at `2025-06-30`.
+3. Scope the comparison set explicitly:
+   - Strategy API or engine changes: active non-generated baseline configs under `platform/configs/`.
+   - Strategy-variant research: the baseline configs relevant to the claimed asset universe, plus any config where the variant is intended to be used.
+   - ETF sleeve expansion: multiple built-in strategy algorithms, for example `risk_parity`, `risk_parity_ewma`, and `risk_parity_ewma_dd_recovery`.
+   - Generated, demo, or archived configs are included only when the claim depends on them or the user asks.
+4. Run start-date sensitivity without touching the final test sample. Generate one `start_date` every 2 calendar months from the earliest common available trading date through `2025-06-30`, and cap every run at `2025-06-30`.
+5. Report whether ranking, Sharpe, annualized return, max drawdown, turnover, trade count, order count, and rejection count materially change across start dates.
+6. Use `platform/results/backtest_cache/` only for cache entries whose symbols, config hash or parameter set, sample window, data freshness timestamp, and code version match the requested run. Cache entries using `2025-07-01` or later data must not be reused for research decisions.
+7. If a data sync occurred, treat older cache entries as expired unless they can prove they were generated from the same or newer data snapshot.
+8. Run final test-sample validation only after the candidate is frozen.
+9. Verify raw artifacts exist under `platform/results/` and standardized artifacts exist under `platform/reports/`.
+10. Read generated metrics from actual artifacts, preferably `metrics.json`; do not infer metrics from memory.
+11. Reports must include hypothesis, files changed, exact commands, baseline/candidate metrics, start-date sensitivity, final test-sample metrics if run, turnover, trade count, rejection count, and recommendation.
+
+## Acceptance Guidance
+
+- A candidate may be submitted only if training-sample comparisons pass, start-date sensitivity is stable, final test-sample performance remains acceptable versus baseline, and execution risk does not worsen materially.
+- If a candidate only has local advantage, is unstable, overfits, increases annualized two-sided turnover by more than 30% without clear compensating benefit, or fails final testing, mark it as `Failed` or `research-only`.
+- Research-only findings may be summarized in `platform/reports/non_baseline_research_history_summary.md` and `agy-research/research_history_summary.md`, but should not leave registered strategy code or new platform baseline configs behind.
+
+## Research Orientation
+
+For platform strategy implementation tasks, prefer ideas adjacent to risk parity:
 
 - volatility estimation changes, such as EWMA or robust rolling volatility
 - covariance shrinkage or robust covariance
 - volatility targeting overlays
 - rebalance frequency or threshold changes
 - turnover-aware constraints
-- ETF basket selection within the configured China ETF universe
+- ETF basket selection within the configured ETF universe
 
-Avoid:
-
-- unrelated alpha or factor models
-- benchmark or asset-universe changes hidden inside a strategy variant
-- large refactors during a research task
-- post-hoc parameter tuning after seeing backtest results
-
-## Implementation Guidelines
-
-- Read `README.md` plus the relevant subsystem README before making changes.
-- All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when clarity requires exact names.
-- Reuse the current config schema unless a separate config is genuinely needed.
-- If out-of-sample metrics are unavailable in the repository, state that explicitly instead of inventing them.
-
-## Validation Workflow For Platform Experiments
-
-Before claiming success:
-
-1. Confirm the baseline configurations and candidate configurations.
-2. Enforce the fixed sample split:
-   - Training/research sample: data up to `2025-06-30`.
-   - Final test sample: data from `2025-07-01` onward.
-   - Do not inspect, tune, rank, select, or reject candidates using the final test sample before the research candidate is frozen.
-3. Run the platform experiment:
-   - **For strategy updates**: Run backtests using the new strategy for **all platform configurations** in `platform/configs/` and compare all results.
-   - **For ETF sleeve expansion**: Run backtests for the expanded portfolio using **multiple strategy algorithms** (e.g., `risk_parity`, `risk_parity_ewma`, `risk_parity_ewma_dd_recovery`) and compare all results.
-4. Run start-date sensitivity:
-   - For each candidate/baseline configuration or algorithm, generate start dates from the earliest available common date to the training-sample end date, stepping by 2 calendar months.
-   - The common training history must be longer than three years; otherwise reject the whole candidate configuration before writing it.
-   - Run or reuse valid cached backtests for each start date, keeping the end date capped at `2025-06-30`.
-   - Report whether ranking, Sharpe, max drawdown, turnover, trade count, and rejection count materially change across start dates.
-5. Run the final test stage only after the candidate is frozen:
-   - Use `2025-07-01` and later data only in this stage.
-   - Do not change strategy code, parameters, ETF basket membership, rebalance rules, or acceptance thresholds after seeing test results.
-   - A candidate may be submitted only if the final test sample remains acceptable versus its baseline and does not introduce worse execution risk.
-6. Manage and utilize the shared backtest cache:
-   - Save backtest results in the shared directory `platform/results/backtest_cache/` in JSON format with a `timestamp`.
-   - Before running a backtest, check if a valid cache exists.
-   - If a data sync (`sync_platform_data.py`) was triggered due to outdated data during the task, mark all existing cache entries generated before the sync timestamp as expired, and rebuild/update them.
-7. Verify raw artifacts exist under `platform/results/`.
-8. Verify standardized artifacts exist under `platform/reports/`.
-9. Read generated metrics from `platform/reports/experiments/<strategy>/<timestamp>/metrics.json`; do not infer them from memory.
-10. Confirm the report includes hypothesis, files changed, exact commands, metrics delta for all configurations/algorithms, start-date sensitivity results, final test-sample metrics, turnover, trade count, and recommendation.
-
-## Research Summary History
-
-- 非基线研究价值成果汇总：[non_baseline_research_history_summary.md](file:///D:/strategy/platform/reports/non_baseline_research_history_summary.md)
-
-## 研究辅助工具 (Research Utility Tools)
-
-为了在研究和回测中提高配置生成的便利性与稳定性，我们在 `platform/scripts/` 下提供了一系列工具：
-
-1. **无配置依赖数据同步工具 (Sync All Market Data)**:
-   - **执行命令**: `.\env\python.exe platform/scripts/sync_all_market_data.py`
-   - **说明**: 自动从 Finshare 获取并同步组合内全部 12 个 ETF 标的的最新的市场日线数据和基本面指标数据，直到当前日期。此脚本独立运行，不依赖于任何配置文件。
-   - **参数**:
-     - `--start-date <YYYY-MM-DD>` (默认值: `2010-01-01`): 从指定日期开始同步。
-     - `--no-fundamentals`: 跳过基本面财务指标数据的同步。
-     - `--data-dir <path>` (默认值: `data`): 指定保存市场数据的本地目录。
-     - `--fundamentals-dir <path>` (默认值: `data/platform_fundamentals`): 指定保存基本面财务指标数据的本地目录。
-
-2. **最长公共历史时段计算工具 (Get Common Date Range)**:
-   - **执行命令**: `.\env\python.exe platform/scripts/get_common_date_range.py --config platform/configs/baseline_r3_global_nasdaq_all_weather_ewma.yaml`
-   - **说明**: 计算指定配置或标的列表在本地数据中的最长公共历史交易时段（历史数据的交集）。这有助于在回测时动态对齐并稳定 `start_date` 和 `end_date`。
-   - **参数**:
-     - `--config <path1> <path2> ...`: 从一个或多个平台配置文件中加载标的列表。
-     - `--codes <code1> <code2> ...`: 直接指定一个或多个标的代码。
-     - `--data-dir <path>` (默认值: `data`): 本地市场数据存储目录。
-     - 例如: `.\env\python.exe platform/scripts/get_common_date_range.py --codes 510300 518880 511260`
+Topic exploration may be broader when the idea can be validated in this repository and the report clearly states the expected validation path, risk, and cost. Avoid hidden benchmark changes, large refactors during a research task, and post-hoc tuning after seeing backtest results. Deep learning, reinforcement learning, broad factor models, and large parameter searches are allowed only when explicitly requested or clearly marked as exploratory rather than default implementation work.
