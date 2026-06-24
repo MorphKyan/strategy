@@ -50,6 +50,7 @@ strategies:
     strategy_version_id: null
     cancel_pending_on_start: false
     params:
+      rebalance_frequency: monthly
       rolling_window: 120
       min_periods: 20
       rebalance_threshold: 0.05

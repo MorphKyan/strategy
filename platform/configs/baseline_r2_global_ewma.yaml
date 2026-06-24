@@ -65,6 +65,7 @@ strategies:
       strategy_version_id: null
       cancel_pending_on_start: false
       params:
+        rebalance_frequency: daily
         rebalance_threshold: 0.05
         init_mode: "calculate"
         init_calc_days: 30

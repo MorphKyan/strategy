@@ -86,6 +86,7 @@ strategies:
   - cancel_pending_on_start: false
     end_date: null
     params:
+      rebalance_frequency: monthly
       damping_factor: 1.0
       init_calc_days: 30
       init_mode: calculate

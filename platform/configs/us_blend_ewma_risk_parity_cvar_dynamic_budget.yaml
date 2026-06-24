@@ -76,7 +76,7 @@ strategies:
         cov_estimator: ledoit_wolf
         cvar_sensitivity: 1.0
         min_periods: 20
-        rebalance_frequency: monthly
+        rebalance_frequency: daily
         rebalance_threshold: 0.05
         rolling_window: 120
         universe:
