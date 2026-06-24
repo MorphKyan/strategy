@@ -1,0 +1,138 @@
+{
+  "single_515080": {
+    "avg_div_weight": {
+      "mean": -0.0034708574213244666,
+      "median": -0.0038027931275046167,
+      "min": -0.010946310379994717,
+      "max": 0.0015666364746425576,
+      "positive": 5,
+      "negative": 12
+    },
+    "median_div_weight": {
+      "mean": 0.00013834170385496058,
+      "median": 0.004925822107432504,
+      "min": -0.0270539283999969,
+      "max": 0.024585109344866685,
+      "positive": 9,
+      "negative": 8
+    },
+    "max_div_weight": {
+      "mean": 0.00040954085867392435,
+      "median": 0.00340523242213131,
+      "min": -0.026487092291449896,
+      "max": 0.032132653519426985,
+      "positive": 10,
+      "negative": 7
+    },
+    "avg_order_target_weight": {
+      "mean": 0.00024500379557471005,
+      "median": 0.0038480196709096415,
+      "min": -0.05436250926693423,
+      "max": 0.04119756415235337,
+      "positive": 9,
+      "negative": 8
+    },
+    "div_trade_count": {
+      "mean": 1.0,
+      "median": 1.0,
+      "min": -5.0,
+      "max": 6.0,
+      "positive": 10,
+      "negative": 3
+    },
+    "div_trade_value_abs": {
+      "mean": 109495.2223070588,
+      "median": 67995.05069999996,
+      "min": -146195.02602000005,
+      "max": 431117.7078,
+      "positive": 14,
+      "negative": 3
+    },
+    "div_order_count": {
+      "mean": 6.117647058823529,
+      "median": -3.0,
+      "min": -75.0,
+      "max": 101.0,
+      "positive": 8,
+      "negative": 9
+    },
+    "div_rejected_order_count": {
+      "mean": 5.117647058823529,
+      "median": -1.0,
+      "min": -75.0,
+      "max": 100.0,
+      "positive": 7,
+      "negative": 9
+    },
+    "avg_div_weight_abs_diff_mean": 0.004002017684308544,
+    "avg_div_weight_abs_diff_max": 0.010946310379994717
+  },
+  "single_563020": {
+    "avg_div_weight": {
+      "mean": 0.005793632492825823,
+      "median": 0.006477520147354976,
+      "min": -0.0006728529093672359,
+      "max": 0.009596846573016904,
+      "positive": 16,
+      "negative": 1
+    },
+    "median_div_weight": {
+      "mean": 0.005302528454379649,
+      "median": 0.005811390112389236,
+      "min": -0.010147917723279304,
+      "max": 0.019688834023236595,
+      "positive": 15,
+      "negative": 2
+    },
+    "max_div_weight": {
+      "mean": 0.004441389500246524,
+      "median": 0.0014659187013301989,
+      "min": -0.019586742544461702,
+      "max": 0.027165177055826994,
+      "positive": 11,
+      "negative": 6
+    },
+    "avg_order_target_weight": {
+      "mean": 0.0022795192998394664,
+      "median": 0.0024825513002955935,
+      "min": -0.05776191598698972,
+      "max": 0.039678093960040475,
+      "positive": 10,
+      "negative": 7
+    },
+    "div_trade_count": {
+      "mean": 0.5882352941176471,
+      "median": 1.0,
+      "min": -5.0,
+      "max": 4.0,
+      "positive": 10,
+      "negative": 4
+    },
+    "div_trade_value_abs": {
+      "mean": -23068.931134117654,
+      "median": -10690.451839999994,
+      "min": -196857.10070000007,
+      "max": 94744.90526000003,
+      "positive": 6,
+      "negative": 11
+    },
+    "div_order_count": {
+      "mean": 39.64705882352941,
+      "median": 54.0,
+      "min": -57.0,
+      "max": 123.0,
+      "positive": 13,
+      "negative": 4
+    },
+    "div_rejected_order_count": {
+      "mean": 39.05882352941177,
+      "median": 53.0,
+      "min": -58.0,
+      "max": 126.0,
+      "positive": 13,
+      "negative": 4
+    },
+    "avg_div_weight_abs_diff_mean": 0.005872791658633733,
+    "avg_div_weight_abs_diff_max": 0.009596846573016904
+  }
+}

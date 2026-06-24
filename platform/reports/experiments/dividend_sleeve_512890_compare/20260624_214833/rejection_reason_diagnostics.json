@@ -1,0 +1,82 @@
+[
+  {
+    "variant": "pure_512890",
+    "scope": "all",
+    "total": 2333,
+    "reasons": {
+      "insufficient_cash_or_lot": 2328,
+      "limit_down": 5
+    }
+  },
+  {
+    "variant": "pure_512890",
+    "scope": "dividend",
+    "total": 1072,
+    "reasons": {
+      "insufficient_cash_or_lot": 1072
+    }
+  },
+  {
+    "variant": "pure_512890",
+    "scope": "non_dividend",
+    "total": 1261,
+    "reasons": {
+      "insufficient_cash_or_lot": 1256,
+      "limit_down": 5
+    }
+  },
+  {
+    "variant": "single_515080",
+    "scope": "all",
+    "total": 1906,
+    "reasons": {
+      "insufficient_cash_or_lot": 1898,
+      "limit_down": 8
+    }
+  },
+  {
+    "variant": "single_515080",
+    "scope": "dividend",
+    "total": 1159,
+    "reasons": {
+      "insufficient_cash_or_lot": 1159
+    }
+  },
+  {
+    "variant": "single_515080",
+    "scope": "non_dividend",
+    "total": 747,
+    "reasons": {
+      "insufficient_cash_or_lot": 739,
+      "limit_down": 8
+    }
+  },
+  {
+    "variant": "single_563020",
+    "scope": "all",
+    "total": 2074,
+    "reasons": {
+      "insufficient_cash_or_lot": 2068,
+      "limit_down": 5,
+      "limit_up": 1
+    }
+  },
+  {
+    "variant": "single_563020",
+    "scope": "dividend",
+    "total": 1736,
+    "reasons": {
+      "insufficient_cash_or_lot": 1736
+    }
+  },
+  {
+    "variant": "single_563020",
+    "scope": "non_dividend",
+    "total": 338,
+    "reasons": {
+      "limit_down": 5,
+      "insufficient_cash_or_lot": 332,
+      "limit_up": 1
+    }
+  }
+]

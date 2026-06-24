@@ -1,0 +1,776 @@
+{
+  "generated_at": "2026-06-24T21:15:10",
+  "data_latest_date": "2026-06-24",
+  "base_config": "platform/configs/baseline_r1_domestic_ewma.yaml",
+  "results_root": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352",
+  "metrics": {
+    "r1_short_majority_512890_train": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_majority_512890_train\\r1_short_majority_512890_train_20260624_211352_744090",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_majority_512890_train\\r1_short_majority_512890_train_20260624_211352_744090\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_majority_512890_train\\r1_short_majority_512890_train_20260624_211352_744090\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_majority_512890_train\\r1_short_majority_512890_train_20260624_211352_744090\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_majority_512890_train\\r1_short_majority_512890_train_20260624_211352_744090\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-12-14",
+      "end_date": "2025-06-30",
+      "observations": 371,
+      "total_return": 0.4377363901210818,
+      "annualized_return": 0.27968446302756433,
+      "annualized_volatility": 0.08239612448455823,
+      "max_drawdown": -0.03162440162436542,
+      "sharpe_ratio": 3.3943885683601502,
+      "turnover_total": 3382132.184588045,
+      "annualized_turnover": 0.9563001839583375,
+      "turnover_amount_total": 3382132.184588045,
+      "turnover_amount_ratio": 1.4078863819386636,
+      "annualized_turnover_amount": 0.9563001839583375,
+      "turnover_quantity_total": 843100.0,
+      "annualized_turnover_quantity": 286335.84905660374,
+      "trade_count": 38,
+      "order_count": 204,
+      "filled_order_count": 38,
+      "rejected_order_count": 166,
+      "order_status_counts": {
+        "REJECTED": 166,
+        "FILLED": 38
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 166
+      },
+      "pending_intent_count": 4,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.08693074554307484,
+      "max_position_count": 4,
+      "label": "r1_short_majority_512890_train",
+      "group": "train_short"
+    },
+    "r1_short_563020_only_train": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_563020_only_train\\r1_short_563020_only_train_20260624_211354_165067",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_563020_only_train\\r1_short_563020_only_train_20260624_211354_165067\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_563020_only_train\\r1_short_563020_only_train_20260624_211354_165067\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_563020_only_train\\r1_short_563020_only_train_20260624_211354_165067\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_563020_only_train\\r1_short_563020_only_train_20260624_211354_165067\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-12-14",
+      "end_date": "2025-06-30",
+      "observations": 371,
+      "total_return": 0.4199919801083103,
+      "annualized_return": 0.2689352839310424,
+      "annualized_volatility": 0.08110110291935427,
+      "max_drawdown": -0.036229734451522555,
+      "sharpe_ratio": 3.316049649762071,
+      "turnover_total": 3367445.0065862355,
+      "annualized_turnover": 0.9575915927101016,
+      "turnover_amount_total": 3367445.0065862355,
+      "turnover_amount_ratio": 1.4097876226009831,
+      "annualized_turnover_amount": 0.9575915927101016,
+      "turnover_quantity_total": 788000.0,
+      "annualized_turnover_quantity": 267622.6415094339,
+      "trade_count": 37,
+      "order_count": 201,
+      "filled_order_count": 37,
+      "rejected_order_count": 164,
+      "order_status_counts": {
+        "REJECTED": 164,
+        "FILLED": 37
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 164
+      },
+      "pending_intent_count": 4,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.08587465934774693,
+      "max_position_count": 4,
+      "label": "r1_short_563020_only_train",
+      "group": "train_short"
+    },
+    "r1_short_515080_only_train": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_only_train\\r1_short_515080_only_train_20260624_211353_406138",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_only_train\\r1_short_515080_only_train_20260624_211353_406138\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_only_train\\r1_short_515080_only_train_20260624_211353_406138\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_only_train\\r1_short_515080_only_train_20260624_211353_406138\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_only_train\\r1_short_515080_only_train_20260624_211353_406138\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-12-14",
+      "end_date": "2025-06-30",
+      "observations": 371,
+      "total_return": 0.4097621386525496,
+      "annualized_return": 0.2627186943057005,
+      "annualized_volatility": 0.08435128413577621,
+      "max_drawdown": -0.03622402353645515,
+      "sharpe_ratio": 3.114578479716027,
+      "turnover_total": 3432433.8360529793,
+      "annualized_turnover": 0.9756761947397016,
+      "turnover_amount_total": 3432433.8360529793,
+      "turnover_amount_ratio": 1.4364121755890051,
+      "annualized_turnover_amount": 0.9756761947397016,
+      "turnover_quantity_total": 750600.0,
+      "annualized_turnover_quantity": 254920.75471698112,
+      "trade_count": 40,
+      "order_count": 206,
+      "filled_order_count": 40,
+      "rejected_order_count": 166,
+      "order_status_counts": {
+        "REJECTED": 166,
+        "FILLED": 40
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 166
+      },
+      "pending_intent_count": 0,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.08746233756863528,
+      "max_position_count": 4,
+      "label": "r1_short_515080_only_train",
+      "group": "train_short"
+    },
+    "r1_short_515080_563020_split_train": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_563020_split_train\\r1_short_515080_563020_split_train_20260624_211354_945949",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_563020_split_train\\r1_short_515080_563020_split_train_20260624_211354_945949\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_563020_split_train\\r1_short_515080_563020_split_train_20260624_211354_945949\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_563020_split_train\\r1_short_515080_563020_split_train_20260624_211354_945949\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_short\\r1_short_515080_563020_split_train\\r1_short_515080_563020_split_train_20260624_211354_945949\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-12-14",
+      "end_date": "2025-06-30",
+      "observations": 371,
+      "total_return": 0.3707106349526137,
+      "annualized_return": 0.23885299954075223,
+      "annualized_volatility": 0.08923719522216428,
+      "max_drawdown": -0.05466753283636494,
+      "sharpe_ratio": 2.6766080998635773,
+      "turnover_total": 3224161.293976003,
+      "annualized_turnover": 0.9316303020963903,
+      "turnover_amount_total": 3224161.293976003,
+      "turnover_amount_ratio": 1.371566833641908,
+      "annualized_turnover_amount": 0.9316303020963903,
+      "turnover_quantity_total": 874600.0,
+      "annualized_turnover_quantity": 297033.9622641509,
+      "trade_count": 44,
+      "order_count": 240,
+      "filled_order_count": 44,
+      "rejected_order_count": 196,
+      "order_status_counts": {
+        "REJECTED": 196,
+        "FILLED": 44
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 196
+      },
+      "pending_intent_count": 0,
+      "max_pending_intent_count": 5,
+      "average_cash_weight": 0.08671759211322724,
+      "max_position_count": 5,
+      "label": "r1_short_515080_563020_split_train",
+      "group": "train_short"
+    },
+    "r1_long_majority_512890_train": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_majority_512890_train\\r1_long_majority_512890_train_20260624_211356_193322",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_majority_512890_train\\r1_long_majority_512890_train_20260624_211356_193322\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_majority_512890_train\\r1_long_majority_512890_train_20260624_211356_193322\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_majority_512890_train\\r1_long_majority_512890_train_20260624_211356_193322\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_majority_512890_train\\r1_long_majority_512890_train_20260624_211356_193322\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2019-12-27",
+      "end_date": "2025-06-30",
+      "observations": 1332,
+      "total_return": 1.0553445157887267,
+      "annualized_return": 0.14602578509043962,
+      "annualized_volatility": 0.09837311591801651,
+      "max_drawdown": -0.10207982781314306,
+      "sharpe_ratio": 1.484407439245256,
+      "turnover_total": 8407689.485737173,
+      "annualized_turnover": 0.5847839540940448,
+      "turnover_amount_total": 8407689.485737173,
+      "turnover_amount_ratio": 3.09100090021138,
+      "annualized_turnover_amount": 0.5847839540940448,
+      "turnover_quantity_total": 2210600.0,
+      "annualized_turnover_quantity": 209110.81081081083,
+      "trade_count": 114,
+      "order_count": 479,
+      "filled_order_count": 114,
+      "rejected_order_count": 365,
+      "order_status_counts": {
+        "REJECTED": 365,
+        "FILLED": 114
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 365
+      },
+      "pending_intent_count": 4,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.026827108003933103,
+      "max_position_count": 4,
+      "label": "r1_long_majority_512890_train",
+      "group": "train_long"
+    },
+    "r1_long_515080_only_train": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_515080_only_train\\r1_long_515080_only_train_20260624_211357_915730",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_515080_only_train\\r1_long_515080_only_train_20260624_211357_915730\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_515080_only_train\\r1_long_515080_only_train_20260624_211357_915730\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_515080_only_train\\r1_long_515080_only_train_20260624_211357_915730\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\train_long\\r1_long_515080_only_train\\r1_long_515080_only_train_20260624_211357_915730\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2019-12-27",
+      "end_date": "2025-06-30",
+      "observations": 1332,
+      "total_return": 0.9671491941730721,
+      "annualized_return": 0.13655600368725995,
+      "annualized_volatility": 0.07743231204040221,
+      "max_drawdown": -0.07639726943014324,
+      "sharpe_ratio": 1.7635532258937134,
+      "turnover_total": 9037775.043259503,
+      "annualized_turnover": 0.6361737908060857,
+      "turnover_amount_total": 9037775.043259503,
+      "turnover_amount_ratio": 3.3626328942607384,
+      "annualized_turnover_amount": 0.6361737908060857,
+      "turnover_quantity_total": 2277200.0,
+      "annualized_turnover_quantity": 215410.81081081083,
+      "trade_count": 130,
+      "order_count": 518,
+      "filled_order_count": 130,
+      "rejected_order_count": 388,
+      "order_status_counts": {
+        "REJECTED": 388,
+        "FILLED": 130
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 388
+      },
+      "pending_intent_count": 0,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.026407672418823528,
+      "max_position_count": 4,
+      "label": "r1_long_515080_only_train",
+      "group": "train_long"
+    },
+    "r1_short_majority_512890": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_majority_512890\\r1_short_majority_512890_20260624_211352_320248",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_majority_512890\\r1_short_majority_512890_20260624_211352_320248\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_majority_512890\\r1_short_majority_512890_20260624_211352_320248\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_majority_512890\\r1_short_majority_512890_20260624_211352_320248\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_majority_512890\\r1_short_majority_512890_20260624_211352_320248\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-12-14",
+      "end_date": "2026-06-24",
+      "observations": 609,
+      "total_return": 0.5716814550113334,
+      "annualized_return": 0.20574171866738045,
+      "annualized_volatility": 0.07763452744011641,
+      "max_drawdown": -0.04272702296696318,
+      "sharpe_ratio": 2.650131654708401,
+      "turnover_total": 4856582.1763670975,
+      "annualized_turnover": 0.7529479278041593,
+      "turnover_amount_total": 4856582.1763670975,
+      "turnover_amount_ratio": 1.8196241588600517,
+      "annualized_turnover_amount": 0.7529479278041593,
+      "turnover_quantity_total": 1237300.0,
+      "annualized_turnover_quantity": 255993.10344827588,
+      "trade_count": 64,
+      "order_count": 282,
+      "filled_order_count": 64,
+      "rejected_order_count": 218,
+      "order_status_counts": {
+        "REJECTED": 218,
+        "FILLED": 64
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 217,
+        "limit_down": 1
+      },
+      "pending_intent_count": 0,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.05624503125639333,
+      "max_position_count": 4,
+      "label": "r1_short_majority_512890",
+      "group": "full_short"
+    },
+    "r1_short_563020_only": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_563020_only\\r1_short_563020_only_20260624_211353_720651",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_563020_only\\r1_short_563020_only_20260624_211353_720651\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_563020_only\\r1_short_563020_only_20260624_211353_720651\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_563020_only\\r1_short_563020_only_20260624_211353_720651\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_563020_only\\r1_short_563020_only_20260624_211353_720651\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-12-14",
+      "end_date": "2026-06-24",
+      "observations": 609,
+      "total_return": 0.544883142970755,
+      "annualized_return": 0.19719173726633032,
+      "annualized_volatility": 0.07657821242650602,
+      "max_drawdown": -0.04008075666355526,
+      "sharpe_ratio": 2.5750370897672763,
+      "turnover_total": 4633722.210729591,
+      "annualized_turnover": 0.7253688167541119,
+      "turnover_amount_total": 4633722.210729591,
+      "turnover_amount_ratio": 1.7529746404891036,
+      "annualized_turnover_amount": 0.7253688167541119,
+      "turnover_quantity_total": 1046900.0,
+      "annualized_turnover_quantity": 216600.0,
+      "trade_count": 62,
+      "order_count": 266,
+      "filled_order_count": 62,
+      "rejected_order_count": 204,
+      "order_status_counts": {
+        "REJECTED": 204,
+        "FILLED": 62
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 203,
+        "limit_down": 1
+      },
+      "pending_intent_count": 0,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.054553968321072135,
+      "max_position_count": 4,
+      "label": "r1_short_563020_only",
+      "group": "full_short"
+    },
+    "r1_short_515080_only": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_only\\r1_short_515080_only_20260624_211353_023642",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_only\\r1_short_515080_only_20260624_211353_023642\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_only\\r1_short_515080_only_20260624_211353_023642\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_only\\r1_short_515080_only_20260624_211353_023642\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_only\\r1_short_515080_only_20260624_211353_023642\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-12-14",
+      "end_date": "2026-06-24",
+      "observations": 609,
+      "total_return": 0.5746572751298511,
+      "annualized_return": 0.20668586397729016,
+      "annualized_volatility": 0.08024084800031966,
+      "max_drawdown": -0.04183401324508007,
+      "sharpe_ratio": 2.575818540408082,
+      "turnover_total": 4787194.520260644,
+      "annualized_turnover": 0.7460172797139282,
+      "turnover_amount_total": 4787194.520260644,
+      "turnover_amount_ratio": 1.802875092641993,
+      "annualized_turnover_amount": 0.7460172797139282,
+      "turnover_quantity_total": 1065000.0,
+      "annualized_turnover_quantity": 220344.8275862069,
+      "trade_count": 59,
+      "order_count": 227,
+      "filled_order_count": 59,
+      "rejected_order_count": 168,
+      "order_status_counts": {
+        "REJECTED": 168,
+        "FILLED": 59
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 167,
+        "limit_down": 1
+      },
+      "pending_intent_count": 4,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.0553253177051345,
+      "max_position_count": 4,
+      "label": "r1_short_515080_only",
+      "group": "full_short"
+    },
+    "r1_short_515080_563020_split": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_563020_split\\r1_short_515080_563020_split_20260624_211354_461270",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_563020_split\\r1_short_515080_563020_split_20260624_211354_461270\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_563020_split\\r1_short_515080_563020_split_20260624_211354_461270\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_563020_split\\r1_short_515080_563020_split_20260624_211354_461270\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_short\\r1_short_515080_563020_split\\r1_short_515080_563020_split_20260624_211354_461270\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2023-12-14",
+      "end_date": "2026-06-24",
+      "observations": 609,
+      "total_return": 0.46647539223422485,
+      "annualized_return": 0.17166473104046154,
+      "annualized_volatility": 0.08290475920297224,
+      "max_drawdown": -0.05466753283636494,
+      "sharpe_ratio": 2.0706257721608234,
+      "turnover_total": 4332801.010107919,
+      "annualized_turnover": 0.6961265298731877,
+      "turnover_amount_total": 4332801.010107919,
+      "turnover_amount_ratio": 1.6823057805268702,
+      "annualized_turnover_amount": 0.6961265298731877,
+      "turnover_quantity_total": 1170800.0,
+      "annualized_turnover_quantity": 242234.4827586207,
+      "trade_count": 68,
+      "order_count": 266,
+      "filled_order_count": 68,
+      "rejected_order_count": 198,
+      "order_status_counts": {
+        "REJECTED": 198,
+        "FILLED": 68
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 197,
+        "limit_down": 1
+      },
+      "pending_intent_count": 5,
+      "max_pending_intent_count": 5,
+      "average_cash_weight": 0.05516344327435576,
+      "max_position_count": 5,
+      "label": "r1_short_515080_563020_split",
+      "group": "full_short"
+    },
+    "r1_long_majority_512890": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_majority_512890\\r1_long_majority_512890_20260624_211355_272655",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_majority_512890\\r1_long_majority_512890_20260624_211355_272655\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_majority_512890\\r1_long_majority_512890_20260624_211355_272655\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_majority_512890\\r1_long_majority_512890_20260624_211355_272655\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_majority_512890\\r1_long_majority_512890_20260624_211355_272655\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2019-12-27",
+      "end_date": "2026-06-24",
+      "observations": 1570,
+      "total_return": 1.2496780219810653,
+      "annualized_return": 0.13898677879529142,
+      "annualized_volatility": 0.09454161167413197,
+      "max_drawdown": -0.10207982781314306,
+      "sharpe_ratio": 1.4701122218473914,
+      "turnover_total": 10031991.14263083,
+      "annualized_turnover": 0.5409225134016543,
+      "turnover_amount_total": 10031991.14263083,
+      "turnover_amount_ratio": 3.3700331192087196,
+      "annualized_turnover_amount": 0.5409225134016543,
+      "turnover_quantity_total": 2546900.0,
+      "annualized_turnover_quantity": 204400.8917197452,
+      "trade_count": 136,
+      "order_count": 505,
+      "filled_order_count": 136,
+      "rejected_order_count": 369,
+      "order_status_counts": {
+        "REJECTED": 369,
+        "FILLED": 136
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 368,
+        "limit_down": 1
+      },
+      "pending_intent_count": 4,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.023851607809386322,
+      "max_position_count": 4,
+      "label": "r1_long_majority_512890",
+      "group": "full_long"
+    },
+    "r1_long_515080_only": {
+      "results_dir": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_515080_only\\r1_long_515080_only_20260624_211356_982390",
+      "nav_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_515080_only\\r1_long_515080_only_20260624_211356_982390\\nav.csv",
+      "positions_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_515080_only\\r1_long_515080_only_20260624_211356_982390\\positions.csv",
+      "orders_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_515080_only\\r1_long_515080_only_20260624_211356_982390\\orders.csv",
+      "trades_csv": "results\\backtests\\user_dividend_holdings_analysis\\20260624_211352\\full_long\\r1_long_515080_only\\r1_long_515080_only_20260624_211356_982390\\trades.csv",
+      "oos_metrics_available": false,
+      "start_date": "2019-12-27",
+      "end_date": "2026-06-24",
+      "observations": 1570,
+      "total_return": 1.1987886025025003,
+      "annualized_return": 0.1348114715937334,
+      "annualized_volatility": 0.07680647989789147,
+      "max_drawdown": -0.07639726943014324,
+      "sharpe_ratio": 1.7552096095662149,
+      "turnover_total": 10957300.609608956,
+      "annualized_turnover": 0.6003088242898835,
+      "turnover_amount_total": 10957300.609608956,
+      "turnover_amount_ratio": 3.7400192624409407,
+      "annualized_turnover_amount": 0.6003088242898835,
+      "turnover_quantity_total": 2714900.0,
+      "annualized_turnover_quantity": 217883.6942675159,
+      "trade_count": 150,
+      "order_count": 554,
+      "filled_order_count": 150,
+      "rejected_order_count": 404,
+      "order_status_counts": {
+        "REJECTED": 404,
+        "FILLED": 150
+      },
+      "rejection_reason_counts": {
+        "insufficient_cash_or_lot": 403,
+        "limit_down": 1
+      },
+      "pending_intent_count": 1,
+      "max_pending_intent_count": 4,
+      "average_cash_weight": 0.023433874720644468,
+      "max_position_count": 4,
+      "label": "r1_long_515080_only",
+      "group": "full_long"
+    }
+  },
+  "asset_analysis": {
+    "short_2023_12_14_to_2026_06_24": {
+      "perf": {
+        "512890": {
+          "start": "2023-12-14",
+          "end": "2026-06-24",
+          "observations": 609,
+          "total_return": 0.19716775599128522,
+          "annualized_return": 0.07730829705386832,
+          "annualized_volatility": 0.154276751254652,
+          "max_drawdown": -0.13789954337899546
+        },
+        "515080": {
+          "start": "2023-12-14",
+          "end": "2026-06-24",
+          "observations": 609,
+          "total_return": 0.046908315565032055,
+          "annualized_return": 0.019149889731435055,
+          "annualized_volatility": 0.15832607540119592,
+          "max_drawdown": -0.15538847117794485
+        },
+        "563020": {
+          "start": "2023-12-14",
+          "end": "2026-06-24",
+          "observations": 609,
+          "total_return": 0.09849246231155773,
+          "annualized_return": 0.03963657744392046,
+          "annualized_volatility": 0.1480896819533248,
+          "max_drawdown": -0.15617128463476082
+        },
+        "510300": {
+          "start": "2023-12-14",
+          "end": "2026-06-24",
+          "observations": 609,
+          "total_return": 0.4700686382233912,
+          "annualized_return": 0.17285183065835352,
+          "annualized_volatility": 0.16250812291794028,
+          "max_drawdown": -0.14111395394607373
+        },
+        "518880": {
+          "start": "2023-12-14",
+          "end": "2026-06-24",
+          "observations": 609,
+          "total_return": 0.8518921270117443,
+          "annualized_return": 0.290439133808738,
+          "annualized_volatility": 0.2198098638152423,
+          "max_drawdown": -0.28545026881720426
+        },
+        "511260_3X": {
+          "start": "2023-12-14",
+          "end": "2026-06-24",
+          "observations": 609,
+          "total_return": 0.38520262865137855,
+          "annualized_return": 0.14434566955569794,
+          "annualized_volatility": 0.07030675370439433,
+          "max_drawdown": -0.06425753700979042
+        }
+      },
+      "corr": {
+        "512890": {
+          "512890": 1.0,
+          "515080": 0.8914,
+          "563020": 0.9698,
+          "510300": 0.5414,
+          "518880": 0.1916,
+          "511260_3X": -0.1005
+        },
+        "515080": {
+          "512890": 0.8914,
+          "515080": 1.0,
+          "563020": 0.8824,
+          "510300": 0.6445,
+          "518880": 0.2415,
+          "511260_3X": -0.1833
+        },
+        "563020": {
+          "512890": 0.9698,
+          "515080": 0.8824,
+          "563020": 1.0,
+          "510300": 0.5394,
+          "518880": 0.1979,
+          "511260_3X": -0.1006
+        },
+        "510300": {
+          "512890": 0.5414,
+          "515080": 0.6445,
+          "563020": 0.5394,
+          "510300": 1.0,
+          "518880": 0.2441,
+          "511260_3X": -0.301
+        },
+        "518880": {
+          "512890": 0.1916,
+          "515080": 0.2415,
+          "563020": 0.1979,
+          "510300": 0.2441,
+          "518880": 1.0,
+          "511260_3X": 0.0051
+        },
+        "511260_3X": {
+          "512890": -0.1005,
+          "515080": -0.1833,
+          "563020": -0.1006,
+          "510300": -0.301,
+          "518880": 0.0051,
+          "511260_3X": 1.0
+        }
+      }
+    },
+    "long_2019_12_27_to_2026_06_24": {
+      "perf": {
+        "512890": {
+          "start": "2019-12-27",
+          "end": "2026-06-24",
+          "observations": 1569,
+          "total_return": 0.8517270429654591,
+          "annualized_return": 0.10401769255786841,
+          "annualized_volatility": 0.17175350725392755,
+          "max_drawdown": -0.1652566271855611
+        },
+        "515080": {
+          "start": "2019-12-27",
+          "end": "2026-06-24",
+          "observations": 1569,
+          "total_return": 0.41498559077809816,
+          "annualized_return": 0.05733488460128222,
+          "annualized_volatility": 0.17016356445537376,
+          "max_drawdown": -0.20012239902080786
+        },
+        "510300": {
+          "start": "2019-12-27",
+          "end": "2026-06-24",
+          "observations": 1569,
+          "total_return": 0.34094549637308447,
+          "annualized_return": 0.04824726332425833,
+          "annualized_volatility": 0.1697395878497713,
+          "max_drawdown": -0.3846522016592214
+        },
+        "518880": {
+          "start": "2019-12-27",
+          "end": "2026-06-24",
+          "observations": 1569,
+          "total_return": 1.5319655069878086,
+          "annualized_return": 0.16091414581183283,
+          "annualized_volatility": 0.17380931824204357,
+          "max_drawdown": -0.28545026881720426
+        },
+        "511260_3X": {
+          "start": "2019-12-27",
+          "end": "2026-06-24",
+          "observations": 1569,
+          "total_return": 1.0411563923266858,
+          "annualized_return": 0.12142389135307519,
+          "annualized_volatility": 0.07588164087467662,
+          "max_drawdown": -0.13441242720460667
+        }
+      },
+      "corr": {
+        "512890": {
+          "512890": 1.0,
+          "515080": 0.8833,
+          "510300": 0.5857,
+          "518880": 0.0835,
+          "511260_3X": -0.1927
+        },
+        "515080": {
+          "512890": 0.8833,
+          "515080": 1.0,
+          "510300": 0.6771,
+          "518880": 0.1287,
+          "511260_3X": -0.2339
+        },
+        "510300": {
+          "512890": 0.5857,
+          "515080": 0.6771,
+          "510300": 1.0,
+          "518880": 0.1383,
+          "511260_3X": -0.2811
+        },
+        "518880": {
+          "512890": 0.0835,
+          "515080": 0.1287,
+          "510300": 0.1383,
+          "518880": 1.0,
+          "511260_3X": 0.08
+        },
+        "511260_3X": {
+          "512890": -0.1927,
+          "515080": -0.2339,
+          "510300": -0.2811,
+          "518880": 0.08,
+          "511260_3X": 1.0
+        }
+      }
+    },
+    "train_long_2019_12_27_to_2025_06_30": {
+      "perf": {
+        "512890": {
+          "start": "2019-12-27",
+          "end": "2025-06-30",
+          "observations": 1331,
+          "total_return": 0.9983150800336982,
+          "annualized_return": 0.1400531751269789,
+          "annualized_volatility": 0.1806287877393173,
+          "max_drawdown": -0.1652566271855611
+        },
+        "515080": {
+          "start": "2019-12-27",
+          "end": "2025-06-30",
+          "observations": 1331,
+          "total_return": 0.46589817483189244,
+          "annualized_return": 0.07509948574229619,
+          "annualized_volatility": 0.17707472614564956,
+          "max_drawdown": -0.20012239902080786
+        },
+        "510300": {
+          "start": "2019-12-27",
+          "end": "2025-06-30",
+          "observations": 1331,
+          "total_return": 0.07557875624148891,
+          "annualized_return": 0.013890054124709117,
+          "annualized_volatility": 0.1738007030913654,
+          "max_drawdown": -0.3846522016592214
+        },
+        "518880": {
+          "start": "2019-12-27",
+          "end": "2025-06-30",
+          "observations": 1331,
+          "total_return": 1.1748438893844781,
+          "annualized_return": 0.1584724462600975,
+          "annualized_volatility": 0.14199488383110584,
+          "max_drawdown": -0.20465966194609408
+        },
+        "511260_3X": {
+          "start": "2019-12-27",
+          "end": "2025-06-30",
+          "observations": 1331,
+          "total_return": 0.9775311143640923,
+          "annualized_return": 0.13779867318001204,
+          "annualized_volatility": 0.07949208122690256,
+          "max_drawdown": -0.13441242720460667
+        }
+      },
+      "corr": {
+        "512890": {
+          "512890": 1.0,
+          "515080": 0.8966,
+          "510300": 0.6254,
+          "518880": 0.0463,
+          "511260_3X": -0.2096
+        },
+        "515080": {
+          "512890": 0.8966,
+          "515080": 1.0,
+          "510300": 0.7101,
+          "518880": 0.0692,
+          "511260_3X": -0.2479
+        },
+        "510300": {
+          "512890": 0.6254,
+          "515080": 0.7101,
+          "510300": 1.0,
+          "518880": 0.0514,
+          "511260_3X": -0.295
+        },
+        "518880": {
+          "512890": 0.0463,
+          "515080": 0.0692,
+          "510300": 0.0514,
+          "518880": 1.0,
+          "511260_3X": 0.1043
+        },
+        "511260_3X": {
+          "512890": -0.2096,
+          "515080": -0.2479,
+          "510300": -0.295,
+          "518880": 0.1043,
+          "511260_3X": 1.0
+        }
+      }
+    }
+  }
+}

@@ -35,6 +35,7 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
     nav = read_csv_or_empty(result_dir / "nav.csv")
     trades = read_csv_or_empty(result_dir / "trades.csv")
     orders = read_csv_or_empty(result_dir / "orders.csv")
+    skipped_orders = read_csv_or_empty(result_dir / "skipped_orders.csv")
     positions = read_csv_or_empty(result_dir / "positions.csv")
 
     metrics: dict[str, Any] = {
@@ -42,11 +43,17 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
         "nav_csv": str(result_dir / "nav.csv"),
         "positions_csv": str(result_dir / "positions.csv"),
         "orders_csv": str(result_dir / "orders.csv"),
+        "skipped_orders_csv": str(result_dir / "skipped_orders.csv"),
         "trades_csv": str(result_dir / "trades.csv"),
         "oos_metrics_available": False,
     }
 
     if nav.empty or "net_value" not in nav.columns:
+        skipped_reason_counts = (
+            skipped_orders.get("reason", pd.Series(dtype=str)).fillna("unknown").value_counts().to_dict()
+            if not skipped_orders.empty
+            else {}
+        )
         metrics.update(
             {
                 "start_date": None,
@@ -66,8 +73,11 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
                 "annualized_turnover_quantity": 0.0,
                 "trade_count": int(len(trades)),
                 "order_count": int(len(orders)),
+                "skipped_order_count": int(len(skipped_orders)),
+                "skipped_below_lot_or_cash_count": int(skipped_reason_counts.get("below_lot_or_cash", 0)),
                 "filled_order_count": 0,
                 "rejected_order_count": 0,
+                "skipped_reason_counts": {str(key): int(value) for key, value in skipped_reason_counts.items()},
                 "pending_intent_count": 0,
                 "max_pending_intent_count": 0,
                 "average_cash_weight": None,
@@ -123,6 +133,9 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
         rejected = orders[orders["status"] == "REJECTED"] if "status" in orders.columns else pd.DataFrame()
         if not rejected.empty:
             rejection_reason_counts = rejected.get("reason", pd.Series(dtype=str)).fillna("unknown").value_counts().to_dict()
+    skipped_reason_counts = {}
+    if not skipped_orders.empty:
+        skipped_reason_counts = skipped_orders.get("reason", pd.Series(dtype=str)).fillna("unknown").value_counts().to_dict()
 
     pending_series = pd.to_numeric(nav.get("pending_intent_count", pd.Series(dtype=float)), errors="coerce").fillna(0)
     average_cash_weight = None
@@ -156,10 +169,13 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
             "annualized_turnover_quantity": safe_float(annualized_turnover_quantity),
             "trade_count": int(len(trades)),
             "order_count": int(len(orders)),
+            "skipped_order_count": int(len(skipped_orders)),
+            "skipped_below_lot_or_cash_count": int(skipped_reason_counts.get("below_lot_or_cash", 0)),
             "filled_order_count": int(status_counts.get("FILLED", 0)),
             "rejected_order_count": int(status_counts.get("REJECTED", 0)),
             "order_status_counts": {str(key): int(value) for key, value in status_counts.items()},
             "rejection_reason_counts": {str(key): int(value) for key, value in rejection_reason_counts.items()},
+            "skipped_reason_counts": {str(key): int(value) for key, value in skipped_reason_counts.items()},
             "pending_intent_count": int(pending_series.iloc[-1]) if len(pending_series) else 0,
             "max_pending_intent_count": int(pending_series.max()) if len(pending_series) else 0,
             "average_cash_weight": average_cash_weight,
@@ -194,6 +210,8 @@ def comparison_metrics(candidate: dict[str, Any], baseline: dict[str, Any] | Non
         "trade_count",
         "order_count",
         "rejected_order_count",
+        "skipped_order_count",
+        "skipped_below_lot_or_cash_count",
         "max_pending_intent_count",
         "average_cash_weight",
     ]

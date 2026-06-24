@@ -127,6 +127,7 @@ class PlatformBacktestEngine:
         nav_rows: list[dict[str, Any]] = []
         position_rows: list[dict[str, Any]] = []
         order_rows: list[dict[str, Any]] = []
+        skipped_order_rows: list[dict[str, Any]] = []
         trade_rows: list[dict[str, Any]] = []
         active_segment_key = None
         active_strategy = None
@@ -205,6 +206,7 @@ class PlatformBacktestEngine:
             state.decrement_cooldowns()
             pending_target = self._target_from_pending(state, current_date)
             if pending_target is not None:
+                skipped_orders = []
                 orders, trades = self.execution.apply_target(
                     current_date=current_date,
                     state=state,
@@ -214,8 +216,10 @@ class PlatformBacktestEngine:
                     cooldown_days=int(active_strategy_runtime.get("cooldown_days", 0)),
                     close_absent_positions=False,
                     signal_dates=self._signal_dates_from_pending(state, current_date),
+                    skipped_orders=skipped_orders,
                 )
                 order_rows.extend(order.to_row() for order in orders)
+                skipped_order_rows.extend(order.to_row() for order in skipped_orders)
                 trade_rows.extend(trade.to_row() for trade in trades)
 
             assert active_strategy is not None
@@ -275,8 +279,9 @@ class PlatformBacktestEngine:
         self._write_csv("nav.csv", nav_rows)
         self._write_csv("positions.csv", position_rows)
         self._write_csv("orders.csv", order_rows)
+        self._write_csv("skipped_orders.csv", skipped_order_rows)
         self._write_csv("trades.csv", trade_rows)
-        metrics = self._metrics(nav_rows, trade_rows)
+        metrics = self._metrics(nav_rows, trade_rows, order_rows, skipped_order_rows)
         self._write_manifest(metrics)
         self._write_report(metrics)
         return PlatformBacktestResult(run_id=self.run_id, output_dir=self.output_dir, metrics=metrics)
@@ -416,9 +421,26 @@ class PlatformBacktestEngine:
         (self.output_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     @staticmethod
-    def _metrics(nav_rows: list[dict[str, Any]], trade_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    def _metrics(
+        nav_rows: list[dict[str, Any]],
+        trade_rows: list[dict[str, Any]],
+        order_rows: list[dict[str, Any]] | None = None,
+        skipped_order_rows: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        order_rows = order_rows or []
+        skipped_order_rows = skipped_order_rows or []
+        skipped_reason_counts: dict[str, int] = {}
+        for row in skipped_order_rows:
+            reason = str(row.get("reason") or "unknown")
+            skipped_reason_counts[reason] = skipped_reason_counts.get(reason, 0) + 1
         if not nav_rows:
-            return {"trade_count": len(trade_rows)}
+            return {
+                "trade_count": len(trade_rows),
+                "order_count": len(order_rows),
+                "skipped_order_count": len(skipped_order_rows),
+                "skipped_below_lot_or_cash_count": skipped_reason_counts.get("below_lot_or_cash", 0),
+                "skipped_reason_counts": skipped_reason_counts,
+            }
         net_values = [float(row["net_value"]) for row in nav_rows]
         total_values = [float(row.get("total_value", 0.0)) for row in nav_rows]
         average_total_value = sum(total_values) / len(total_values) if total_values else 0.0
@@ -441,6 +463,10 @@ class PlatformBacktestEngine:
             "total_return": net_values[-1] / net_values[0] - 1 if net_values[0] else 0.0,
             "max_drawdown": max_drawdown,
             "trade_count": len(trade_rows),
+            "order_count": len(order_rows),
+            "skipped_order_count": len(skipped_order_rows),
+            "skipped_below_lot_or_cash_count": skipped_reason_counts.get("below_lot_or_cash", 0),
+            "skipped_reason_counts": skipped_reason_counts,
             "turnover_total": turnover_amount_total / 2,
             "annualized_turnover": annualized_turnover_amount,
             "turnover_amount_total": turnover_amount_total / 2,

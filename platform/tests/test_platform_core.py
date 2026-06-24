@@ -13,7 +13,7 @@ from src.platform_core.engine import PlatformBacktestEngine, load_checkpoint
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
 from src.platform_core.experiment import run_platform_experiment
 from src.platform_core.metrics import build_platform_metrics
-from src.platform_core.models import Asset, Bar, PortfolioState, TargetPortfolio
+from src.platform_core.models import Asset, Bar, PendingIntent, PortfolioState, TargetPortfolio
 from src.platform_core.sim import SimPortfolio
 from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.strategy import MonthlyEqualWeightStrategy
@@ -193,6 +193,49 @@ def test_execution_skips_below_lot_residual_without_pending():
     assert state.pending_intents == {}
 
 
+def test_execution_skips_buy_when_cash_cannot_cover_one_lot_without_pending():
+    asset = Asset(asset_id="A", code="A", name="A", lot_size=100)
+    held_asset = Asset(asset_id="B", code="B", name="B", lot_size=100)
+    state = PortfolioState(cash=50)
+    state.position("B").quantity = 1000
+    state.pending_intents["A"] = PendingIntent(
+        asset_id="A",
+        target_weight=0.5,
+        created_date=date(2024, 1, 1),
+        signal_date=date(2024, 1, 1),
+    )
+    bars = {
+        "A": Bar(date=date(2024, 1, 2), asset_id="A", open=10, high=10, low=10, close=10),
+        "B": Bar(date=date(2024, 1, 2), asset_id="B", open=10, high=10, low=10, close=10),
+    }
+    engine = ExecutionEngine(
+        ExecutionConfig(
+            fee_profile=FeeProfile(rate=0.0),
+            weight_tolerance=0.0001,
+            skip_below_lot=True,
+            slippage_bps=0.0,
+        )
+    )
+    skipped_orders = []
+
+    orders, trades = engine.apply_target(
+        date(2024, 1, 2),
+        state,
+        {"A": asset, "B": held_asset},
+        bars,
+        TargetPortfolio({"A": 0.5}),
+        close_absent_positions=False,
+        skipped_orders=skipped_orders,
+    )
+
+    assert orders == []
+    assert trades == []
+    assert state.pending_intents == {}
+    assert len(skipped_orders) == 1
+    assert skipped_orders[0].status == "SKIPPED"
+    assert skipped_orders[0].reason == "below_lot_or_cash"
+
+
 def test_execution_cash_buffer_and_gap_priority():
     assets = {
         "BOND": Asset(asset_id="BOND", code="BOND", name="Bond", lot_size=100),
@@ -301,7 +344,16 @@ def test_platform_backtest_outputs_and_checkpoint_resume(tmp_path: Path):
     finally:
         store.close()
 
-    expected_files = ["manifest.json", "config_snapshot.yaml", "nav.csv", "positions.csv", "orders.csv", "trades.csv", "report.md"]
+    expected_files = [
+        "manifest.json",
+        "config_snapshot.yaml",
+        "nav.csv",
+        "positions.csv",
+        "orders.csv",
+        "skipped_orders.csv",
+        "trades.csv",
+        "report.md",
+    ]
     for name in expected_files:
         assert (result.output_dir / name).exists()
     checkpoint_path = result.output_dir / "checkpoints" / "2024-01-31.json"
@@ -535,6 +587,15 @@ def test_platform_metrics_and_visualization_from_artifacts(tmp_path: Path):
         ),
         encoding="utf-8",
     )
+    (result_dir / "skipped_orders.csv").write_text(
+        "\n".join(
+            [
+                "order_id,date,asset_id,side,quantity,price,trade_value,status,reason,target_weight",
+                "S1,2024-01-02,C,BUY,0,10,0,SKIPPED,below_lot_or_cash,0.1",
+            ]
+        ),
+        encoding="utf-8",
+    )
     (result_dir / "trades.csv").write_text(
         "trade_id,order_id,date,asset_id,side,quantity,price,trade_value,fee,cash_after\n"
         "T1,O1,2024-01-01,A,BUY,90,10,900,0,100\n",
@@ -544,7 +605,10 @@ def test_platform_metrics_and_visualization_from_artifacts(tmp_path: Path):
     metrics = build_platform_metrics(result_dir)
     assert metrics["trade_count"] == 1
     assert metrics["rejected_order_count"] == 1
+    assert metrics["skipped_order_count"] == 1
+    assert metrics["skipped_below_lot_or_cash_count"] == 1
     assert metrics["rejection_reason_counts"]["limit_up"] == 1
+    assert metrics["skipped_reason_counts"]["below_lot_or_cash"] == 1
     paths = render_platform_charts(result_dir)
     assert paths
     assert all(path.exists() for path in paths)

@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-06-24T21:48:47",
+  "common_start": "2023-12-14",
+  "completed_pure_512890_runs": 17,
+  "failed_runs": 0,
+  "raw_root": "results\\backtests\\dividend_sleeve_512890_compare\\20260624_214833",
+  "report_dir": "reports\\experiments\\dividend_sleeve_512890_compare\\20260624_214833",
+  "variant_means": {
+    "pure_512890": {
+      "annualized_return": 0.19184381970589562,
+      "annualized_volatility": 0.07257248432287204,
+      "max_drawdown": -0.04611065393998088,
+      "sharpe_ratio": 2.6575978445902386,
+      "annualized_turnover_amount": 0.6895909377618579,
+      "trade_count": 74.88235294117646,
+      "order_count": 212.11764705882354,
+      "rejected_order_count": 137.23529411764707
+    },
+    "single_515080": {
+      "annualized_return": 0.18830491600544091,
+      "annualized_volatility": 0.07369410423448762,
+      "max_drawdown": -0.047675470990676344,
+      "sharpe_ratio": 2.5731084680660476,
+      "annualized_turnover_amount": 0.7337822675604008,
+      "trade_count": 79.23529411764706,
+      "order_count": 191.35294117647058,
+      "rejected_order_count": 112.11764705882354
+    },
+    "single_563020": {
+      "annualized_return": 0.18604709791057034,
+      "annualized_volatility": 0.07240825572354025,
+      "max_drawdown": -0.046852163368362565,
+      "sharpe_ratio": 2.5837656388094747,
+      "annualized_turnover_amount": 0.697308269643392,
+      "trade_count": 75.70588235294117,
+      "order_count": 197.7058823529412,
+      "rejected_order_count": 122.0
+    }
+  },
+  "pairwise_summary_vs_pure_512890": {
+    "single_515080": {
+      "count": 17,
+      "ann_return_delta_mean": -0.003538903700454719,
+      "ann_return_wins": 7,
+      "sharpe_delta_mean": -0.08448937652419154,
+      "sharpe_wins": 3,
+      "max_drawdown_delta_mean": -0.0015648170506954648,
+      "drawdown_wins": 8,
+      "vol_delta_mean": 0.0011216199116155716,
+      "vol_lower_count": 4,
+      "turnover_delta_mean": 0.044191329798542865,
+      "rejected_order_delta_mean": -25.11764705882353,
+      "rejected_order_lower_count": 10
+    },
+    "single_563020": {
+      "count": 17,
+      "ann_return_delta_mean": -0.005796721795325292,
+      "ann_return_wins": 1,
+      "sharpe_delta_mean": -0.07383220578076424,
+      "sharpe_wins": 1,
+      "max_drawdown_delta_mean": -0.0007415094283816815,
+      "drawdown_wins": 7,
+      "vol_delta_mean": -0.00016422859933181122,
+      "vol_lower_count": 12,
+      "turnover_delta_mean": 0.007717331881534091,
+      "rejected_order_delta_mean": -15.235294117647058,
+      "rejected_order_lower_count": 10
+    }
+  },
+  "failures": []
+}

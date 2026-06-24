@@ -49,6 +49,7 @@ class ExecutionEngine:
         cooldown_days: int = 0,
         close_absent_positions: bool = True,
         signal_dates: dict[str, date] | None = None,
+        skipped_orders: list[Order] | None = None,
     ) -> tuple[list[Order], list[Trade]]:
         prices = {asset_id: self._price_for_bar(bar) for asset_id, bar in bars.items()}
         state_value = state.total_value(prices)
@@ -135,6 +136,13 @@ class ExecutionEngine:
                 quantity = self._cap_buy_quantity(quantity, execution_price, buy_cash, asset.lot_size)
                 order.quantity = quantity
             if quantity <= 0:
+                if side == "BUY":
+                    order.status = "SKIPPED"
+                    order.reason = "below_lot_or_cash"
+                    state.pending_intents.pop(asset_id, None)
+                    if skipped_orders is not None:
+                        skipped_orders.append(order)
+                    continue
                 order.status = "REJECTED"
                 order.reason = "insufficient_cash_or_lot"
                 orders.append(order)

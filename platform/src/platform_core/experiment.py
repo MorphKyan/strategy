@@ -144,6 +144,8 @@ def build_report(
             f"- 成交笔数：{c.get('trade_count')}",
             f"- 订单数：{c.get('order_count')}",
             f"- 拒单数：{c.get('rejected_order_count')}",
+            f"- 跳过订单数：{c.get('skipped_order_count')}",
+            f"- 低于一手或现金不足跳过数：{c.get('skipped_below_lot_or_cash_count')}",
             f"- 最大待执行意图数：{c.get('max_pending_intent_count')}",
             f"- 平均现金权重：{pct_or_na(c.get('average_cash_weight'))}",
             f"- 是否有样本外指标：{bool_zh(c.get('oos_metrics_available'))}",
@@ -171,6 +173,8 @@ def build_report(
             "trade_count_delta": "成交笔数差值",
             "order_count_delta": "订单数差值",
             "rejected_order_count_delta": "拒单数差值",
+            "skipped_order_count_delta": "跳过订单数差值",
+            "skipped_below_lot_or_cash_count_delta": "低于一手或现金不足跳过数差值",
             "max_pending_intent_count_delta": "最大待执行意图数差值",
             "average_cash_weight_delta": "平均现金权重差值",
         }
