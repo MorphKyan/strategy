@@ -65,7 +65,6 @@ strategies:
         min_threshold: 0.01
         max_threshold: 0.20
         rebalance_frequency: "daily"
-        cov_estimator: "ledoit_wolf"
         shrinkage_target: "constant_correlation"
 
 output:

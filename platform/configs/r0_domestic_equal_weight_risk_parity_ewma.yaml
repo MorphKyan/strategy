@@ -49,11 +49,10 @@ strategies:
     - cancel_pending_on_start: false
       end_date:
       params:
-        ewma_lambda: 0.94
-        min_periods: 20
+        ewma_span: 60
+        ewma_min_periods: 20
         rebalance_frequency: monthly
         rebalance_threshold: 0.05
-        rolling_window: 120
         universe:
           - CN_ETF:510300.SH
           - CN_ETF:518880.SH

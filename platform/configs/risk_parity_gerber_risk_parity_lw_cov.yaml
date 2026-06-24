@@ -60,19 +60,6 @@ strategies:
     - cancel_pending_on_start: false
       end_date:
       params:
-        cooldown_days: 20
-        fundamental_rules:
-          descending: true
-          limit: 3
-          max:
-            pb: 5
-            pe: 30
-          min:
-            roe: 0
-          required:
-            - pe
-            - pb
-          sort_by: dividend_yield
         min_periods: 20
         rebalance_frequency: monthly
         rebalance_threshold: 0.05
