@@ -242,6 +242,8 @@ class RiskParityStrategy(Strategy):
         next_date = context.data.calendar[idx + 1]
         
         freq = context.runtime.get("rebalance_frequency", "quarterly")
+        if freq == "daily":
+            return True
         if freq == "semiannually":
             current_q = (current.month - 1) // 3
             next_q = (next_date.month - 1) // 3

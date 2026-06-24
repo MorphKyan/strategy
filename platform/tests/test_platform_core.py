@@ -17,6 +17,7 @@ from src.platform_core.models import Asset, Bar, PortfolioState, TargetPortfolio
 from src.platform_core.sim import SimPortfolio
 from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.strategy import MonthlyEqualWeightStrategy
+from src.platform_core.strategy import RiskParityStrategy
 from src.platform_core.strategy import get_strategy_class
 from src.platform_core.visualization import render_platform_charts
 
@@ -26,6 +27,25 @@ def test_target_portfolio_rejects_invalid_weights():
         TargetPortfolio({"A": -0.1})
     with pytest.raises(ValueError):
         TargetPortfolio({"A": 0.7, "B": 0.4})
+
+
+def test_risk_parity_daily_rebalance_frequency_checks_every_trading_day():
+    class Data:
+        calendar = [
+            date(2024, 1, 2),
+            date(2024, 1, 3),
+            date(2024, 1, 4),
+            date(2024, 1, 5),
+        ]
+
+    class Context:
+        date = date(2024, 1, 3)
+        data = Data()
+        runtime = {"rebalance_frequency": "daily"}
+
+    assert RiskParityStrategy._is_rebalance_day(Context())
+    Context.runtime = {"rebalance_frequency": "quarterly"}
+    assert not RiskParityStrategy._is_rebalance_day(Context())
 
 
 def test_fee_profile_applies_minimum_fee():
