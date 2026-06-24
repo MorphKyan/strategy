@@ -13,7 +13,7 @@ Do not mix their source, configs, scripts, reports, or results. Shared workspace
 
 - This file is the canonical workspace rule file.
 - `etf_selection/AGENTS.md` may add ETF-selection-specific rules, but must not weaken this file.
-- `.agents/agents/*/agent.json` and `agy-research/*_prompt.md` are harness prompts. They must summarize or reference these rules instead of introducing conflicting gates.
+- `.agents/agents/*/agent.json` are harness prompts. They must summarize or reference these rules instead of introducing conflicting gates.
 - Deprecated or duplicate instruction files should be deleted instead of kept as separate rule sources.
 
 When documents conflict, apply this priority order: user instruction for the current task, this file, subsystem `AGENTS.md`, harness prompts, README files.
@@ -94,7 +94,7 @@ Before claiming a platform research result is successful:
 
 - A candidate may be submitted only if training-sample comparisons pass, start-date sensitivity is stable, final test-sample performance remains acceptable versus baseline, and execution risk does not worsen materially.
 - If a candidate only has local advantage, is unstable, overfits, increases annualized two-sided turnover by more than 30% without clear compensating benefit, or fails final testing, mark it as `Failed` or `research-only`.
-- Research-only findings may be summarized in `platform/reports/non_baseline_research_history_summary.md` and `agy-research/research_history_summary.md`, but should not leave registered strategy code or new platform baseline configs behind.
+- Research-only findings may be summarized in `platform/reports/non_baseline_research_history_summary.md` and `research-dashboard/research_history_summary.md`, but should not leave registered strategy code or new platform baseline configs behind.
 
 ## Research Orientation
 

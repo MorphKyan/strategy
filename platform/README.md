@@ -24,7 +24,7 @@ This directory contains the newer daily event-driven platform runtime. It is sep
   - `storage.py`: SQLite metadata store.
 - `configs/`: platform YAML configs.
 - `data/`: platform-owned market data and SQLite metadata.
-- `docs/`: platform planning and architecture decisions.
+- `docs/`: current platform documentation and planned features.
 - `reports/`: platform reports.
 - `results/`: platform raw run artifacts.
 - `tests/`: platform unit and integration tests.
@@ -85,43 +85,10 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 
 Raw run directories contain execution-level artifacts. Report directories contain decision-level summaries, metrics, config copies, and pointers back to raw paths.
 
-## Research Parity Notes
+## Platform Docs
 
-See `docs/research_feature_parity.md` for which research-system features are already represented in the platform and which need additional implementation.
+See `docs/current_platform.md` for the current effective platform design and `docs/planned_features.md` for planned features that are not fully implemented.
 
-## TODO
-
-### ETF Basket Screening
-
-ETF basket screening is owned by the standalone `../etf_selection/` workflow, not by platform internals.
-
-What to build:
-- Keep ETF candidate universe and screening code under `../etf_selection/`.
-- Let `etf_selection/` generate platform-compatible configs.
-- Keep platform responsible only for executing generated configs and reporting strategy results.
-- Maintain the platform config schema so generated basket configs remain valid.
-
-How to do it:
-- Run `..\env\python.exe ..\etf_selection\scripts\screen_etf_sleeves.py --config ..\etf_selection\config\etf_universe.yaml` from `platform/`, or use the root command documented in `../etf_selection/README.md`.
-- Use generated configs as inputs to `scripts/run_platform_experiment.py`.
-- Do not add ETF selection logic to `src/platform_core/`.
-
-### Literature And Research Notes
-
-Create a platform research-note flow for strategy and execution-model decisions.
-
-What to build:
-- Add `reports/literature/` as the platform location for research notes.
-- Add a small helper or template under `docs/templates/experiment_note.md`.
-- Require notes to record: hypothesis, source or rationale, expected execution-model impact, platform files touched, exact command, metrics delta, execution rejection summary, and recommendation.
-- Link standardized experiment reports back to any related literature note.
-
-How to do it:
-- Keep notes plain Markdown so they remain reviewable.
-- For execution-model changes, prefer ADRs under `docs/adr/`.
-- For strategy ideas, use `reports/literature/<date>_<topic>.md`.
-- Do not claim literature support without a source or a clearly marked internal rationale.
-
-### Not Planned
+## Not Planned
 
 - The old research strategy plugin interface `run_strategy(df, config)` will not be migrated. Platform strategies should use `Strategy.generate_targets(context)`.

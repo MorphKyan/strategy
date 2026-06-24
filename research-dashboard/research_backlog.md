@@ -1,4 +1,4 @@
-# AGY 量化研究看板 (Research Backlog)
+﻿# AGY 量化研究看板 (Research Backlog)
 
 该看板是多 Agent 协同量化研究的核心去重和状态同步机制。所有新发掘的研究方向将首先登记在此，并由各个 `QuantResearcher` 实例认领执行。
 

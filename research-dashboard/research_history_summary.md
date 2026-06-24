@@ -1,4 +1,4 @@
-# AGY 量化研究成果汇总历史 (Research History Summary)
+﻿# AGY 量化研究成果汇总历史 (Research History Summary)
 
 本文件用于集中记录所有已完成实验的研究成果，方便策略开发历史的研究追溯与指标沉淀。所有 `QuantResearcher` 实例在完成研究后，须将核心实验结果在此处进行登记。
 
