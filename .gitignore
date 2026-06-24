@@ -105,6 +105,7 @@ data_manifest.json
 
 # Reproducible raw run artifacts. Keep standardized experiment reports under
 # reports/experiments/ tracked for auditability.
+/platform/results/
 /platform/results/platform/
 /platform/results/backtests/
 /platform/results/sensitivity_raw/
@@ -129,4 +130,3 @@ data_manifest.json
 
 # Temporary bond research raw run artifacts
 /platform/results/temp_bond_research/
-
