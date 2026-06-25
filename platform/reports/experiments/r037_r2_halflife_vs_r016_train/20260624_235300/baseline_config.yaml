@@ -1,0 +1,76 @@
+platform:
+  run_name: "research_r037_r2_r016_train"
+data:
+  data_dir: "data"
+assets:
+  - asset_id: "CN_ETF:512890.SH"
+    code: "512890"
+    name: "Dividend Low Vol ETF"
+    asset_type: "etf"
+    exchange: "SH"
+    currency: "CNY"
+    lot_size: 100
+    price_limit_pct: 0.1
+  - asset_id: "CN_ETF:513500.SH"
+    code: "513500"
+    name: "S&P 500 ETF"
+    asset_type: "etf"
+    exchange: "SH"
+    currency: "CNY"
+    lot_size: 100
+    price_limit_pct: 0.1
+  - asset_id: "CN_ETF:518880.SH"
+    code: "518880"
+    name: "Gold ETF"
+    asset_type: "etf"
+    exchange: "SH"
+    currency: "CNY"
+    lot_size: 100
+    price_limit_pct: 0.1
+  - asset_id: "CN_ETF:511260_3X.SH"
+    code: "511260_3X"
+    name: "Simulated 30Y Treasury Futures"
+    asset_type: "etf"
+    exchange: "SH"
+    currency: "CNY"
+    lot_size: 100
+    price_limit_pct: 0.1
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+backtest:
+  start_date: "2019-02-28"
+  end_date: "2025-06-30"
+execution:
+  price_field: "close"
+  weight_tolerance: 0.0005
+  unfilled_policy: "retry_next_day"
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+strategies:
+  segments:
+    - start_date: "2019-02-28"
+      end_date: null
+      strategy_name: "adaptive_risk_deviation_volatility_triggered"
+      strategy_version_id: null
+      cancel_pending_on_start: false
+      params:
+        rolling_window: 120
+        min_periods: 20
+        rebalance_threshold: 0.05
+        short_window: 20
+        threshold_sensitivity: 1.0
+        vol_trigger_ratio: 2.0
+        min_threshold: 0.01
+        max_threshold: 0.20
+        rebalance_frequency: "daily"
+        shrinkage_target: "constant_correlation"
+        universe:
+          - "CN_ETF:512890.SH"
+          - "CN_ETF:513500.SH"
+          - "CN_ETF:518880.SH"
+          - "CN_ETF:511260_3X.SH"
+output:
+  results_dir: "results/backtests"

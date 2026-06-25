@@ -14,6 +14,26 @@
 
 ---
 
+## 37. 基于波动率半衰期衰减动态阈值触发的自适应再平衡风险平价策略评估 (R037)
+
+### 37.1 评估背景
+
+本课题在已合入的 R016 `adaptive_risk_deviation_volatility_triggered` 基础上，尝试将短长波动率比值驱动的动态偏离阈值，替换为 realized volatility 的 AR(1) 半衰期估计。候选策略冻结参数为 `half_life_window=120`、`half_life_vol_window=20`、`half_life_gamma=5.0`、`rebalance_fraction=0.8`，训练样本截止 `2025-06-30`，未使用 `2025-07-01` 之后数据进行参数选择或结论判断。
+
+### 37.2 评估核心结论
+
+1. **训练样本 Sharpe 与最大回撤未通过门槛**：在 `r1 domestic rolling` 中，R016 基线 Sharpe `1.2926`、MaxDD `-14.22%`，候选为 Sharpe `1.2557`、MaxDD `-15.28%`；在 `r2 global dividend ewma` 中，R016 基线 Sharpe `1.0953`、MaxDD `-15.91%`，候选为 Sharpe `1.0196`、MaxDD `-18.34%`。
+2. **换手率下降不足以补偿执行摩擦**：候选年化换手率在两组配置中小幅下降，但交易笔数分别从 `115 -> 179`、`159 -> 210`，订单数也明显上升，说明半衰期阈值没有真正改善执行质量。
+3. **起点敏感性未改善**：每 2 个自然月起点的训练样本敏感性中，`r1` 候选 Sharpe Std `0.9583` 高于 R016 `0.9479`，`r2` 候选 Sharpe Std `1.0116` 高于 R016 `0.9705`；最大回撤均值和波动也均劣于基线。
+
+### 37.3 物理拒绝处理动作
+
+**判定结果**：`Failed` / 物理拒绝。
+
+因候选在训练样本已不满足 Sharpe、最大回撤与起点稳定性门槛，最终测试样本未运行。临时实现的 `half_life_adaptive_risk_parity` 策略类、`BUILTIN_STRATEGIES` 注册和 `platform/configs/research_r037_*_train.yaml` 研究配置均已物理清除，不合入任何平台代码或 baseline 配置。完整报告见 `platform/reports/r037_half_life_adaptive_rebalance_report.md`。
+
+---
+
 
 
 ## 2. 多资产组合交叉回测与相关性发现（平台实验 Case 3, 4, 7）

@@ -1,0 +1,80 @@
+{
+  "generated_at": "2026-06-25T00:09:53",
+  "rows": [
+    {
+      "config_group": "r1",
+      "side": "baseline_r016",
+      "sample_count": 39,
+      "sharpe_mean": 2.0961961247838885,
+      "sharpe_std": 0.9479415031772847,
+      "annualized_return_mean": 0.16226853590424137,
+      "max_drawdown_mean": -0.07678975890370782,
+      "max_drawdown_std": 0.0564793794365162,
+      "annualized_turnover_mean": 0.5807742540949763,
+      "trade_count_mean": 70.25641025641026,
+      "order_count_mean": 70.66666666666667,
+      "rejected_order_count_mean": 0.41025641025641024
+    },
+    {
+      "config_group": "r1",
+      "side": "candidate_halflife",
+      "sample_count": 39,
+      "sharpe_mean": 2.0896965196805652,
+      "sharpe_std": 0.9582994304328555,
+      "annualized_return_mean": 0.16127448603341374,
+      "max_drawdown_mean": -0.07916421259978336,
+      "max_drawdown_std": 0.060546180223544396,
+      "annualized_turnover_mean": 0.5458982944268392,
+      "trade_count_mean": 98.35897435897436,
+      "order_count_mean": 98.43589743589743,
+      "rejected_order_count_mean": 0.07692307692307693
+    },
+    {
+      "config_group": "r1",
+      "side": "candidate_minus_baseline",
+      "sample_count": 39,
+      "sharpe_delta_mean": -0.006499605103323742,
+      "sharpe_delta_min": -0.14067159567819454,
+      "sharpe_delta_max": 0.13870439073816332,
+      "candidate_better_count": 14
+    },
+    {
+      "config_group": "r2",
+      "side": "baseline_r016",
+      "sample_count": 39,
+      "sharpe_mean": 1.8948283024004366,
+      "sharpe_std": 0.9704786267657055,
+      "annualized_return_mean": 0.16746699667244774,
+      "max_drawdown_mean": -0.09816909887390196,
+      "max_drawdown_std": 0.058917658220464776,
+      "annualized_turnover_mean": 0.5433309836126169,
+      "trade_count_mean": 75.28205128205128,
+      "order_count_mean": 76.12820512820512,
+      "rejected_order_count_mean": 0.8461538461538461
+    },
+    {
+      "config_group": "r2",
+      "side": "candidate_halflife",
+      "sample_count": 39,
+      "sharpe_mean": 1.9096220437983153,
+      "sharpe_std": 1.0115644740875387,
+      "annualized_return_mean": 0.16719378426873663,
+      "max_drawdown_mean": -0.1032586416835153,
+      "max_drawdown_std": 0.0645160459613308,
+      "annualized_turnover_mean": 0.5066291668353585,
+      "trade_count_mean": 96.28205128205128,
+      "order_count_mean": 96.38461538461539,
+      "rejected_order_count_mean": 0.10256410256410256
+    },
+    {
+      "config_group": "r2",
+      "side": "candidate_minus_baseline",
+      "sample_count": 39,
+      "sharpe_delta_mean": 0.014793741397878183,
+      "sharpe_delta_min": -0.17832705226283374,
+      "sharpe_delta_max": 0.20934491196844052,
+      "candidate_better_count": 21
+    }
+  ],
+  "raw_root": "results\\sensitivity_raw\\r037_half_life\\20260624_235524"
+}

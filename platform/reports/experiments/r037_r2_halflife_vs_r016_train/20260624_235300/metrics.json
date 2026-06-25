@@ -1,0 +1,113 @@
+{
+  "experiment_name": "r037_r2_halflife_vs_r016_train",
+  "candidate_config": "D:\\strategy\\platform\\configs\\research_r037_r2_halflife_train.yaml",
+  "baseline_config": "D:\\strategy\\platform\\configs\\research_r037_r2_r016_train.yaml",
+  "candidate": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\half_life_adaptive_risk_parity\\research_r037_r2_halflife_train_candidate_20260624_235300_491546",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\half_life_adaptive_risk_parity\\research_r037_r2_halflife_train_candidate_20260624_235300_491546\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\half_life_adaptive_risk_parity\\research_r037_r2_halflife_train_candidate_20260624_235300_491546\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\half_life_adaptive_risk_parity\\research_r037_r2_halflife_train_candidate_20260624_235300_491546\\orders.csv",
+    "skipped_orders_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\half_life_adaptive_risk_parity\\research_r037_r2_halflife_train_candidate_20260624_235300_491546\\skipped_orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\half_life_adaptive_risk_parity\\research_r037_r2_halflife_train_candidate_20260624_235300_491546\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2019-02-28",
+    "end_date": "2025-06-30",
+    "observations": 1537,
+    "total_return": 1.3433921362735401,
+    "annualized_return": 0.14984211683345228,
+    "annualized_volatility": 0.1469614806719635,
+    "max_drawdown": -0.18339307094680735,
+    "sharpe_ratio": 1.0196013006150824,
+    "turnover_total": 5720273.008218672,
+    "annualized_turnover": 0.3142776128815569,
+    "turnover_amount_total": 5720273.008218672,
+    "turnover_amount_ratio": 1.9168440119006072,
+    "annualized_turnover_amount": 0.3142776128815569,
+    "turnover_quantity_total": 2132200.0,
+    "annualized_turnover_quantity": 174793.2335718933,
+    "trade_count": 210,
+    "order_count": 211,
+    "skipped_order_count": 17,
+    "skipped_below_lot_or_cash_count": 17,
+    "filled_order_count": 210,
+    "rejected_order_count": 1,
+    "order_status_counts": {
+      "FILLED": 210,
+      "REJECTED": 1
+    },
+    "rejection_reason_counts": {
+      "limit_down": 1
+    },
+    "skipped_reason_counts": {
+      "below_lot_or_cash": 17
+    },
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 4,
+    "average_cash_weight": 0.02271909474327374,
+    "max_position_count": 4
+  },
+  "baseline": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\adaptive_risk_deviation_volatility_triggered\\research_r037_r2_r016_train_baseline_20260624_235317_021250",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\adaptive_risk_deviation_volatility_triggered\\research_r037_r2_r016_train_baseline_20260624_235317_021250\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\adaptive_risk_deviation_volatility_triggered\\research_r037_r2_r016_train_baseline_20260624_235317_021250\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\adaptive_risk_deviation_volatility_triggered\\research_r037_r2_r016_train_baseline_20260624_235317_021250\\orders.csv",
+    "skipped_orders_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\adaptive_risk_deviation_volatility_triggered\\research_r037_r2_r016_train_baseline_20260624_235317_021250\\skipped_orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\r037_r2_halflife_vs_r016_train\\20260624_235300\\adaptive_risk_deviation_volatility_triggered\\research_r037_r2_r016_train_baseline_20260624_235317_021250\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2019-02-28",
+    "end_date": "2025-06-30",
+    "observations": 1537,
+    "total_return": 1.384737666791859,
+    "annualized_return": 0.15314404752273747,
+    "annualized_volatility": 0.13982203609298674,
+    "max_drawdown": -0.1591194240143754,
+    "sharpe_ratio": 1.0952783395379189,
+    "turnover_total": 6165650.086359125,
+    "annualized_turnover": 0.3357734270109441,
+    "turnover_amount_total": 6165650.086359125,
+    "turnover_amount_ratio": 2.0479514179199247,
+    "annualized_turnover_amount": 0.3357734270109441,
+    "turnover_quantity_total": 2371400.0,
+    "annualized_turnover_quantity": 194402.34222511388,
+    "trade_count": 159,
+    "order_count": 161,
+    "skipped_order_count": 12,
+    "skipped_below_lot_or_cash_count": 12,
+    "filled_order_count": 159,
+    "rejected_order_count": 2,
+    "order_status_counts": {
+      "FILLED": 159,
+      "REJECTED": 2
+    },
+    "rejection_reason_counts": {
+      "limit_down": 2
+    },
+    "skipped_reason_counts": {
+      "below_lot_or_cash": 12
+    },
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 4,
+    "average_cash_weight": 0.023009306508846198,
+    "max_position_count": 4
+  },
+  "comparison": {
+    "total_return_delta": -0.041345530518318796,
+    "annualized_return_delta": -0.003301930689285193,
+    "annualized_volatility_delta": 0.00713944457897675,
+    "max_drawdown_delta": -0.024273646932431947,
+    "sharpe_ratio_delta": -0.0756770389228365,
+    "turnover_amount_total_delta": -445377.0781404525,
+    "turnover_amount_ratio_delta": -0.13110740601931758,
+    "annualized_turnover_amount_delta": -0.02149581412938717,
+    "turnover_quantity_total_delta": -239200.0,
+    "annualized_turnover_quantity_delta": -19609.10865322058,
+    "trade_count_delta": 51.0,
+    "order_count_delta": 50.0,
+    "rejected_order_count_delta": -1.0,
+    "skipped_order_count_delta": 5.0,
+    "skipped_below_lot_or_cash_count_delta": 5.0,
+    "max_pending_intent_count_delta": 0.0,
+    "average_cash_weight_delta": -0.00029021176557245815
+  },
+  "generated_at": "2026-06-24T23:53:30"
+}
