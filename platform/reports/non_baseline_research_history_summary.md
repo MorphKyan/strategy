@@ -1243,3 +1243,37 @@
 
 
 
+
+---
+
+## 37. 基于最小扭转有效押注数 (Minimum-Torsion ENB) 约束的风险预算拥挤度控制 (R041)
+
+### 37.1 评估背景
+本课题尝试在现有 `risk_parity_lw_cov` 目标权重之上，使用 Minimum-Torsion Bets 近似押注空间计算 `ENB/N` 和最大单一押注贡献，并在 `ENB/N` 低于冻结阈值 `0.55` 或单一押注贡献超过 `0.45` 时进行轻量权重惩罚和混合。候选参数在训练启动后冻结为 `enb_blend=0.25`、`enb_max_iter=4`、`enb_penalty_strength=0.75`。
+
+### 37.2 核心评估结论
+1. **主训练窗口仅有弱改善**：R2、R3 和 US Blend 的 Sharpe 分别从 `1.2961/0.6637/0.8370` 提升到 `1.3472/0.6706/0.8497`，但最大回撤均略有恶化，且 R2 年化换手率从 `0.7680` 升至 `0.8680`。
+2. **日历起点敏感性未通过**：有效起点下 R2 候选 Sharpe 均值 `1.8517` 低于基线 `1.8563`，R3 候选 `1.4645` 低于基线 `1.4746`，说明主训练窗口改善不具备稳定性。
+3. **拥挤度控制目标未达成**：三组候选 `ENB/N` 最低均值分别为 `0.4270`、`0.3161`、`0.2795`，均低于冻结阈值 `0.55`；US Blend 最大单一押注贡献均值反而从 `0.8404` 升至 `0.8597`。
+
+### 37.3 处理动作
+**判定结果**：`Failed` / 物理拒绝。
+
+候选策略源码、注册和 `platform/configs/r041_min_torsion_enb_*.yaml` 已清除；最终测试样本未运行。保留训练对照 artifacts、敏感性 artifacts 和中文报告供复核：`platform/reports/r041_min_torsion_enb_failed_report.md`。
+
+---
+
+## 38. 基于层级等风险贡献 (HERC) 与簇间风险预算约束的多资产风险平价策略 (R040)
+
+### 38.1 评估背景
+本课题尝试增量实现 `HERCClusterRiskParityStrategy`，注册名为 `herc_cluster_risk_parity`。候选策略先按 `sleeve_mapping` 将资产划分为权益、债券、黄金、商品、境外权益等簇，再在簇内使用风险平价分配，在簇间使用等风险贡献并施加 `cluster_weight_cap=0.55`，目标是减少同类资产数量不均导致的风险预算拥挤。训练样本固定截至 `2025-06-30`，最终测试样本 `2025-07-01` 之后未用于参数选择或结论判断。
+
+### 38.2 核心评估结论
+1. **训练样本主对照未通过**：`r3` 配置 Sharpe 从 `0.6637` 退化到 `0.5833`，最大回撤从 `-26.97%` 扩大到 `-31.11%`。`r2` Sharpe 从 `1.1876` 小幅升至 `1.2006`，`r7` 从 `1.2984` 小幅升至 `1.3096`，但两者最大回撤也分别恶化至 `-13.00%` 与 `-14.98%`。
+2. **起点敏感性失败**：日历起点敏感性中，候选 Sharpe Std 分别为 `0.8531`、`1.0442`、`0.5015`，均远高于 R040 门槛 `0.25`；MaxDD Std 也均超过 `2%`。`r7_candidate_3x` 的敏感性 Sharpe 均值 `1.6350` 低于基线 `1.6883`，且交易笔数均值从 `50.09` 上升到 `55.09`。
+3. **换手下降不足以补偿风险退化**：候选在 `r2/r3/r7` 主训练窗口中 annualized_turnover 均低于基线，但 Sharpe 和最大回撤没有稳定改善，属于以收益和回撤稳定性换取部分换手下降，不能合入。
+
+### 38.3 物理拒绝处理动作
+**判定结果**：`Failed` / 物理拒绝。
+
+已从 `platform/src/platform_core/strategy.py` 删除 `HERCClusterRiskParityStrategy` 和 `BUILTIN_STRATEGIES` 注册；已删除 `platform/configs/r040_baseline_r7_cluster_representative_damped_3x.yaml`、`platform/configs/r040_herc_cluster_r2_global_ewma.yaml`、`platform/configs/r040_herc_cluster_r3_global_nasdaq_all_weather_ewma.yaml`、`platform/configs/r040_herc_cluster_r7_cluster_representative_damped_3x.yaml` 和 `tmp_r040_calendar_sensitivity.py`。历史实验报告和 raw artifacts 保留用于复核。完整报告见 `platform/reports/r040_herc_cluster_risk_parity_failed_report.md`。

@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\r041_r3_train\20260625_094715\risk_parity_min_torsion_enb\r041_min_torsion_enb_r3_global_nasdaq_all_weather_ewma_candidate_20260625_094715_670542

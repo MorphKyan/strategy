@@ -1,0 +1,113 @@
+{
+  "experiment_name": "r040_herc_cluster_r2_train",
+  "candidate_config": "D:\\strategy\\platform\\configs\\r040_herc_cluster_r2_global_ewma.yaml",
+  "baseline_config": "D:\\strategy\\platform\\configs\\baseline_r2_global_ewma.yaml",
+  "candidate": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\herc_cluster_risk_parity\\r040_herc_cluster_r2_global_ewma_candidate_20260625_091924_878491",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\herc_cluster_risk_parity\\r040_herc_cluster_r2_global_ewma_candidate_20260625_091924_878491\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\herc_cluster_risk_parity\\r040_herc_cluster_r2_global_ewma_candidate_20260625_091924_878491\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\herc_cluster_risk_parity\\r040_herc_cluster_r2_global_ewma_candidate_20260625_091924_878491\\orders.csv",
+    "skipped_orders_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\herc_cluster_risk_parity\\r040_herc_cluster_r2_global_ewma_candidate_20260625_091924_878491\\skipped_orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\herc_cluster_risk_parity\\r040_herc_cluster_r2_global_ewma_candidate_20260625_091924_878491\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2020-01-17",
+    "end_date": "2025-06-30",
+    "observations": 1318,
+    "total_return": 0.9166538403780169,
+    "annualized_return": 0.13245775285445416,
+    "annualized_volatility": 0.11033060292711215,
+    "max_drawdown": -0.1300349204619331,
+    "sharpe_ratio": 1.2005531497182145,
+    "turnover_total": 10304637.34619899,
+    "annualized_turnover": 0.7520736068429966,
+    "turnover_amount_total": 10304637.34619899,
+    "turnover_amount_ratio": 3.9334643405518634,
+    "annualized_turnover_amount": 0.7520736068429966,
+    "turnover_quantity_total": 3001000.0,
+    "annualized_turnover_quantity": 286893.7784522003,
+    "trade_count": 282,
+    "order_count": 283,
+    "skipped_order_count": 26,
+    "skipped_below_lot_or_cash_count": 26,
+    "filled_order_count": 282,
+    "rejected_order_count": 1,
+    "order_status_counts": {
+      "FILLED": 282,
+      "REJECTED": 1
+    },
+    "rejection_reason_counts": {
+      "limit_down": 1
+    },
+    "skipped_reason_counts": {
+      "below_lot_or_cash": 26
+    },
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 5,
+    "average_cash_weight": 0.027994638270230462,
+    "max_position_count": 5
+  },
+  "baseline": {
+    "results_dir": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\risk_parity_lw_cov\\baseline_r2_global_ewma_baseline_20260625_091931_742995",
+    "nav_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\risk_parity_lw_cov\\baseline_r2_global_ewma_baseline_20260625_091931_742995\\nav.csv",
+    "positions_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\risk_parity_lw_cov\\baseline_r2_global_ewma_baseline_20260625_091931_742995\\positions.csv",
+    "orders_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\risk_parity_lw_cov\\baseline_r2_global_ewma_baseline_20260625_091931_742995\\orders.csv",
+    "skipped_orders_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\risk_parity_lw_cov\\baseline_r2_global_ewma_baseline_20260625_091931_742995\\skipped_orders.csv",
+    "trades_csv": "D:\\strategy\\platform\\results\\backtests\\r040_herc_cluster_r2_train\\20260625_091924\\risk_parity_lw_cov\\baseline_r2_global_ewma_baseline_20260625_091931_742995\\trades.csv",
+    "oos_metrics_available": false,
+    "start_date": "2020-01-17",
+    "end_date": "2025-06-30",
+    "observations": 1318,
+    "total_return": 0.9192840227810155,
+    "annualized_return": 0.13275472002741795,
+    "annualized_volatility": 0.11178502104111279,
+    "max_drawdown": -0.1065697032861107,
+    "sharpe_ratio": 1.1875895248844908,
+    "turnover_total": 11283634.43929018,
+    "annualized_turnover": 0.8160087176327712,
+    "turnover_amount_total": 11283634.43929018,
+    "turnover_amount_ratio": 4.267855118412668,
+    "annualized_turnover_amount": 0.8160087176327712,
+    "turnover_quantity_total": 3374400.0,
+    "annualized_turnover_quantity": 322590.59180576634,
+    "trade_count": 302,
+    "order_count": 303,
+    "skipped_order_count": 34,
+    "skipped_below_lot_or_cash_count": 34,
+    "filled_order_count": 302,
+    "rejected_order_count": 1,
+    "order_status_counts": {
+      "FILLED": 302,
+      "REJECTED": 1
+    },
+    "rejection_reason_counts": {
+      "limit_down": 1
+    },
+    "skipped_reason_counts": {
+      "below_lot_or_cash": 34
+    },
+    "pending_intent_count": 0,
+    "max_pending_intent_count": 5,
+    "average_cash_weight": 0.027480414173350443,
+    "max_position_count": 5
+  },
+  "comparison": {
+    "total_return_delta": -0.0026301824029986154,
+    "annualized_return_delta": -0.00029696717296379127,
+    "annualized_volatility_delta": -0.0014544181140006412,
+    "max_drawdown_delta": -0.023465217175822395,
+    "sharpe_ratio_delta": 0.012963624833723708,
+    "turnover_amount_total_delta": -978997.0930911917,
+    "turnover_amount_ratio_delta": -0.3343907778608046,
+    "annualized_turnover_amount_delta": -0.06393511078977454,
+    "turnover_quantity_total_delta": -373400.0,
+    "annualized_turnover_quantity_delta": -35696.813353566045,
+    "trade_count_delta": -20.0,
+    "order_count_delta": -20.0,
+    "rejected_order_count_delta": 0.0,
+    "skipped_order_count_delta": -8.0,
+    "skipped_below_lot_or_cash_count_delta": -8.0,
+    "max_pending_intent_count_delta": 0.0,
+    "average_cash_weight_delta": 0.0005142240968800185
+  },
+  "generated_at": "2026-06-25T09:19:37"
+}

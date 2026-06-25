@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\r041_us_blend_train\20260625_094715\risk_parity_min_torsion_enb\r041_min_torsion_enb_us_blend_ewma_candidate_20260625_094715_668192

@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-06-25T09:42:39",
+  "end_date": "2025-06-30",
+  "sampling_rule": "每 2 个自然月一个 start_date，并映射到不早于该日期的首个共同交易日",
+  "summary_csv": "D:\\strategy\\platform\\reports\\r040_calendar_sensitivity\\20260625_093633\\sensitivity_summary.csv",
+  "stats_csv": "D:\\strategy\\platform\\reports\\r040_calendar_sensitivity\\20260625_093633\\sensitivity_stats.csv",
+  "raw_root": "D:\\strategy\\platform\\results\\r040_calendar_sensitivity_raw\\20260625_093633",
+  "configs": [
+    [
+      "r2_baseline",
+      "configs/baseline_r2_global_ewma.yaml"
+    ],
+    [
+      "r2_candidate",
+      "configs/r040_herc_cluster_r2_global_ewma.yaml"
+    ],
+    [
+      "r3_baseline",
+      "configs/baseline_r3_global_nasdaq_all_weather_ewma.yaml"
+    ],
+    [
+      "r3_candidate",
+      "configs/r040_herc_cluster_r3_global_nasdaq_all_weather_ewma.yaml"
+    ],
+    [
+      "r7_baseline_3x",
+      "configs/r040_baseline_r7_cluster_representative_damped_3x.yaml"
+    ],
+    [
+      "r7_candidate_3x",
+      "configs/r040_herc_cluster_r7_cluster_representative_damped_3x.yaml"
+    ]
+  ]
+}

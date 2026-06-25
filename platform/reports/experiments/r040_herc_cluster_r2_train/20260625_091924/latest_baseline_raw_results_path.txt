@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\r040_herc_cluster_r2_train\20260625_091924\risk_parity_lw_cov\baseline_r2_global_ewma_baseline_20260625_091931_742995

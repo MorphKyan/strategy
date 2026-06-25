@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\r041_smoke_r2_train\20260625_094646\risk_parity_lw_cov\baseline_r2_global_ewma_baseline_20260625_094654_603628
