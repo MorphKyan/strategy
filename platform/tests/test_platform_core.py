@@ -324,16 +324,10 @@ def test_platform_backtest_outputs_and_checkpoint_resume(tmp_path: Path):
         "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
         "backtest": {"start_date": "2024-01-29", "end_date": "2024-02-01", "enable_checkpoints": True},
         "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
-        "strategies": {
-            "segments": [
-                {
-                    "start_date": "2024-01-29",
-                    "end_date": None,
-                    "strategy_name": "monthly_equal_weight",
+        "strategy": {
+            "strategy_name": "monthly_equal_weight",
                     "strategy_version_id": None,
                     "params": {"universe": ["A"], "rebalance_on_start": True},
-                }
-            ]
         },
         "output": {"results_dir": str(tmp_path / "results")},
     }
@@ -388,16 +382,10 @@ def test_platform_backtest_executes_signal_next_day_at_open(tmp_path: Path):
         "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
         "backtest": {"start_date": "2024-01-02", "end_date": "2024-01-04"},
         "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001, "execution_price_field": "open"},
-        "strategies": {
-            "segments": [
-                {
-                    "start_date": "2024-01-02",
-                    "end_date": None,
-                    "strategy_name": "monthly_equal_weight",
+        "strategy": {
+            "strategy_name": "monthly_equal_weight",
                     "strategy_version_id": None,
                     "params": {"universe": ["A"], "rebalance_on_start": True},
-                }
-            ]
         },
         "output": {"results_dir": str(tmp_path / "results")},
     }
@@ -420,6 +408,82 @@ def test_platform_backtest_executes_signal_next_day_at_open(tmp_path: Path):
     assert trades[0]["signal_date"] == "2024-01-02"
     assert float(trades[0]["price"]) == pytest.approx(10.002)
     assert float(trades[0]["quantity"]) == pytest.approx(99.0)
+
+
+def test_platform_backtest_uses_full_data_when_dates_are_omitted(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "trade_date,open,high,low,close,volume,amount,adjust_factor,source,updated_at",
+                "2024-01-02,10,10,10,10,1000,10000,1,csv,now",
+                "2024-01-03,10,10,10,10,1000,10000,1,csv,now",
+                "2024-01-04,10,10,10,10,1000,10000,1,csv,now",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config = {
+        "platform": {"run_name": "no_dates"},
+        "data": {"data_dir": str(data_dir)},
+        "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None}],
+        "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
+        "backtest": {},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "strategy": {
+            "strategy_name": "monthly_equal_weight",
+                    "strategy_version_id": None,
+                    "params": {"universe": ["A"], "rebalance_on_start": True},
+        },
+        "output": {"results_dir": str(tmp_path / "results")},
+    }
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+    finally:
+        store.close()
+
+    assert result.metrics["start_date"] == "2024-01-02"
+    assert result.metrics["end_date"] == "2024-01-04"
+    assert result.metrics["trade_count"] > 0
+
+
+def test_platform_backtest_rejects_legacy_strategy_segments(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "trade_date,open,high,low,close,volume,amount,adjust_factor,source,updated_at",
+                "2024-01-02,10,10,10,10,1000,10000,1,csv,now",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config = {
+        "platform": {"run_name": "legacy_segments"},
+        "data": {"data_dir": str(data_dir)},
+        "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None}],
+        "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
+        "backtest": {},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "strategies": {
+            "segments": [
+                {
+                    "strategy_name": "monthly_equal_weight",
+                    "params": {"universe": ["A"], "rebalance_on_start": True},
+                }
+            ]
+        },
+        "output": {"results_dir": str(tmp_path / "results")},
+    }
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        with pytest.raises(ValueError, match="single `strategy` mapping"):
+            PlatformBacktestEngine(config, store)
+    finally:
+        store.close()
 
 
 class DummySource:
@@ -466,12 +530,8 @@ def test_platform_risk_parity_strategy_runs(tmp_path: Path):
         "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
         "backtest": {"start_date": "2024-03-27", "end_date": "2024-04-02"},
         "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
-        "strategies": {
-            "segments": [
-                {
-                    "start_date": "2024-03-27",
-                    "end_date": None,
-                    "strategy_name": "risk_parity",
+        "strategy": {
+            "strategy_name": "risk_parity",
                     "strategy_version_id": None,
                     "params": {
                         "universe": ["A", "B", "C"],
@@ -481,8 +541,6 @@ def test_platform_risk_parity_strategy_runs(tmp_path: Path):
                         "init_calc_days": 2,
                         "rebalance_threshold": 0.05,
                     },
-                }
-            ]
         },
         "output": {"results_dir": str(tmp_path / "results")},
     }
@@ -523,12 +581,8 @@ def test_platform_risk_parity_ewma_strategy_runs(tmp_path: Path):
         "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
         "backtest": {"start_date": "2024-03-27", "end_date": "2024-04-02"},
         "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
-        "strategies": {
-            "segments": [
-                {
-                    "start_date": "2024-03-27",
-                    "end_date": None,
-                    "strategy_name": "risk_parity_ewma",
+        "strategy": {
+            "strategy_name": "risk_parity_ewma",
                     "strategy_version_id": None,
                     "params": {
                         "universe": ["A", "B", "C"],
@@ -538,8 +592,6 @@ def test_platform_risk_parity_ewma_strategy_runs(tmp_path: Path):
                         "init_calc_days": 2,
                         "rebalance_threshold": 0.05,
                     },
-                }
-            ]
         },
         "output": {"results_dir": str(tmp_path / "results")},
     }
@@ -661,20 +713,14 @@ def test_platform_experiment_runner_writes_standard_report(tmp_path: Path):
     config = {
         "platform": {"run_name": "experiment_test"},
         "data": {"data_dir": str(data_dir)},
-        "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": 0.1}],
+        "assets": [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None}],
         "portfolio": {"initial_cash": 1000.0, "initial_equity": 1000.0, "initial_positions": []},
-        "backtest": {"start_date": "2024-01-29", "end_date": "2024-01-31"},
+        "backtest": {},
         "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
-        "strategies": {
-            "segments": [
-                {
-                    "start_date": "2024-01-29",
-                    "end_date": None,
-                    "strategy_name": "monthly_equal_weight",
+        "strategy": {
+            "strategy_name": "monthly_equal_weight",
                     "strategy_version_id": None,
                     "params": {"universe": ["A"], "rebalance_on_start": True},
-                }
-            ]
         },
         "output": {"results_dir": str(tmp_path / "unused")},
     }
@@ -688,11 +734,17 @@ def test_platform_experiment_runner_writes_standard_report(tmp_path: Path):
         raw_root=tmp_path / "raw",
         report_root=tmp_path / "reports",
         render_charts=False,
+        start_date="2024-01-30",
+        end_date="2024-01-31",
     )
 
     assert result.metrics_path.exists()
     assert result.report_path.exists()
     payload = json.loads(result.metrics_path.read_text(encoding="utf-8"))
+    assert payload["candidate"]["start_date"] == "2024-01-30"
+    assert payload["candidate"]["end_date"] == "2024-01-31"
+    assert payload["baseline"]["start_date"] == "2024-01-30"
+    assert payload["baseline"]["end_date"] == "2024-01-31"
     assert payload["candidate"]["trade_count"] > 0
     assert payload["baseline"]["trade_count"] > 0
     assert "sharpe_ratio_delta" in payload["comparison"]

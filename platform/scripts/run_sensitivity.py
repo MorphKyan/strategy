@@ -1,5 +1,4 @@
 import argparse
-import copy
 import json
 import os
 import sys
@@ -18,6 +17,7 @@ os.chdir(ROOT)
 from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import assets_from_config
 from src.platform_core.experiment import run_backtest, strategy_name
+from src.platform_core.runtime_config import apply_runtime_dates
 from src.platform_core.storage import SQLiteStore
 from src.platform_core.visualization import render_sensitivity_charts
 
@@ -28,18 +28,14 @@ def load_config(path: Path) -> dict:
 
 
 def set_start_date(config: dict, start_date: str) -> dict:
-    runtime = copy.deepcopy(config)
-    runtime.setdefault("backtest", {})["start_date"] = start_date
-    segments = runtime.setdefault("strategies", {}).setdefault("segments", [])
-    if segments:
-        segments[0]["start_date"] = start_date
+    runtime = apply_runtime_dates(config, start_date=start_date)
     runtime.setdefault("platform", {})["run_name"] = f"{runtime.get('platform', {}).get('run_name', strategy_name(runtime))}_start_{start_date.replace('-', '')}"
     return runtime
 
 
 def calendar_for_config(config: dict) -> list[str]:
     data_config = config.get("data", {})
-    backtest = config.get("backtest", {})
+    backtest = config.get("backtest") or {}
     market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
     data = LocalCsvBarData(
         data_dir=market_dir,
@@ -58,6 +54,7 @@ def main() -> int:
     parser.add_argument("--raw-root", default="results/sensitivity_raw", help="Root for raw sensitivity run artifacts.")
     parser.add_argument("--report-root", default="reports/sensitivity", help="Root for sensitivity summary reports.")
     parser.add_argument("--charts", action="store_true", help="Render per-run charts. Off by default because sensitivity can produce many runs.")
+    parser.add_argument("--end-date", help="Runtime sensitivity end date, YYYY-MM-DD. Use 2025-06-30 for training-sample research.")
     args = parser.parse_args()
 
     if args.step <= 0:
@@ -68,7 +65,7 @@ def main() -> int:
     raw_root = (ROOT / args.raw_root).resolve() if not Path(args.raw_root).is_absolute() else Path(args.raw_root)
     report_root = (ROOT / args.report_root).resolve() if not Path(args.report_root).is_absolute() else Path(args.report_root)
 
-    base_config = load_config(config_path)
+    base_config = apply_runtime_dates(load_config(config_path), end_date=args.end_date)
     name = strategy_name(base_config)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_dir = report_root / name / timestamp

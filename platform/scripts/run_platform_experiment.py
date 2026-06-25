@@ -22,6 +22,8 @@ def main() -> int:
     parser.add_argument("--report-root", default="reports/experiments", help="Root for standardized experiment reports.")
     parser.add_argument("--skip-baseline", action="store_true", help="Run candidate only.")
     parser.add_argument("--no-charts", action="store_true", help="Skip chart rendering.")
+    parser.add_argument("--start-date", help="Runtime backtest start date for candidate and baseline, YYYY-MM-DD.")
+    parser.add_argument("--end-date", help="Runtime backtest end date for candidate and baseline, YYYY-MM-DD.")
     args = parser.parse_args()
 
     config_path = (ROOT / args.config).resolve() if not Path(args.config).is_absolute() else Path(args.config)
@@ -41,6 +43,8 @@ def main() -> int:
         report_root=report_root,
         skip_baseline=args.skip_baseline,
         render_charts=not args.no_charts,
+        start_date=args.start_date,
+        end_date=args.end_date,
     )
     print(f"Standardized platform report written to: {result.report_dir}")
     print(f"Candidate raw artifacts: {result.candidate.output_dir}")

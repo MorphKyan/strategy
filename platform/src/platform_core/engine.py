@@ -25,12 +25,23 @@ class PlatformBacktestResult:
     metrics: dict[str, Any]
 
 
+def load_strategy_config(payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("Platform config requires a single `strategy` mapping.")
+    if "strategy_name" not in payload:
+        raise ValueError("Platform `strategy.strategy_name` is required.")
+    if "start_date" in payload or "end_date" in payload:
+        raise ValueError("Platform strategy configs must not include dates.")
+    return dict(payload)
+
+
 class PlatformBacktestEngine:
     def __init__(self, config: dict[str, Any], store: SQLiteStore, output_dir: str | Path | None = None):
         self.config = config
         self.store = store
         self.assets = self._load_assets(config.get("assets", []))
-        backtest_config = config.get("backtest", {})
+        self.strategy_config = load_strategy_config(config.get("strategy"))
+        backtest_config = config.get("backtest") or {}
         data_config = config.get("data", {})
         data_fetch = bool(data_config.get("fetch", False))
         market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
@@ -129,16 +140,11 @@ class PlatformBacktestEngine:
         order_rows: list[dict[str, Any]] = []
         skipped_order_rows: list[dict[str, Any]] = []
         trade_rows: list[dict[str, Any]] = []
-        active_segment_key = None
         active_strategy = None
         active_strategy_runtime: dict[str, Any] = {}
         active_strategy_version_id: int | None = None
 
         for current_date in self.data.calendar:
-            segment = self._segment_for_date(current_date)
-            if segment is None:
-                continue
-
             # 1. Process Splits
             for split in self.splits:
                 if split["split_date"] == current_date:
@@ -172,21 +178,20 @@ class PlatformBacktestEngine:
                     remaining_receivables.append(item)
             state.dividend_receivables = remaining_receivables
 
-            segment_key = self._segment_key(segment)
             bars = self.data.bars_on(current_date)
-            if active_segment_key != segment_key:
-                if segment.get("cancel_pending_on_start", False):
+            if active_strategy is None:
+                if self.strategy_config.get("cancel_pending_on_start", False):
                     state.pending_intents.clear()
-                strategy_cls = get_strategy_class(segment["strategy_name"])
-                version_id = segment.get("strategy_version_id")
+                strategy_cls = get_strategy_class(self.strategy_config["strategy_name"])
+                version_id = self.strategy_config.get("strategy_version_id")
                 if version_id is not None:
                     try:
                         self.store.get_strategy_version(int(version_id))
                     except KeyError:
                         version_id = None
                 if version_id is None:
-                    version_id = self.store.ensure_builtin_version(strategy_cls, segment.get("params", {}))
-                    segment["strategy_version_id"] = version_id
+                    version_id = self.store.ensure_builtin_version(strategy_cls, self.strategy_config.get("params", {}))
+                    self.strategy_config["strategy_version_id"] = version_id
                 self.store.add_strategy_reference(int(version_id), "backtest", str(backtest_id))
                 active_strategy = strategy_cls()
                 active_strategy_runtime = {}
@@ -196,12 +201,11 @@ class PlatformBacktestEngine:
                     bars=bars,
                     state=state,
                     data=self.data,
-                    params=segment.get("params", {}),
+                    params=self.strategy_config.get("params", {}),
                     runtime=active_strategy_runtime,
                 )
                 active_strategy.initialize(init_context)
                 active_strategy_version_id = int(version_id)
-                active_segment_key = self._segment_key(segment)
 
             state.decrement_cooldowns()
             pending_target = self._target_from_pending(state, current_date)
@@ -229,7 +233,7 @@ class PlatformBacktestEngine:
                 bars=bars,
                 state=state,
                 data=self.data,
-                params=segment.get("params", {}),
+                params=self.strategy_config.get("params", {}),
                 runtime=active_strategy_runtime,
             )
             target = active_strategy.generate_targets(context)
@@ -264,12 +268,12 @@ class PlatformBacktestEngine:
                 )
 
             state.last_date = current_date
-            if self.config.get("backtest", {}).get("enable_checkpoints", False):
+            if (self.config.get("backtest") or {}).get("enable_checkpoints", False):
                 checkpoint_path = self.checkpoint_dir / f"{date_str(current_date)}.json"
                 self._write_json(checkpoint_path, state.to_dict())
                 self.store.add_checkpoint(self.run_id, date_str(current_date), checkpoint_path)
 
-        if not self.config.get("backtest", {}).get("enable_checkpoints", False) and self.data.calendar:
+        if not (self.config.get("backtest") or {}).get("enable_checkpoints", False) and self.data.calendar:
             last_date = self.data.calendar[-1]
             checkpoint_path = self.checkpoint_dir / f"{date_str(last_date)}.json"
             self._write_json(checkpoint_path, state.to_dict())
@@ -316,25 +320,6 @@ class PlatformBacktestEngine:
     def _initial_equity(self) -> float:
         portfolio = self.config.get("portfolio", {})
         return float(portfolio.get("initial_equity") or portfolio.get("initial_cash") or 1.0)
-
-    def _segment_for_date(self, current_date: date) -> dict[str, Any] | None:
-        for segment in self.config.get("strategies", {}).get("segments", []):
-            start = parse_date(segment["start_date"])
-            end = parse_date(segment["end_date"]) if segment.get("end_date") else None
-            if current_date >= start and (end is None or current_date <= end):
-                return segment
-        return None
-
-    @staticmethod
-    def _segment_key(segment: dict[str, Any]) -> str:
-        return "|".join(
-            [
-                str(segment.get("start_date")),
-                str(segment.get("end_date")),
-                str(segment.get("strategy_name")),
-                str(segment.get("strategy_version_id")),
-            ]
-        )
 
     @staticmethod
     def _target_from_pending(state: PortfolioState, current_date: date) -> TargetPortfolio | None:

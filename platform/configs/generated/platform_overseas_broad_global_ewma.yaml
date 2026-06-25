@@ -52,7 +52,7 @@ assets:
   lot_size: 100
   price_limit_pct: 0.1
 - asset_id: CN_ETF:511260_3X.SH
-  code: '511260_3X'
+  code: 511260_3X
   name: 模拟30年国债期货
   asset_type: etf
   exchange: SH
@@ -63,9 +63,7 @@ portfolio:
   initial_cash: 1000000.0
   initial_equity: 1000000.0
   initial_positions: []
-backtest:
-  start_date: '2019-02-28'
-  end_date: '2026-06-10'
+backtest: {}
 execution:
   price_field: close
   weight_tolerance: 0.0005
@@ -73,26 +71,23 @@ execution:
   fee:
     rate: 0.0002
     min_fee: 5.0
-strategies:
-  segments:
-  - start_date: '2019-02-28'
-    end_date: null
-    strategy_name: risk_parity_ewma
-    strategy_version_id: null
-    cancel_pending_on_start: false
-    params:
-      rebalance_threshold: 0.05
-      init_mode: calculate
-      init_calc_days: 30
-      universe:
-      - CN_ETF:510300.SH
-      - CN_ETF:512890.SH
-      - CN_ETF:513500.SH
-      - CN_ETF:159920.SZ
-      - CN_ETF:513030.SH
-      - CN_ETF:518880.SH
-      - CN_ETF:511260_3X.SH
-      ewma_span: 60
-      ewma_min_periods: 20
 output:
   results_dir: results/backtests
+strategy:
+  strategy_name: risk_parity_ewma
+  strategy_version_id: null
+  cancel_pending_on_start: false
+  params:
+    rebalance_threshold: 0.05
+    init_mode: calculate
+    init_calc_days: 30
+    universe:
+    - CN_ETF:510300.SH
+    - CN_ETF:512890.SH
+    - CN_ETF:513500.SH
+    - CN_ETF:159920.SZ
+    - CN_ETF:513030.SH
+    - CN_ETF:518880.SH
+    - CN_ETF:511260_3X.SH
+    ewma_span: 60
+    ewma_min_periods: 20

@@ -47,9 +47,7 @@ assets:
   lot_size: 100
   name: 标普500ETF
   price_limit_pct: 0.1
-backtest:
-  end_date: '2026-06-10'
-  start_date: '2024-03-28'
+backtest: {}
 data:
   data_dir: data
 execution:
@@ -81,33 +79,30 @@ selection_metadata:
   inverse_vol_hhi: 0.208591
   max_abs_corr: 0.361265
   score: 0.654651
-strategies:
-  segments:
-  - cancel_pending_on_start: false
-    end_date: null
-    params:
-      damping_factor: 0.25
-      init_calc_days: 30
-      init_mode: calculate
-      min_periods: 20
-      rebalance_threshold: 0.05
-      rolling_window: 120
-      sleeve_mapping:
-        CN_ETF:159981.SZ: commodity
-        CN_ETF:159985.SZ: commodity
-        CN_ETF:510310.SH: hs300
-        CN_ETF:511130.SH: bond
-        CN_ETF:513500.SH: qdii
-        CN_ETF:518880.SH: gold
-      switching_threshold: 0.05
-      top_k_per_sleeve: 1
-      universe:
-      - CN_ETF:518880.SH
-      - CN_ETF:510310.SH
-      - CN_ETF:159985.SZ
-      - CN_ETF:159981.SZ
-      - CN_ETF:511130.SH
-      - CN_ETF:513500.SH
-    start_date: '2024-03-28'
-    strategy_name: cluster_representative_damped_risk_parity
-    strategy_version_id: null
+strategy:
+  cancel_pending_on_start: false
+  params:
+    damping_factor: 0.25
+    init_calc_days: 30
+    init_mode: calculate
+    min_periods: 20
+    rebalance_threshold: 0.05
+    rolling_window: 120
+    sleeve_mapping:
+      CN_ETF:159981.SZ: commodity
+      CN_ETF:159985.SZ: commodity
+      CN_ETF:510310.SH: hs300
+      CN_ETF:511130.SH: bond
+      CN_ETF:513500.SH: qdii
+      CN_ETF:518880.SH: gold
+    switching_threshold: 0.05
+    top_k_per_sleeve: 1
+    universe:
+    - CN_ETF:518880.SH
+    - CN_ETF:510310.SH
+    - CN_ETF:159985.SZ
+    - CN_ETF:159981.SZ
+    - CN_ETF:511130.SH
+    - CN_ETF:513500.SH
+  strategy_name: cluster_representative_damped_risk_parity
+  strategy_version_id: null

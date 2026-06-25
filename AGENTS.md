@@ -55,9 +55,10 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 4. Do not introduce deep learning, reinforcement learning, unrelated factor models, broad architecture rewrites, hidden benchmark changes, or unrestricted parameter searches unless explicitly requested.
 5. Preserve transaction-cost handling and trade reporting. If backtest artifacts exist, report turnover, trade count, order count, and rejection count.
 6. Do not overwrite generated historical results, reports, configs, checkpoints, or raw execution artifacts unless the user explicitly asks.
-7. Agent-created temporary scripts used for backtests, analysis, or one-off reporting must be deleted before task completion. Submit only necessary code changes, configs, raw artifacts, metrics, and reports.
-8. Only reusable, parameterized tools may be added under `platform/scripts/`. Do not add task-specific backtest scripts, hardcoded config matrices, hardcoded strategy sweeps, or one-off report generators there. A retained script must have a stable CLI, avoid hardcoded research config lists, document its usage, and have a clear maintenance owner.
-9. All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when exactness matters.
+7. Agent-created temporary scripts used for backtests, analysis, or one-off reporting must be deleted before task completion.
+8. Reusable platform configs under `platform/configs/`, including retained generated configs, may be kept when they encode one strategy and one portfolio useful for baseline/candidate comparison. These configs must not include fixed backtest `start_date` or `end_date`; runtime commands must provide sample windows when a bounded sample is required. Platform configs must use a single `strategy` mapping and must not use multi-segment strategy schedules.
+9. Only reusable, parameterized tools may be added under `platform/scripts/`. Do not add task-specific backtest scripts, hardcoded config matrices, hardcoded strategy sweeps, or one-off report generators there. A retained script must have a stable CLI, avoid hardcoded research config lists, document its usage, and have a clear maintenance owner.
+10. All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when exactness matters.
 
 ## Data Freshness And Sample Isolation
 
@@ -75,13 +76,13 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 Before claiming a platform research result is successful:
 
 1. Confirm the baseline and candidate configs or algorithms.
-2. Run training-sample comparisons with backtest end date capped at `2025-06-30`.
+2. Run training-sample comparisons with runtime backtest end date capped at `2025-06-30`.
 3. Scope the comparison set explicitly:
    - Strategy API or engine changes: active non-generated baseline configs under `platform/configs/`.
    - Strategy-variant research: the baseline configs relevant to the claimed asset universe, plus any config where the variant is intended to be used.
    - ETF sleeve expansion: multiple built-in strategy algorithms, for example `risk_parity`, `risk_parity_ewma`, and `risk_parity_ewma_dd_recovery`.
    - Generated, demo, or archived configs are included only when the claim depends on them or the user asks.
-4. Run start-date sensitivity without touching the final test sample. Generate one `start_date` every 2 calendar months from the earliest common available trading date through `2025-06-30`, and cap every run at `2025-06-30`.
+4. Run start-date sensitivity without touching the final test sample. Generate one runtime `start_date` every 2 calendar months from the earliest common available trading date through `2025-06-30`, and cap every run at `2025-06-30`.
 5. Report whether ranking, Sharpe, annualized return, max drawdown, turnover, trade count, order count, and rejection count materially change across start dates.
 6. Use `platform/results/backtest_cache/` only for cache entries whose symbols, config hash or parameter set, sample window, data freshness timestamp, and code version match the requested run. Cache entries using `2025-07-01` or later data must not be reused for research decisions.
 7. If a data sync occurred, treat older cache entries as expired unless they can prove they were generated from the same or newer data snapshot.

@@ -20,13 +20,13 @@ Common commands (executed from repository root):
 
 ```powershell
 # Run a single daily platform backtest
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
 
 # Run a standardized experiment with baseline comparison
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
 
 # Run a start-date sensitivity analysis
-.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
 
 # Fetch/Sync latest ETF market prices and metadata
 .\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml

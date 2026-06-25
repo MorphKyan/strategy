@@ -10,7 +10,7 @@ from typing import Any
 
 from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import MarketDataStore
-from src.platform_core.engine import load_checkpoint
+from src.platform_core.engine import load_checkpoint, load_strategy_config
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
 from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
 from src.platform_core.storage import SQLiteStore
@@ -33,6 +33,7 @@ class SimPortfolio:
         self.state = state
         self.source_checkpoint = Path(source_checkpoint)
         self.assets = self._load_assets(config.get("assets", []))
+        self.strategy_config = load_strategy_config(config.get("strategy"))
         self.output_root = Path(output_root or config.get("output", {}).get("sim_dir", "results/sim_portfolios"))
         self.portfolio_dir = self.output_root / self.portfolio_id
         self.state_path = self.portfolio_dir / "portfolio_state.json"
@@ -122,7 +123,7 @@ class SimPortfolio:
         data = LocalCsvBarData(
             data_dir=self.market_dir,
             assets=self.assets.values(),
-            start_date=self.config.get("backtest", {}).get("start_date"),
+            start_date=(self.config.get("backtest") or {}).get("start_date"),
             end_date=date_str(target_date),
         )
 
@@ -132,7 +133,6 @@ class SimPortfolio:
         order_rows: list[dict[str, Any]] = []
         trade_rows: list[dict[str, Any]] = []
         nav_rows: list[dict[str, Any]] = []
-        active_segment_key = None
         active_strategy = None
         active_strategy_runtime: dict[str, Any] = {}
         active_strategy_version_id: int | None = None
@@ -141,9 +141,6 @@ class SimPortfolio:
             if self.state.last_date and current_date <= self.state.last_date:
                 continue
             if current_date > target_date:
-                continue
-            segment = self._segment_for_date(current_date)
-            if segment is None:
                 continue
 
             # 1. Process Splits
@@ -180,15 +177,14 @@ class SimPortfolio:
             self.state.dividend_receivables = remaining_receivables
 
             bars = data.bars_on(current_date)
-            segment_key = self._segment_key(segment)
-            if active_segment_key != segment_key:
-                if segment.get("cancel_pending_on_start", False):
+            if active_strategy is None:
+                if self.strategy_config.get("cancel_pending_on_start", False):
                     self.state.pending_intents.clear()
-                strategy_cls = get_strategy_class(segment["strategy_name"])
-                version_id = segment.get("strategy_version_id")
+                strategy_cls = get_strategy_class(self.strategy_config["strategy_name"])
+                version_id = self.strategy_config.get("strategy_version_id")
                 if version_id is None:
-                    version_id = self.store.ensure_builtin_version(strategy_cls, segment.get("params", {}))
-                    segment["strategy_version_id"] = version_id
+                    version_id = self.store.ensure_builtin_version(strategy_cls, self.strategy_config.get("params", {}))
+                    self.strategy_config["strategy_version_id"] = version_id
                 self.store.get_strategy_version(int(version_id))
                 self.store.add_portfolio_reference(int(version_id), self.portfolio_id)
                 active_strategy = strategy_cls()
@@ -200,12 +196,11 @@ class SimPortfolio:
                         bars=bars,
                         state=self.state,
                         data=data,
-                        params=segment.get("params", {}),
+                        params=self.strategy_config.get("params", {}),
                         runtime=active_strategy_runtime,
                     )
                 )
                 active_strategy_version_id = int(version_id)
-                active_segment_key = self._segment_key(segment)
 
             self.state.decrement_cooldowns()
             pending_target = self._target_from_pending(current_date)
@@ -231,7 +226,7 @@ class SimPortfolio:
                     bars=bars,
                     state=self.state,
                     data=data,
-                    params=segment.get("params", {}),
+                    params=self.strategy_config.get("params", {}),
                     runtime=active_strategy_runtime,
                 )
             )
@@ -295,7 +290,7 @@ class SimPortfolio:
             market_store = MarketDataStore(self.market_dir)
             market_store.sync_assets(
                 list(self.assets.values()),
-                start=date_str(self.state.last_date) if self.state.last_date else self.config.get("backtest", {}).get("start_date"),
+                start=date_str(self.state.last_date) if self.state.last_date else (self.config.get("backtest") or {}).get("start_date"),
                 end=date_str(target_date),
                 fetch=True,
             )
@@ -315,25 +310,6 @@ class SimPortfolio:
             )
             assets[asset.asset_id] = asset
         return assets
-
-    def _segment_for_date(self, current_date) -> dict[str, Any] | None:
-        for segment in self.config.get("strategies", {}).get("segments", []):
-            start = parse_date(segment["start_date"])
-            end = parse_date(segment["end_date"]) if segment.get("end_date") else None
-            if current_date >= start and (end is None or current_date <= end):
-                return segment
-        return None
-
-    @staticmethod
-    def _segment_key(segment: dict[str, Any]) -> str:
-        return "|".join(
-            [
-                str(segment.get("start_date")),
-                str(segment.get("end_date")),
-                str(segment.get("strategy_name")),
-                str(segment.get("strategy_version_id")),
-            ]
-        )
 
     def _target_from_pending(self, current_date) -> TargetPortfolio | None:
         due = {

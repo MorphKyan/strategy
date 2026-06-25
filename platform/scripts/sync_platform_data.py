@@ -28,7 +28,7 @@ def main() -> int:
     config = load_config(config_path)
     data_config = config.get("data", {})
     assets = assets_from_config(config.get("assets", []))
-    backtest = config.get("backtest", {})
+    backtest = config.get("backtest") or {}
 
     market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
 

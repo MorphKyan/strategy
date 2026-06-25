@@ -12,6 +12,7 @@ import yaml
 
 from src.platform_core.engine import PlatformBacktestEngine
 from src.platform_core.metrics import build_platform_metrics, comparison_metrics
+from src.platform_core.runtime_config import apply_runtime_dates
 from src.platform_core.storage import SQLiteStore
 from src.platform_core.visualization import render_platform_charts
 
@@ -52,9 +53,9 @@ def write_text(path: str | Path, content: str) -> None:
 
 
 def strategy_name(config: dict[str, Any]) -> str:
-    segments = config.get("strategies", {}).get("segments", [])
-    if segments:
-        return str(segments[0].get("strategy_name", "platform_strategy"))
+    strategy = config.get("strategy")
+    if isinstance(strategy, dict):
+        return str(strategy.get("strategy_name", "platform_strategy"))
     return str(config.get("platform", {}).get("run_name", "platform_strategy"))
 
 
@@ -206,11 +207,13 @@ def run_platform_experiment(
     report_root: str | Path = "reports/experiments",
     skip_baseline: bool = False,
     render_charts: bool = True,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> ExperimentResult:
     candidate_config_path = Path(candidate_config_path)
     baseline_config_path = Path(baseline_config_path) if baseline_config_path else candidate_config_path
-    candidate_config = load_yaml(candidate_config_path)
-    baseline_config = None if skip_baseline else load_yaml(baseline_config_path)
+    candidate_config = apply_runtime_dates(load_yaml(candidate_config_path), start_date=start_date, end_date=end_date)
+    baseline_config = None if skip_baseline else apply_runtime_dates(load_yaml(baseline_config_path), start_date=start_date, end_date=end_date)
 
     resolved_name = experiment_name or strategy_name(candidate_config)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

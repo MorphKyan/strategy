@@ -25,8 +25,8 @@
 ## 已实现能力
 
 - 单账户、多资产日频回测引擎。
-- 从 YAML 配置加载资产、组合、策略段、执行参数和数据路径。
-- 多策略时间段调度，支持 `start_date`、`end_date` 和策略参数。
+- 从 YAML 配置加载资产、组合、单一策略、执行参数和数据路径。
+- 每个 YAML 配置只定义一个策略和一个组合；回测样本窗口由运行时参数提供。
 - `PortfolioState`、`Position`、`Order`、`Trade`、`PendingIntent`、`TargetPortfolio` 等核心模型。
 - 现金、持仓、市值、成本、净值、待执行意图、冷却池和应收分红状态。
 - 原始价格执行，`adj_close` 信号历史，涨停/跌停/停牌检查，lot size 约束，费用和滑点。
@@ -63,9 +63,9 @@
 从仓库根目录运行：
 
 ```powershell
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml
-.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
 .\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\sync_all_market_data.py
 .\env\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml

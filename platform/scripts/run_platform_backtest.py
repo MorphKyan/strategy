@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 os.chdir(ROOT)
 
 from src.platform_core.engine import PlatformBacktestEngine
+from src.platform_core.runtime_config import apply_runtime_dates
 from src.platform_core.storage import SQLiteStore
 
 
@@ -24,6 +25,8 @@ def main() -> int:
     parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Platform YAML config path.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
     parser.add_argument("--output-dir", help="Override output root directory.")
+    parser.add_argument("--start-date", help="Runtime backtest start date, YYYY-MM-DD. Defaults to earliest available data.")
+    parser.add_argument("--end-date", help="Runtime backtest end date, YYYY-MM-DD. Defaults to latest available data.")
     args = parser.parse_args()
 
     config_path = (ROOT / args.config).resolve() if not Path(args.config).is_absolute() else Path(args.config)
@@ -32,7 +35,7 @@ def main() -> int:
     if args.output_dir:
         output_dir = (ROOT / args.output_dir).resolve() if not Path(args.output_dir).is_absolute() else Path(args.output_dir)
 
-    config = load_config(config_path)
+    config = apply_runtime_dates(load_config(config_path), start_date=args.start_date, end_date=args.end_date)
     store = SQLiteStore(db_path)
     try:
         result = PlatformBacktestEngine(config=config, store=store, output_dir=output_dir).run()
