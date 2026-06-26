@@ -13,7 +13,7 @@ import yaml
 from src.platform_core.engine import PlatformBacktestEngine
 from src.platform_core.metrics import build_platform_metrics, comparison_metrics
 from src.platform_core.runtime_config import apply_runtime_dates
-from src.platform_core.storage import SQLiteStore
+from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.visualization import render_platform_charts
 
 
@@ -67,7 +67,7 @@ def run_name(config: dict[str, Any], label: str) -> str:
 def run_backtest(
     config: dict[str, Any],
     label: str,
-    store: SQLiteStore,
+    store: SQLiteStore | InMemoryStore,
     raw_root: str | Path,
     render_charts: bool = True,
 ) -> ExperimentRun:
@@ -222,7 +222,11 @@ def run_platform_experiment(
     report_dir.mkdir(parents=True, exist_ok=True)
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    store = SQLiteStore(db_path)
+    enable_db = (candidate_config.get("backtest") or {}).get("enable_database", False)
+    if enable_db:
+        store = SQLiteStore(db_path)
+    else:
+        store = InMemoryStore()
     try:
         candidate = run_backtest(candidate_config, "candidate", store, raw_dir, render_charts=render_charts)
         baseline = None

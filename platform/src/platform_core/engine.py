@@ -14,7 +14,7 @@ from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import MarketDataStore
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
 from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
-from src.platform_core.storage import SQLiteStore
+from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.strategy import StrategyContext, get_strategy_class
 
 
@@ -25,7 +25,7 @@ class PlatformBacktestResult:
     metrics: dict[str, Any]
 
 
-def load_strategy_config(payload: dict[str, Any] | None) -> dict[str, Any]:
+def load_strategy_config(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Platform config requires a single `strategy` mapping.")
     if "strategy_name" not in payload:
@@ -36,7 +36,7 @@ def load_strategy_config(payload: dict[str, Any] | None) -> dict[str, Any]:
 
 
 class PlatformBacktestEngine:
-    def __init__(self, config: dict[str, Any], store: SQLiteStore, output_dir: str | Path | None = None):
+    def __init__(self, config: dict[str, Any], store: SQLiteStore | InMemoryStore, output_dir: str | Path | None = None):
         self.config = config
         self.store = store
         self.assets = self._load_assets(config.get("assets", []))

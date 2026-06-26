@@ -75,7 +75,12 @@ def main() -> int:
 
     dates = calendar_for_config(base_config)[:: args.step]
     rows = []
-    store = SQLiteStore(db_path)
+    enable_db = (base_config.get("backtest") or {}).get("enable_database", False)
+    if enable_db:
+        store = SQLiteStore(db_path)
+    else:
+        from src.platform_core.storage import InMemoryStore
+        store = InMemoryStore()
     try:
         for start_date in dates:
             runtime_config = set_start_date(base_config, start_date)

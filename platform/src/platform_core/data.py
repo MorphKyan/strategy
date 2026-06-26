@@ -48,6 +48,22 @@ class LocalCsvBarData:
         self.quality = DataQualityReport()
         self.frames = self._load_frames()
         self.calendar = self._build_calendar()
+        self._aligned_adj_close = pd.DataFrame({
+            asset_id: frame["adj_close"] for asset_id, frame in self.frames.items()
+        })
+        self._aligned_acc_nav = pd.DataFrame({
+            asset_id: (frame["acc_nav"] if "acc_nav" in frame.columns else frame["adj_close"])
+            for asset_id, frame in self.frames.items()
+        })
+
+    def get_price_frame(self, universe: list[str], end_date: date, use_nav: bool = False) -> pd.DataFrame | None:
+        if not all(asset_id in self.frames for asset_id in universe):
+            return None
+        df = self._aligned_acc_nav if use_nav else self._aligned_adj_close
+        valid_cols = [c for c in universe if c in df.columns]
+        if not valid_cols:
+            return pd.DataFrame()
+        return df.loc[df.index <= end_date, valid_cols].dropna()
 
     def _load_frames(self) -> dict[str, pd.DataFrame]:
         frames: dict[str, pd.DataFrame] = {}

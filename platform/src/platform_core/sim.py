@@ -13,7 +13,7 @@ from src.platform_core.data_store import MarketDataStore
 from src.platform_core.engine import load_checkpoint, load_strategy_config
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
 from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
-from src.platform_core.storage import SQLiteStore
+from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.strategy import StrategyContext, get_strategy_class
 
 
@@ -26,7 +26,7 @@ class SimAdvanceResult:
 
 
 class SimPortfolio:
-    def __init__(self, portfolio_id: str, config: dict[str, Any], store: SQLiteStore, state: PortfolioState, source_checkpoint: str | Path, output_root: str | Path | None = None):
+    def __init__(self, portfolio_id: str, config: dict[str, Any], store: SQLiteStore | InMemoryStore, state: PortfolioState, source_checkpoint: str | Path, output_root: str | Path | None = None):
         self.portfolio_id = portfolio_id
         self.config = config
         self.store = store
@@ -106,7 +106,7 @@ class SimPortfolio:
         cls,
         checkpoint_path: str | Path,
         config: dict[str, Any],
-        store: SQLiteStore,
+        store: SQLiteStore | InMemoryStore,
         portfolio_id: str | None = None,
         output_root: str | Path | None = None,
     ) -> "SimPortfolio":

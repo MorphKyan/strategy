@@ -37,7 +37,12 @@ def main() -> int:
         output_dir = (ROOT / args.output_dir).resolve() if not Path(args.output_dir).is_absolute() else Path(args.output_dir)
 
     config = load_config(config_path)
-    store = SQLiteStore(db_path)
+    enable_db = (config.get("backtest") or {}).get("enable_database", False)
+    if enable_db:
+        store = SQLiteStore(db_path)
+    else:
+        from src.platform_core.storage import InMemoryStore
+        store = InMemoryStore()
     try:
         portfolio = SimPortfolio.create_from_checkpoint(
             checkpoint_path=checkpoint_path,

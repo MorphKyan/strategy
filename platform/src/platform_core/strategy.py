@@ -130,17 +130,8 @@ class RiskParityStrategy(Strategy):
         use_nav = bool(context.params.get("use_nav", False))
         estimation_freq = context.params.get("estimation_freq", "daily")
         
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
             
         price_frame.index = pd.to_datetime(price_frame.index)
@@ -264,17 +255,8 @@ class RiskParityEWMAStrategy(RiskParityStrategy):
         use_nav = bool(context.params.get("use_nav", False))
         estimation_freq = context.params.get("estimation_freq", "daily")
         
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
             
         # Convert index to DatetimeIndex for resampling
@@ -329,17 +311,8 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
         # Nonlinear Threshold parameter
         penalty_threshold = float(context.params.get("dd_penalty_threshold", 0.025))
 
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
             
         # Convert index to DatetimeIndex for resampling
@@ -446,17 +419,8 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
         estimation_freq = context.params.get("estimation_freq", "daily")
         shrinkage_target = context.params.get("shrinkage_target", "constant_correlation")
         
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
             
         # 转换为 DatetimeIndex
@@ -598,17 +562,8 @@ class HierarchicalRiskParityStrategy(RiskParityStrategy):
         use_nav = bool(context.params.get("use_nav", False))
         estimation_freq = context.params.get("estimation_freq", "daily")
         
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
             
         # 转换为 DatetimeIndex
@@ -746,17 +701,8 @@ class RiskParityCVaRDynamicBudgetStrategy(RiskParityLWCovStrategy):
         estimation_freq = context.params.get("estimation_freq", "daily")
         cov_estimator = context.params.get("cov_estimator", "ledoit_wolf")
         
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
             
         price_frame.index = pd.to_datetime(price_frame.index)
@@ -917,17 +863,8 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
                 min_periods = int(context.params.get("min_periods", 20))
                 use_nav = bool(context.params.get("use_nav", False))
                 
-                closes = {}
-                for asset_id in universe:
-                    frame = context.data.frames.get(asset_id)
-                    if frame is None:
-                        return target
-                    col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-                    history = frame[frame.index <= context.date][col]
-                    closes[asset_id] = history
-
-                price_frame = pd.DataFrame(closes).dropna()
-                if price_frame.empty:
+                price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+                if price_frame is None or price_frame.empty:
                     return target
                 price_frame.index = pd.to_datetime(price_frame.index)
                 
@@ -988,17 +925,8 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
         min_periods = int(context.params.get("min_periods", 20))
         use_nav = bool(context.params.get("use_nav", False))
         
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
         price_frame.index = pd.to_datetime(price_frame.index)
         
@@ -1111,17 +1039,8 @@ class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
         switching_threshold = float(context.params.get("switching_threshold", 0.05))
         sleeve_mapping = context.params.get("sleeve_mapping", None)
         
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
             
         price_frame.index = pd.to_datetime(price_frame.index)
@@ -1346,17 +1265,8 @@ class RiskParityGerberStrategy(RiskParityLWCovStrategy):
         estimation_freq = context.params.get("estimation_freq", "daily")
         gerber_c = float(context.params.get("gerber_c", 0.5))  # 阈值比例因子，默认 0.5
         
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
             
         price_frame.index = pd.to_datetime(price_frame.index)
@@ -1478,17 +1388,8 @@ class RiskParityEWMACovStrategy(RiskParityLWCovStrategy):
         # 对角收缩强度，保证 Σ 的数值正定与稳定（0 表示不收缩）
         shrinkage = float(context.params.get("ewma_cov_shrinkage", 0.1))
 
-        closes = {}
-        for asset_id in universe:
-            frame = context.data.frames.get(asset_id)
-            if frame is None:
-                return None
-            col = "acc_nav" if (use_nav and "acc_nav" in frame.columns) else "adj_close"
-            history = frame[frame.index <= context.date][col]
-            closes[asset_id] = history
-
-        price_frame = pd.DataFrame(closes).dropna()
-        if price_frame.empty:
+        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
+        if price_frame is None or price_frame.empty:
             return None
 
         price_frame.index = pd.to_datetime(price_frame.index)

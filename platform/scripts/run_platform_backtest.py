@@ -36,7 +36,12 @@ def main() -> int:
         output_dir = (ROOT / args.output_dir).resolve() if not Path(args.output_dir).is_absolute() else Path(args.output_dir)
 
     config = apply_runtime_dates(load_config(config_path), start_date=args.start_date, end_date=args.end_date)
-    store = SQLiteStore(db_path)
+    enable_db = (config.get("backtest") or {}).get("enable_database", False)
+    if enable_db:
+        store = SQLiteStore(db_path)
+    else:
+        from src.platform_core.storage import InMemoryStore
+        store = InMemoryStore()
     try:
         result = PlatformBacktestEngine(config=config, store=store, output_dir=output_dir).run()
     finally:
