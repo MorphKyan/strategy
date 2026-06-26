@@ -192,6 +192,7 @@ class ExecutionEngine:
                 fee=fee,
                 cash_after=state.cash,
                 signal_date=order.signal_date,
+                valuation_price=valuation_price,
             )
             trades.append(trade)
 

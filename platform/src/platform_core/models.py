@@ -260,6 +260,7 @@ class Trade:
     fee: float
     cash_after: float
     signal_date: date | None = None
+    valuation_price: float | None = None
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -274,4 +275,5 @@ class Trade:
             "fee": self.fee,
             "cash_after": self.cash_after,
             "signal_date": date_str(self.signal_date),
+            "valuation_price": self.valuation_price,
         }

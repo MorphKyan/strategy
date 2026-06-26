@@ -435,6 +435,26 @@ class PlatformBacktestEngine:
         turnover_amount_ratio = (turnover_amount_total / 2) / average_total_value if average_total_value > 0 else 0.0
         annualized_turnover_amount = turnover_amount_ratio / years if years else turnover_amount_ratio
         annualized_turnover_quantity = (turnover_quantity_total / 2) / years if years else (turnover_quantity_total / 2)
+        
+        execution_slippage = 0.0
+        sum_slippage_amt = 0.0
+        sum_valuation_amt = 0.0
+        for row in trade_rows:
+            price = float(row.get("price") or 0.0)
+            val_price = float(row.get("valuation_price") or price)
+            qty = float(row.get("quantity") or 0.0)
+            sum_slippage_amt += abs(price - val_price) * qty
+            sum_valuation_amt += val_price * qty
+        if sum_valuation_amt > 0:
+            execution_slippage = sum_slippage_amt / sum_valuation_amt
+
+        fee_total = sum(float(row.get("fee") or 0.0) for row in trade_rows)
+        fee_drag_ratio = 0.0
+        annualized_fee_drag = 0.0
+        if average_total_value > 0:
+            fee_drag_ratio = fee_total / average_total_value
+            annualized_fee_drag = fee_drag_ratio / years if years else fee_drag_ratio
+
         peak = net_values[0]
         max_drawdown = 0.0
         for value in net_values:
@@ -460,6 +480,10 @@ class PlatformBacktestEngine:
             "turnover_quantity_total": turnover_quantity_total / 2,
             "annualized_turnover_quantity": annualized_turnover_quantity,
             "pending_intent_count": int(nav_rows[-1].get("pending_intent_count", 0)),
+            "execution_slippage": execution_slippage,
+            "fee_total": fee_total,
+            "fee_drag_ratio": fee_drag_ratio,
+            "annualized_fee_drag": annualized_fee_drag,
         }
 
     def _write_csv(self, name: str, rows: list[dict[str, Any]]) -> None:

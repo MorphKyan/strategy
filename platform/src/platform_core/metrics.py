@@ -81,6 +81,10 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
                 "pending_intent_count": 0,
                 "max_pending_intent_count": 0,
                 "average_cash_weight": None,
+                "execution_slippage": 0.0,
+                "fee_total": 0.0,
+                "fee_drag_ratio": 0.0,
+                "annualized_fee_drag": 0.0,
             }
         )
         return metrics
@@ -150,6 +154,30 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
         if not active_positions.empty:
             max_position_count = int(active_positions.groupby("date")["asset_id"].count().max())
 
+    execution_slippage = 0.0
+    if not trades.empty and "valuation_price" in trades.columns:
+        trade_prices = pd.to_numeric(trades["price"], errors="coerce")
+        trade_val_prices = pd.to_numeric(trades["valuation_price"], errors="coerce")
+        trade_qty = pd.to_numeric(trades["quantity"], errors="coerce")
+        
+        slippage_amt = (trade_prices - trade_val_prices).abs() * trade_qty
+        valuation_amt = trade_val_prices * trade_qty
+        
+        sum_slippage_amt = slippage_amt.sum()
+        sum_valuation_amt = valuation_amt.sum()
+        
+        if sum_valuation_amt > 0:
+            execution_slippage = sum_slippage_amt / sum_valuation_amt
+
+    fee_total = 0.0
+    fee_drag_ratio = 0.0
+    annualized_fee_drag = 0.0
+    if not trades.empty and "fee" in trades.columns:
+        fee_total = pd.to_numeric(trades["fee"], errors="coerce").fillna(0.0).sum()
+        if average_total_value and average_total_value > 0:
+            fee_drag_ratio = fee_total / average_total_value
+            annualized_fee_drag = fee_drag_ratio / years if years else fee_drag_ratio
+
     metrics.update(
         {
             "start_date": nav["date"].min().strftime("%Y-%m-%d"),
@@ -180,6 +208,10 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
             "max_pending_intent_count": int(pending_series.max()) if len(pending_series) else 0,
             "average_cash_weight": average_cash_weight,
             "max_position_count": max_position_count,
+            "execution_slippage": safe_float(execution_slippage),
+            "fee_total": safe_float(fee_total),
+            "fee_drag_ratio": safe_float(fee_drag_ratio),
+            "annualized_fee_drag": safe_float(annualized_fee_drag),
         }
     )
     return metrics
@@ -214,6 +246,8 @@ def comparison_metrics(candidate: dict[str, Any], baseline: dict[str, Any] | Non
         "skipped_below_lot_or_cash_count",
         "max_pending_intent_count",
         "average_cash_weight",
+        "execution_slippage",
+        "annualized_fee_drag",
     ]
     return {f"{key}_delta": delta(candidate, baseline, key) for key in keys}
 
