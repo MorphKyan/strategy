@@ -83,6 +83,7 @@ class PlatformBacktestEngine:
                 ),
                 slippage_by_asset_id=slippage_config.get("asset_bps"),
                 slippage_by_code=slippage_config.get("code_bps"),
+                round_mode=execution_config.get("round_mode", "round"),
             )
         )
         run_name = config.get("platform", {}).get("run_name", "platform_backtest")

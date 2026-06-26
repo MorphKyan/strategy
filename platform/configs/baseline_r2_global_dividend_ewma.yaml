@@ -41,6 +41,7 @@ portfolio:
   initial_positions: []
 backtest: {}
 execution:
+  round_mode: round
   price_field: close
   weight_tolerance: 0.0005
   unfilled_policy: retry_next_day

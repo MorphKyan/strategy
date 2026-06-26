@@ -61,6 +61,7 @@ class SimPortfolio:
                 ),
                 slippage_by_asset_id=slippage_config.get("asset_bps"),
                 slippage_by_code=slippage_config.get("code_bps"),
+                round_mode=execution_config.get("round_mode", "round"),
             )
         )
         self.code_to_asset_id = {asset.code: asset_id for asset_id, asset in self.assets.items()}

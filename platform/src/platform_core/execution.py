@@ -31,6 +31,7 @@ class ExecutionConfig:
     qdii_commodity_slippage_bps: float = 6.0
     slippage_by_asset_id: dict[str, float] | None = None
     slippage_by_code: dict[str, float] | None = None
+    round_mode: str = "round"
 
 
 class ExecutionEngine:
@@ -288,10 +289,16 @@ class ExecutionEngine:
             return sorted(trade_plan, key=lambda item: (item[1] > 0, -item[2], -abs(item[1]), item[0]))
         return sorted(trade_plan, key=lambda item: (item[1] > 0, item[0]))
 
-    @staticmethod
-    def _round_quantity(quantity: float, lot_size: int) -> float:
+    def _round_quantity(self, quantity: float, lot_size: int) -> float:
         lot = max(1, int(lot_size))
-        return float(int(quantity // lot) * lot)
+        round_mode = getattr(self.config, "round_mode", "round")
+        if round_mode == "ceil":
+            import math
+            return float(math.ceil(quantity / lot) * lot)
+        elif round_mode == "round":
+            return float(int(quantity / lot + 0.5) * lot)
+        else: # floor
+            return float(int(quantity // lot) * lot)
 
     def _cap_buy_quantity(self, quantity: float, price: float, cash: float, lot_size: int) -> float:
         if quantity <= 0:

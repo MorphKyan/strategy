@@ -38,6 +38,7 @@ data:
   market_store_dir: null
   source: finshare
 execution:
+  round_mode: round
   fee:
     min_fee: 5.0
     rate: 0.0002
