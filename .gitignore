@@ -130,3 +130,6 @@ data_manifest.json
 
 # Temporary bond research raw run artifacts
 /platform/results/temp_bond_research/
+
+# Local-only project map (shared between user and Claude, not for the repo)
+/PROJECT_MAP.md
