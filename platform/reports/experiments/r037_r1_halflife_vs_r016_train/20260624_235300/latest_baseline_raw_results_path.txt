@@ -1,1 +1,0 @@
-D:\strategy\platform\results\backtests\r037_r1_halflife_vs_r016_train\20260624_235300\adaptive_risk_deviation_volatility_triggered\research_r037_r1_r016_train_baseline_20260624_235315_993879

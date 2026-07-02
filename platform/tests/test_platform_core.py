@@ -666,6 +666,56 @@ def test_platform_metrics_and_visualization_from_artifacts(tmp_path: Path):
     assert all(path.exists() for path in paths)
 
 
+def test_platform_metrics_reports_training_and_oos_slices(tmp_path: Path):
+    result_dir = tmp_path / "result_oos"
+    result_dir.mkdir()
+    (result_dir / "nav.csv").write_text(
+        "\n".join(
+            [
+                "date,net_value,total_value,cash,pending_intent_count,strategy_version_id",
+                "2025-06-30,1.0,1000,100,0,1",
+                "2025-07-01,1.1,1100,50,1,1",
+                "2025-07-02,1.2,1200,60,0,1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (result_dir / "positions.csv").write_text(
+        "\n".join(
+            [
+                "date,asset_id,quantity,price,market_value,weight,cost_basis",
+                "2025-06-30,A,90,10,900,0.9,10",
+                "2025-07-01,A,105,10,1050,0.9545,10",
+                "2025-07-02,A,114,10,1140,0.95,10",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (result_dir / "orders.csv").write_text(
+        "\n".join(
+            [
+                "order_id,date,asset_id,side,quantity,price,trade_value,status,reason,target_weight",
+                "O1,2025-07-01,A,BUY,10,10,100,FILLED,,1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (result_dir / "skipped_orders.csv").write_text("", encoding="utf-8")
+    (result_dir / "trades.csv").write_text(
+        "trade_id,order_id,date,asset_id,side,quantity,price,trade_value,fee,cash_after,valuation_price\n"
+        "T1,O1,2025-07-01,A,BUY,10,10,100,0,50,10\n",
+        encoding="utf-8",
+    )
+
+    metrics = build_platform_metrics(result_dir)
+
+    assert not metrics["training_metrics_available"]
+    assert metrics["oos_metrics_available"]
+    assert metrics["training_metrics"]["observations"] == 1
+    assert metrics["oos_metrics"]["observations"] == 2
+    assert metrics["oos_metrics"]["trade_count"] == 1
+
+
 def test_hfq_validation_matches_research_chain(tmp_path: Path):
     research_dir = tmp_path / "research_data"
     platform_dir = tmp_path / "platform_data"

@@ -1,1 +1,0 @@
-D:\strategy\platform\results\backtests\r041_smoke_r2_train\20260625_094646\risk_parity_min_torsion_enb\r041_min_torsion_enb_r2_global_ewma_candidate_20260625_094646_866936

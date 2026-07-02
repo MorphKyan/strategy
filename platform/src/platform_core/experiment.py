@@ -11,7 +11,7 @@ from typing import Any
 import yaml
 
 from src.platform_core.engine import PlatformBacktestEngine
-from src.platform_core.metrics import build_platform_metrics, comparison_metrics
+from src.platform_core.metrics import OOS_START_DATE, TRAINING_END_DATE, build_platform_metrics, comparison_metrics
 from src.platform_core.runtime_config import apply_runtime_dates
 from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.visualization import render_platform_charts
@@ -97,13 +97,43 @@ def bool_zh(value: Any) -> str:
 def recommendation(candidate: dict[str, Any], baseline: dict[str, Any] | None) -> str:
     if baseline is None:
         return "复核"
-    sharpe_up = (candidate.get("sharpe_ratio") or 0) > (baseline.get("sharpe_ratio") or 0)
-    drawdown_ok = (candidate.get("max_drawdown") or 0) >= (baseline.get("max_drawdown") or 0)
-    candidate_turnover = candidate.get("annualized_turnover_amount", candidate.get("annualized_turnover")) or 0
-    baseline_turnover = baseline.get("annualized_turnover_amount", baseline.get("annualized_turnover")) or 0
+    if not candidate.get("training_metrics_available"):
+        return "继续改进：缺少训练样本指标"
+    if not candidate.get("oos_metrics_available"):
+        return "继续改进：缺少样本外指标"
+    if not baseline.get("training_metrics_available") or not baseline.get("oos_metrics_available"):
+        return "继续改进：baseline 缺少训练或样本外指标"
+
+    candidate_oos = candidate.get("oos_metrics") or {}
+    baseline_oos = baseline.get("oos_metrics") or {}
+    sharpe_up = (candidate_oos.get("sharpe_ratio") or 0) > (baseline_oos.get("sharpe_ratio") or 0)
+    drawdown_ok = (candidate_oos.get("max_drawdown") or 0) >= (baseline_oos.get("max_drawdown") or 0)
+    candidate_turnover = candidate_oos.get("annualized_turnover_amount", candidate_oos.get("annualized_turnover")) or 0
+    baseline_turnover = baseline_oos.get("annualized_turnover_amount", baseline_oos.get("annualized_turnover")) or 0
     turnover_ok = candidate_turnover <= baseline_turnover * 1.2
-    execution_ok = (candidate.get("rejected_order_count") or 0) <= (baseline.get("rejected_order_count") or 0)
+    execution_ok = (candidate_oos.get("rejected_order_count") or 0) <= (baseline_oos.get("rejected_order_count") or 0)
     return "接受" if sharpe_up and drawdown_ok and turnover_ok and execution_ok else "继续改进"
+
+
+def metric_lines(title: str, metrics: dict[str, Any]) -> list[str]:
+    return [
+        "",
+        f"## {title}",
+        f"- 开始日期：{metrics.get('start_date')}",
+        f"- 结束日期：{metrics.get('end_date')}",
+        f"- 观测数：{metrics.get('observations')}",
+        f"- 累计收益率：{pct_or_na(metrics.get('total_return'))}",
+        f"- 年化收益率：{pct_or_na(metrics.get('annualized_return'))}",
+        f"- 年化波动率：{pct_or_na(metrics.get('annualized_volatility'))}",
+        f"- 最大回撤：{pct_or_na(metrics.get('max_drawdown'))}",
+        f"- Sharpe：{num_or_na(metrics.get('sharpe_ratio'))}",
+        f"- 年化金额换手率：{pct_or_na(metrics.get('annualized_turnover_amount', metrics.get('annualized_turnover')))}",
+        f"- 成交笔数：{metrics.get('trade_count')}",
+        f"- 订单数：{metrics.get('order_count')}",
+        f"- 拒单数：{metrics.get('rejected_order_count')}",
+        f"- 最大待执行意图数：{metrics.get('max_pending_intent_count')}",
+        f"- 平均现金权重：{pct_or_na(metrics.get('average_cash_weight'))}",
+    ]
 
 
 def build_report(
@@ -113,6 +143,8 @@ def build_report(
     candidate_config_path: Path,
     baseline_config_path: Path | None,
     comparison: dict[str, Any],
+    training_comparison: dict[str, Any] | None = None,
+    oos_comparison: dict[str, Any] | None = None,
 ) -> str:
     lines = [
         f"# 平台实验报告：{experiment_name}",
@@ -131,27 +163,25 @@ def build_report(
     lines.extend(
         [
             "",
-            "## 候选指标",
-            f"- 累计收益率：{pct_or_na(c.get('total_return'))}",
-            f"- 年化收益率：{pct_or_na(c.get('annualized_return'))}",
-            f"- 年化波动率：{pct_or_na(c.get('annualized_volatility'))}",
-            f"- 最大回撤：{pct_or_na(c.get('max_drawdown'))}",
-            f"- 夏普比率：{num_or_na(c.get('sharpe_ratio'))}",
-            f"- 成交金额合计：{num_or_na(c.get('turnover_amount_total'))}",
-            f"- 金额换手率：{pct_or_na(c.get('turnover_amount_ratio'))}",
-            f"- 年化金额换手率：{pct_or_na(c.get('annualized_turnover_amount', c.get('annualized_turnover')))}",
-            f"- 成交数量合计：{num_or_na(c.get('turnover_quantity_total'))}",
-            f"- 年化数量换手：{num_or_na(c.get('annualized_turnover_quantity'))}",
-            f"- 成交笔数：{c.get('trade_count')}",
-            f"- 订单数：{c.get('order_count')}",
-            f"- 拒单数：{c.get('rejected_order_count')}",
-            f"- 跳过订单数：{c.get('skipped_order_count')}",
-            f"- 低于一手或现金不足跳过数：{c.get('skipped_below_lot_or_cash_count')}",
-            f"- 最大待执行意图数：{c.get('max_pending_intent_count')}",
-            f"- 平均现金权重：{pct_or_na(c.get('average_cash_weight'))}",
-            f"- 是否有样本外指标：{bool_zh(c.get('oos_metrics_available'))}",
+            "## 样本切分",
+            f"- 训练样本截至：`{TRAINING_END_DATE}`",
+            f"- 样本外起始：`{OOS_START_DATE}`",
+            f"- 候选是否有训练指标：{bool_zh(c.get('training_metrics_available'))}",
+            f"- 候选是否有样本外指标：{bool_zh(c.get('oos_metrics_available'))}",
         ]
     )
+    if baseline is not None:
+        b = baseline.metrics
+        lines.extend(
+            [
+                f"- Baseline 是否有训练指标：{bool_zh(b.get('training_metrics_available'))}",
+                f"- Baseline 是否有样本外指标：{bool_zh(b.get('oos_metrics_available'))}",
+            ]
+        )
+
+    lines.extend(metric_lines("候选全样本指标", c.get("full_metrics") or c))
+    lines.extend(metric_lines("候选训练样本指标", c.get("training_metrics") or {}))
+    lines.extend(metric_lines("候选样本外指标", c.get("oos_metrics") or {}))
 
     if c.get("rejection_reason_counts"):
         lines.extend(["", "## 候选执行拒单"])
@@ -181,6 +211,14 @@ def build_report(
         }
         for key, value in comparison.items():
             lines.append(f"- {comparison_labels.get(key, key)}：{num_or_na(value)}")
+        if training_comparison:
+            lines.extend(["", "## 训练样本对比"])
+            for key, value in training_comparison.items():
+                lines.append(f"- {comparison_labels.get(key, key)}：{num_or_na(value)}")
+        if oos_comparison:
+            lines.extend(["", "## 样本外对比"])
+            for key, value in oos_comparison.items():
+                lines.append(f"- {comparison_labels.get(key, key)}：{num_or_na(value)}")
     else:
         lines.extend(["", "## Baseline 对比", "- 本次未请求 baseline 对比。"])
 
@@ -236,6 +274,15 @@ def run_platform_experiment(
         store.close()
 
     comparison = comparison_metrics(candidate.metrics, baseline.metrics if baseline else None)
+    training_comparison = comparison_metrics(
+        candidate.metrics.get("training_metrics") or {},
+        (baseline.metrics.get("training_metrics") if baseline else None),
+    )
+    oos_comparison = comparison_metrics(
+        candidate.metrics.get("oos_metrics") or {},
+        (baseline.metrics.get("oos_metrics") if baseline else None),
+    )
+    recommendation_text = recommendation(candidate.metrics, baseline.metrics if baseline else None)
     payload = {
         "experiment_name": resolved_name,
         "candidate_config": str(candidate_config_path),
@@ -243,6 +290,9 @@ def run_platform_experiment(
         "candidate": candidate.metrics,
         "baseline": None if baseline is None else baseline.metrics,
         "comparison": comparison,
+        "training_comparison": training_comparison,
+        "oos_comparison": oos_comparison,
+        "recommendation": recommendation_text,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
     metrics_path = report_dir / "metrics.json"
@@ -250,7 +300,16 @@ def run_platform_experiment(
     write_json(metrics_path, payload)
     write_text(
         report_path,
-        build_report(resolved_name, candidate, baseline, candidate_config_path, baseline_config_path if baseline else None, comparison),
+        build_report(
+            resolved_name,
+            candidate,
+            baseline,
+            candidate_config_path,
+            baseline_config_path if baseline else None,
+            comparison,
+            training_comparison,
+            oos_comparison,
+        ),
     )
     shutil.copy2(candidate_config_path, report_dir / "candidate_config.yaml")
     if baseline is not None and baseline_config_path:
