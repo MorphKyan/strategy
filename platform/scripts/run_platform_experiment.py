@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
 os.chdir(ROOT)
 
 from src.platform_core.experiment import run_platform_experiment
+from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS
 
 
 def main() -> int:
@@ -24,6 +25,12 @@ def main() -> int:
     parser.add_argument("--no-charts", action="store_true", help="Skip chart rendering.")
     parser.add_argument("--start-date", help="Runtime backtest start date for candidate and baseline, YYYY-MM-DD.")
     parser.add_argument("--end-date", help="Runtime backtest end date for candidate and baseline, YYYY-MM-DD.")
+    parser.add_argument(
+        "--slippage-scenario",
+        choices=[*REQUIRED_SLIPPAGE_SCENARIOS, "all"],
+        default="all",
+        help="Slippage scenario to run. Default `all` runs default, stress, and dynamic_participation.",
+    )
     args = parser.parse_args()
 
     config_path = (ROOT / args.config).resolve() if not Path(args.config).is_absolute() else Path(args.config)
@@ -34,22 +41,25 @@ def main() -> int:
     raw_root = (ROOT / args.raw_root).resolve() if not Path(args.raw_root).is_absolute() else Path(args.raw_root)
     report_root = (ROOT / args.report_root).resolve() if not Path(args.report_root).is_absolute() else Path(args.report_root)
 
-    result = run_platform_experiment(
-        candidate_config_path=config_path,
-        baseline_config_path=baseline_config_path,
-        experiment_name=args.experiment_name,
-        db_path=db_path,
-        raw_root=raw_root,
-        report_root=report_root,
-        skip_baseline=args.skip_baseline,
-        render_charts=not args.no_charts,
-        start_date=args.start_date,
-        end_date=args.end_date,
-    )
-    print(f"Standardized platform report written to: {result.report_dir}")
-    print(f"Candidate raw artifacts: {result.candidate.output_dir}")
-    if result.baseline:
-        print(f"Baseline raw artifacts: {result.baseline.output_dir}")
+    scenario_names = REQUIRED_SLIPPAGE_SCENARIOS if args.slippage_scenario == "all" else (args.slippage_scenario,)
+    for scenario in scenario_names:
+        result = run_platform_experiment(
+            candidate_config_path=config_path,
+            baseline_config_path=baseline_config_path,
+            experiment_name=args.experiment_name,
+            db_path=db_path,
+            raw_root=raw_root,
+            report_root=report_root,
+            skip_baseline=args.skip_baseline,
+            render_charts=not args.no_charts,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            slippage_scenario=scenario,
+        )
+        print(f"[{scenario}] standardized platform report written to: {result.report_dir}")
+        print(f"[{scenario}] candidate raw artifacts: {result.candidate.output_dir}")
+        if result.baseline:
+            print(f"[{scenario}] baseline raw artifacts: {result.baseline.output_dir}")
     return 0
 
 

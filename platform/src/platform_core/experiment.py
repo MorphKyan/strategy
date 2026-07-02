@@ -13,6 +13,7 @@ import yaml
 from src.platform_core.engine import PlatformBacktestEngine
 from src.platform_core.metrics import OOS_START_DATE, TRAINING_END_DATE, build_platform_metrics, comparison_metrics
 from src.platform_core.runtime_config import apply_runtime_dates
+from src.platform_core.slippage import apply_slippage_scenario
 from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.visualization import render_platform_charts
 
@@ -247,13 +248,20 @@ def run_platform_experiment(
     render_charts: bool = True,
     start_date: str | None = None,
     end_date: str | None = None,
+    slippage_scenario: str | None = None,
 ) -> ExperimentResult:
     candidate_config_path = Path(candidate_config_path)
     baseline_config_path = Path(baseline_config_path) if baseline_config_path else candidate_config_path
     candidate_config = apply_runtime_dates(load_yaml(candidate_config_path), start_date=start_date, end_date=end_date)
     baseline_config = None if skip_baseline else apply_runtime_dates(load_yaml(baseline_config_path), start_date=start_date, end_date=end_date)
+    if slippage_scenario is not None:
+        candidate_config = apply_slippage_scenario(candidate_config, slippage_scenario)
+        if baseline_config is not None:
+            baseline_config = apply_slippage_scenario(baseline_config, slippage_scenario)
 
     resolved_name = experiment_name or strategy_name(candidate_config)
+    if slippage_scenario is not None:
+        resolved_name = f"{resolved_name}_{slippage_scenario}"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_dir = Path(report_root) / resolved_name / timestamp
     raw_dir = Path(raw_root) / resolved_name / timestamp
@@ -287,6 +295,7 @@ def run_platform_experiment(
         "experiment_name": resolved_name,
         "candidate_config": str(candidate_config_path),
         "baseline_config": None if baseline is None else str(baseline_config_path),
+        "slippage_scenario": slippage_scenario,
         "candidate": candidate.metrics,
         "baseline": None if baseline is None else baseline.metrics,
         "comparison": comparison,

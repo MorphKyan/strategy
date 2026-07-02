@@ -15,6 +15,7 @@ from src.platform_core.experiment import run_platform_experiment
 from src.platform_core.metrics import build_platform_metrics
 from src.platform_core.models import Asset, Bar, PendingIntent, PortfolioState, TargetPortfolio
 from src.platform_core.sim import SimPortfolio
+from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, apply_slippage_scenario
 from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.strategy import MonthlyEqualWeightStrategy
 from src.platform_core.strategy import RiskParityStrategy
@@ -72,6 +73,38 @@ def test_execution_applies_default_and_qdii_commodity_slippage():
     state = PortfolioState(cash=1000)
     _, trades = engine.apply_target(date(2024, 1, 1), state, {"A": commodity_asset}, {"A": bar}, TargetPortfolio({"A": 0.5}))
     assert trades[0].price == pytest.approx(10.006)
+
+
+def test_execution_applies_dynamic_participation_slippage():
+    bar = Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10, amount=1000)
+    asset = Asset(asset_id="A", code="510300", name="沪深300ETF", lot_size=1)
+    state = PortfolioState(cash=1000)
+    engine = ExecutionEngine(
+        ExecutionConfig(
+            fee_profile=FeeProfile(rate=0.0),
+            slippage_bps=2.0,
+            participation_impact={
+                "enabled": True,
+                "free_participation_rate": 0.0,
+                "impact_bps_per_1pct": 5.0,
+                "max_impact_bps": 100.0,
+            },
+        )
+    )
+
+    _, trades = engine.apply_target(date(2024, 1, 1), state, {"A": asset}, {"A": bar}, TargetPortfolio({"A": 0.5}))
+
+    assert trades[0].price > 10.002
+
+
+def test_slippage_scenarios_apply_required_execution_configs():
+    base = {"platform": {"run_name": "x"}, "execution": {"fee": {"rate": 0.0}}}
+
+    for scenario in REQUIRED_SLIPPAGE_SCENARIOS:
+        cfg = apply_slippage_scenario(base, scenario)
+        assert cfg["execution"]["slippage_scenario"] == scenario
+        assert "default_bps" in cfg["execution"]["slippage"]
+        assert cfg["platform"]["run_name"].endswith(f"_{scenario}")
 
 
 def test_execution_rejects_price_limits_and_suspension():

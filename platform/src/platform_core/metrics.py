@@ -235,6 +235,14 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
     orders = read_csv_or_empty(result_dir / "orders.csv")
     skipped_orders = read_csv_or_empty(result_dir / "skipped_orders.csv")
     positions = read_csv_or_empty(result_dir / "positions.csv")
+    manifest_path = result_dir / "manifest.json"
+    execution_model: dict[str, Any] = {}
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            execution_model = manifest.get("execution_model", {}) if isinstance(manifest, dict) else {}
+        except json.JSONDecodeError:
+            execution_model = {}
 
     metrics: dict[str, Any] = {
         "results_dir": str(result_dir),
@@ -245,6 +253,7 @@ def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
         "trades_csv": str(result_dir / "trades.csv"),
         "training_end_date": TRAINING_END_DATE,
         "oos_start_date": OOS_START_DATE,
+        "slippage_scenario": execution_model.get("slippage_scenario", "unknown"),
     }
 
     full_metrics = _compute_period_metrics(nav, trades, orders, skipped_orders, positions)

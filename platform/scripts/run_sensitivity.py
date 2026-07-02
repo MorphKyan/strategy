@@ -18,6 +18,7 @@ from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import assets_from_config
 from src.platform_core.experiment import run_backtest, strategy_name
 from src.platform_core.runtime_config import apply_runtime_dates
+from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, apply_slippage_scenario
 from src.platform_core.storage import SQLiteStore
 from src.platform_core.visualization import render_sensitivity_charts
 
@@ -55,6 +56,12 @@ def main() -> int:
     parser.add_argument("--report-root", default="reports/sensitivity", help="Root for sensitivity summary reports.")
     parser.add_argument("--charts", action="store_true", help="Render per-run charts. Off by default because sensitivity can produce many runs.")
     parser.add_argument("--end-date", help="Runtime sensitivity end date, YYYY-MM-DD. Use 2025-06-30 for training-sample research.")
+    parser.add_argument(
+        "--slippage-scenario",
+        choices=[*REQUIRED_SLIPPAGE_SCENARIOS, "all"],
+        default="all",
+        help="Slippage scenario to run. Default `all` runs default, stress, and dynamic_participation.",
+    )
     args = parser.parse_args()
 
     if args.step <= 0:
@@ -82,24 +89,28 @@ def main() -> int:
         from src.platform_core.storage import InMemoryStore
         store = InMemoryStore()
     try:
-        for start_date in dates:
-            runtime_config = set_start_date(base_config, start_date)
-            run = run_backtest(runtime_config, "sensitivity", store, raw_dir / start_date, render_charts=args.charts)
-            row = {"start_date": start_date, "run_id": run.run_id, "raw_path": str(run.output_dir)}
-            for key in [
-                "total_return",
-                "annualized_return",
-                "annualized_volatility",
-                "max_drawdown",
-                "sharpe_ratio",
-                "annualized_turnover",
-                "trade_count",
-                "rejected_order_count",
-                "max_pending_intent_count",
-                "average_cash_weight",
-            ]:
-                row[key] = run.metrics.get(key)
-            rows.append(row)
+        scenario_names = REQUIRED_SLIPPAGE_SCENARIOS if args.slippage_scenario == "all" else (args.slippage_scenario,)
+        for scenario in scenario_names:
+            scenario_config = apply_slippage_scenario(base_config, scenario)
+            for start_date in dates:
+                runtime_config = set_start_date(scenario_config, start_date)
+                run = run_backtest(runtime_config, "sensitivity", store, raw_dir / scenario / start_date, render_charts=args.charts)
+                row = {"slippage_scenario": scenario, "start_date": start_date, "run_id": run.run_id, "raw_path": str(run.output_dir)}
+                for key in [
+                    "total_return",
+                    "annualized_return",
+                    "annualized_volatility",
+                    "max_drawdown",
+                    "sharpe_ratio",
+                    "annualized_turnover",
+                    "trade_count",
+                    "rejected_order_count",
+                    "max_pending_intent_count",
+                    "average_cash_weight",
+                    "execution_slippage",
+                ]:
+                    row[key] = run.metrics.get(key)
+                rows.append(row)
     finally:
         store.close()
 
@@ -108,6 +119,8 @@ def main() -> int:
     payload = {
         "config": str(config_path),
         "step": args.step,
+        "slippage_scenario": args.slippage_scenario,
+        "required_slippage_scenarios": list(REQUIRED_SLIPPAGE_SCENARIOS),
         "sample_count": len(rows),
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "summary_csv": str(report_dir / "sensitivity_summary.csv"),

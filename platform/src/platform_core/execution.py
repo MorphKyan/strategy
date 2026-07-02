@@ -31,6 +31,7 @@ class ExecutionConfig:
     qdii_commodity_slippage_bps: float = 6.0
     slippage_by_asset_id: dict[str, float] | None = None
     slippage_by_code: dict[str, float] | None = None
+    participation_impact: dict[str, float | bool] | None = None
     round_mode: str = "round"
 
 
@@ -101,14 +102,15 @@ class ExecutionEngine:
                 continue
 
             side = "BUY" if diff_value > 0 else "SELL"
-            execution_price = self._execution_price(valuation_price, side, asset)
+            planned_quantity = self._round_quantity(abs(diff_value) / valuation_price, asset.lot_size)
+            if side == "SELL":
+                planned_quantity = min(planned_quantity, self._round_quantity(position.quantity, asset.lot_size))
+            execution_price = self._execution_price(valuation_price, side, asset, bar, planned_quantity)
             if side == "BUY" and bar.limit_up is not None:
                 execution_price = min(execution_price, bar.limit_up)
             elif side == "SELL" and bar.limit_down is not None:
                 execution_price = max(execution_price, bar.limit_down)
-            quantity = self._round_quantity(abs(diff_value) / valuation_price, asset.lot_size)
-            if side == "SELL":
-                quantity = min(quantity, self._round_quantity(position.quantity, asset.lot_size))
+            quantity = planned_quantity
             one_lot_value = execution_price * max(1, int(asset.lot_size))
             if self.config.skip_below_lot and quantity <= 0 and abs(diff_value) < one_lot_value:
                 state.pending_intents.pop(asset_id, None)
@@ -211,14 +213,28 @@ class ExecutionEngine:
         field = self.config.price_field
         return float(getattr(bar, field))
 
-    def _execution_price(self, valuation_price: float, side: str, asset: Asset) -> float:
-        slippage = self._slippage_rate(asset)
+    def _execution_price(
+        self,
+        valuation_price: float,
+        side: str,
+        asset: Asset,
+        bar: Bar | None = None,
+        planned_quantity: float = 0.0,
+    ) -> float:
+        slippage = self._slippage_rate(asset, bar, planned_quantity, valuation_price)
         if side == "BUY":
             return valuation_price * (1.0 + slippage)
         return valuation_price * (1.0 - slippage)
 
-    def _slippage_rate(self, asset: Asset) -> float:
+    def _slippage_rate(
+        self,
+        asset: Asset,
+        bar: Bar | None = None,
+        planned_quantity: float = 0.0,
+        valuation_price: float = 0.0,
+    ) -> float:
         slippage_bps = self._slippage_bps(asset)
+        slippage_bps += self._participation_impact_bps(bar, planned_quantity, valuation_price)
         return max(0.0, float(slippage_bps)) / 10000.0
 
     def _slippage_bps(self, asset: Asset) -> float:
@@ -233,6 +249,22 @@ class ExecutionEngine:
         if self._is_qdii_or_commodity(asset):
             return float(self.config.qdii_commodity_slippage_bps)
         return float(self.config.slippage_bps)
+
+    def _participation_impact_bps(self, bar: Bar | None, planned_quantity: float, valuation_price: float) -> float:
+        impact = self.config.participation_impact or {}
+        if not bool(impact.get("enabled", False)):
+            return 0.0
+        trade_value = max(0.0, float(planned_quantity) * float(valuation_price))
+        if trade_value <= 0:
+            return 0.0
+        amount = float(getattr(bar, "amount", 0.0) or 0.0) if bar is not None else 0.0
+        if amount <= 0:
+            return float(impact.get("missing_amount_extra_bps", 20.0))
+        participation_rate = trade_value / amount
+        free_rate = max(0.0, float(impact.get("free_participation_rate", 0.005)))
+        excess_rate = max(0.0, participation_rate - free_rate)
+        impact_bps = (excess_rate / 0.01) * float(impact.get("impact_bps_per_1pct", 5.0))
+        return min(float(impact.get("max_impact_bps", 100.0)), max(0.0, impact_bps))
 
     @staticmethod
     def _is_qdii_or_commodity(asset: Asset) -> bool:

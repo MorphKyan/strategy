@@ -77,19 +77,20 @@ Before claiming a platform research result is successful:
 
 1. Confirm the baseline and candidate configs or algorithms.
 2. Run training-sample comparisons with runtime backtest end date capped at `2025-06-30`.
-3. Scope the comparison set explicitly:
+3. Every platform backtest, experiment, sensitivity run, and final test validation must include all three required slippage scenarios: `default`, `stress`, and `dynamic_participation`. The `default` scenario uses ordinary fixed bps slippage, `stress` uses widened fixed bps slippage, and `dynamic_participation` adds trade-value-versus-daily-amount impact on top of ordinary slippage. Reports must identify the slippage scenario for every metric set and must not claim a candidate is successful unless execution risk is acceptable under all three scenarios.
+4. Scope the comparison set explicitly:
    - Strategy API or engine changes: active non-generated baseline configs under `platform/configs/`.
    - Strategy-variant research: the baseline configs relevant to the claimed asset universe, plus any config where the variant is intended to be used.
    - ETF sleeve expansion: multiple built-in strategy algorithms, for example `risk_parity`, `risk_parity_ewma`, and `risk_parity_ewma_dd_recovery`.
    - Generated, demo, or archived configs are included only when the claim depends on them or the user asks.
-4. Run start-date sensitivity without touching the final test sample. Generate one runtime `start_date` every 2 calendar months from the earliest common available trading date through `2025-06-30`, and cap every run at `2025-06-30`.
-5. Report whether ranking, Sharpe, annualized return, max drawdown, turnover, trade count, order count, and rejection count materially change across start dates.
-6. Use `platform/results/backtest_cache/` only for cache entries whose symbols, config hash or parameter set, sample window, data freshness timestamp, and code version match the requested run. Cache entries using `2025-07-01` or later data must not be reused for research decisions.
-7. If a data sync occurred, treat older cache entries as expired unless they can prove they were generated from the same or newer data snapshot.
-8. Run final test-sample validation only after the candidate is frozen.
-9. Verify raw artifacts exist under `platform/results/` and standardized artifacts exist under `platform/reports/`.
-10. Read generated metrics from actual artifacts, preferably `metrics.json`; do not infer metrics from memory.
-11. Reports must include hypothesis, files changed, exact commands, baseline/candidate metrics, start-date sensitivity, final test-sample metrics if run, turnover, trade count, rejection count, and recommendation.
+5. Run start-date sensitivity without touching the final test sample. Generate one runtime `start_date` every 2 calendar months from the earliest common available trading date through `2025-06-30`, and cap every run at `2025-06-30`.
+6. Report whether ranking, Sharpe, annualized return, max drawdown, turnover, trade count, order count, and rejection count materially change across start dates and across the three slippage scenarios.
+7. Use `platform/results/backtest_cache/` only for cache entries whose symbols, config hash or parameter set, sample window, data freshness timestamp, code version, and slippage scenario match the requested run. Cache entries using `2025-07-01` or later data must not be reused for research decisions.
+8. If a data sync occurred, treat older cache entries as expired unless they can prove they were generated from the same or newer data snapshot.
+9. Run final test-sample validation only after the candidate is frozen.
+10. Verify raw artifacts exist under `platform/results/` and standardized artifacts exist under `platform/reports/`.
+11. Read generated metrics from actual artifacts, preferably `metrics.json`; do not infer metrics from memory.
+12. Reports must include hypothesis, files changed, exact commands, baseline/candidate metrics, start-date sensitivity, final test-sample metrics if run, turnover, trade count, rejection count, slippage-scenario metrics, and recommendation.
 
 ## Acceptance Guidance
 

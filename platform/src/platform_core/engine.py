@@ -83,9 +83,11 @@ class PlatformBacktestEngine:
                 ),
                 slippage_by_asset_id=slippage_config.get("asset_bps"),
                 slippage_by_code=slippage_config.get("code_bps"),
+                participation_impact=slippage_config.get("participation_impact"),
                 round_mode=execution_config.get("round_mode", "round"),
             )
         )
+        self.slippage_scenario = execution_config.get("slippage_scenario", "custom")
         run_name = config.get("platform", {}).get("run_name", "platform_backtest")
         self.run_id = f"{run_name}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         configured_output = output_dir or config.get("output", {}).get("results_dir", "results/platform")
@@ -287,6 +289,7 @@ class PlatformBacktestEngine:
         self._write_csv("skipped_orders.csv", skipped_order_rows)
         self._write_csv("trades.csv", trade_rows)
         metrics = self._metrics(nav_rows, trade_rows, order_rows, skipped_order_rows)
+        metrics["slippage_scenario"] = self.slippage_scenario
         self._write_manifest(metrics)
         self._write_report(metrics)
         return PlatformBacktestResult(run_id=self.run_id, output_dir=self.output_dir, metrics=metrics)
@@ -374,6 +377,8 @@ class PlatformBacktestEngine:
             "execution_model": {
                 "signal_execution_lag_days": 1,
                 "execution_price_field": self.execution.config.price_field,
+                "slippage_scenario": self.slippage_scenario,
+                "slippage": self.config.get("execution", {}).get("slippage", {}),
             },
             "metrics": metrics,
             "data_quality_notes": self.data.quality.notes + self.data_quality_notes,
