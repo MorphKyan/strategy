@@ -27,12 +27,12 @@ When documents conflict, apply this priority order: user instruction for the cur
 - Platform raw artifacts: `platform/results/`
 - Platform reports: `platform/reports/`
 - Platform metadata/data: `platform/data/`
-- Platform backtest entry: `.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml`
-- Platform experiment entry: `.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml`
-- Platform sensitivity entry: `.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml`
-- Platform data sync entry: `.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml`
-- Platform all-market data sync entry: `.\env\python.exe platform\scripts\sync_all_market_data.py`
-- Platform common date range entry: `.\env\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml`
+- Platform backtest entry: `.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml`
+- Platform experiment entry: `.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml`
+- Platform sensitivity entry: `.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml`
+- Platform data sync entry: `.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml`
+- Platform all-market data sync entry: `.\env\Scripts\python.exe platform\scripts\sync_all_market_data.py`
+- Platform common date range entry: `.\env\Scripts\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml`
 
 Platform entrypoints resolve relative paths from `platform/`. Do not use commands that reference missing configs.
 
@@ -40,7 +40,7 @@ Platform entrypoints resolve relative paths from `platform/`. Do not use command
 
 - ETF selection source: `etf_selection/src/`
 - ETF selection config: `etf_selection/config/etf_universe.yaml`
-- ETF selection entry: `.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml`
+- ETF selection entry: `.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml`
 - ETF selection agent rules: `etf_selection/AGENTS.md`
 - Generated platform configs: `etf_selection/generated_configs/<timestamp>/`
 - ETF selection reports: `etf_selection/reports/<timestamp>/`
@@ -49,7 +49,7 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 
 ## Hard Rules
 
-1. Use `.\env\python.exe` for project Python commands on Windows.
+1. Use `.\env\Scripts\python.exe` for project Python commands on Windows.
 2. Platform strategy work must stay under `platform/` and use the platform `Strategy.generate_targets(context)` API.
 3. Strategy variants must be additive. Register a strategy in `BUILTIN_STRATEGIES` only when it is intended to be loadable by platform configs. Failed or research-only variants must not remain registered in the submitted diff.
 4. Do not introduce deep learning, reinforcement learning, unrelated factor models, broad architecture rewrites, hidden benchmark changes, or unrestricted parameter searches unless explicitly requested.

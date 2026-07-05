@@ -39,6 +39,7 @@
 - 起始日期敏感性分析入口。
 - HFQ 数据链校验入口。
 - 平台市场数据同步入口。
+- 本地只读 Streamlit 看板（`platform/src/platform_dashboard/`）：概览、回测分析（净值/收益率双模式 + 近N月区间归零、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、滚动波动/Sharpe、训练 vs 冻结样本对照、含现金层的持仓面积图、订单与交易表）、回测对比（2–5 个回测在所选区间首日对齐归一 + 指标对照表）、策略配置浏览。
 
 ## 内置策略范围
 
@@ -63,14 +64,17 @@
 从仓库根目录运行：
 
 ```powershell
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
-.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
-.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
-.\env\python.exe platform\scripts\sync_all_market_data.py
-.\env\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml
-.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date <YYYY-MM-DD>
+.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\Scripts\python.exe platform\scripts\sync_all_market_data.py
+.\env\Scripts\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml
+.\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date <YYYY-MM-DD>
+.\env\Scripts\python.exe platform\scripts\run_dashboard.py
 ```
+
+看板默认端口 8501，可用 `PORT` 环境变量覆盖。
 
 平台脚本会把工作目录切到 `platform/`，因此脚本参数中的 `configs/`、`data/`、`results/` 等相对路径均按平台目录解析。
 

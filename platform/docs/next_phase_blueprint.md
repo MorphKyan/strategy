@@ -195,22 +195,15 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 现状：Streamlit + Plotly 完全够用，**不要换框架**。问题只是图表规格太素。改动集中在 `platform/src/platform_dashboard/`。
 
-### B1. 收益多尺度视图（改 `app.py` 的 `render_performance`）
+### B1. 收益多尺度视图（已完成，2026-07-05）
 
-专业软件的"日线/月线/多尺度"体验，用 Plotly 现成能力实现：
+已在 `app.py` 的"净值与回撤"/"收益分解"两个标签页落地：净值/收益率双显示模式 + 区间选择（近1月～近3年/今年/全部）、对数坐标、基准对比与超额曲线、月度收益热力图（红涨绿跌）、年度收益、日收益分布、月度收益序列、滚动 60 日波动 / 252 日 Sharpe。全部从 `nav.csv` 派生，引擎零改动；派生计算在 `artifacts.py`（`nav_analytics` / `rebase_benchmark` / `window_start_date`）。
 
-1. **净值主图**加 `rangeselector`（按钮 1M/3M/6M/YTD/1Y/全部）+ `rangeslider`，一行 `fig.update_xaxes(rangeselector=..., rangeslider_visible=True)` 解决"不同尺度"诉求。
-2. **对数坐标开关**：`st.toggle` 切换 `yaxis_type="log"`（长区间复利曲线必备）。
-3. **月度收益热力图**：nav 重采样 `resample("ME").last().pct_change()` → 年×月 pivot → `px.imshow`，红绿发散色标。
-4. **年度收益柱状图** + **日收益分布直方图**。
-5. **滚动指标**：滚动 60 日年化波动、滚动 252 日 Sharpe 两条线。
-6. **基准对比**：下拉选另一个 run 或某资产的 `adj_close` 归一化后叠加到净值主图，并给出超额收益曲线。
+**记录一个设计取舍（后续别改回去）**：区间切换最初尝试用 Plotly 图内 `rangeselector` 按钮，后放弃——那是前端纯视觉缩放，无法把曲线重新归零到区间首日（做不了"近1月从 0% 起算"），且按钮与图例在图顶重叠。最终方案是 Streamlit 侧的"显示 + 区间"控件：切换触发页面重跑并重算 rebase（毫秒级，缓存兜底），回测分析页与回测对比页共用同一套控件语言和 `window_start_date()` 口径。
 
-以上全部从已有 `nav.csv` 派生，不需要引擎改动。建议把派生计算放进 `artifacts.py`（如 `nav_derived_frames(nav) -> dict[str, DataFrame]`），`app.py` 只管画。
+### B2. 多回测对比页（已完成，2026-07-05）
 
-### B2. 多回测对比页（新页面）
-
-`st.multiselect` 选 2–5 个 run → 净值归一化叠加 + 指标对照表（复用 `metrics.py` 的 `comparison_metrics()`）。这是研究时"候选 vs 基线"最常用的视图，当前只能看单 run。
+已落地：`st.multiselect` 选 2–5 个 run，`align_navs()` 裁剪到共同重叠区间（可选）并在所选区间首日各自归一（净值模式从 1.0、收益率模式从 0% 出发），净值/回撤叠加 + 全样本指标对照表。区间与显示控件与 B1 完全一致。
 
 ### B3. 模拟/实盘组合页（新页面，依赖主线 A 落地）
 
@@ -278,7 +271,7 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 ### 9.1 环境与文档坑（实测核对于 2026-07-05）
 
-- **Python 解释器实际在 `env\Scripts\python.exe`**（uv venv 布局）。`AGENTS.md`/`README`/`PROJECT_MAP.md` 写的 `env\python.exe` 是错的，照抄会报找不到命令。接手后建议顺手把文档改对。
+- **Python 解释器在 `env\Scripts\python.exe`**（uv venv 布局）。活文档（`AGENTS.md`/README/docs/SKILL.md）中曾写错为 `env\python.exe`，已于 2026-07-05 统一改正；`platform/reports/`、`research-dashboard/notes/` 等历史报告中的旧命令未改（历史产物不回写），复制历史报告里的命令时注意替换。
 - 平台脚本会把 cwd 切到 `platform/`，参数里 `configs/ data/ results/` 相对路径按 platform 目录解析。
 - 回测前先 `sync_all_market_data.py`，否则数据新鲜度闸门（7 天）会拦截。
 - 部分文档提到的 `baseline_mvp_equal_weight.yaml` 等旧配置名已不存在，现行基线是 `baseline_r0/r1_*` 系列，以 `platform/configs/` 实际文件为准。
@@ -293,8 +286,8 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 1. A1+A2：`live.py` 的 reconcile + plan + 下单票（核心价值，先跑通手动闭环）
 2. A3+A4：notify + `run_live_cycle.py` + 任务计划（闭环自动化）
-3. ~~B1：收益多尺度视图~~ **已完成（2026-07-05）**：净值图区间缩放/对数坐标/基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、月度序列、滚动波动与滚动 Sharpe，持仓面积图含现金层。派生计算在 `artifacts.py`（`nav_analytics`/`rebase_benchmark`），测试在 `test_platform_dashboard.py`。
+3. ~~B1：收益多尺度视图~~ **已完成（2026-07-05）**：净值/收益率双模式（收益率按区间首日归零）、区间选择、对数坐标、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、月度序列、滚动波动与滚动 Sharpe，持仓面积图含现金层。派生计算在 `artifacts.py`（`nav_analytics`/`rebase_benchmark`/`window_start_date`），测试在 `test_platform_dashboard.py`。
 4. B3+B4：sim/实盘组合页 + 组合总览列表（近 1 周/1 月/3 月/半年收益，配合 A 使用）
 5. A5：月度归因报告
-6. ~~B2：多回测对比页~~ **已完成（2026-07-05）**：`align_navs` 对齐重叠区间归一叠加 + 回撤叠加 + 指标对照表。
+6. ~~B2：多回测对比页~~ **已完成（2026-07-05）**：`align_navs` 对齐重叠区间、在所选区间首日归一叠加（净值/收益率双模式）+ 回撤叠加 + 指标对照表，控件与回测分析页统一。
 7. C1 流程文档化 + C2（真要做个股时再启动）

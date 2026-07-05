@@ -20,19 +20,22 @@ Common commands (executed from repository root):
 
 ```powershell
 # Run a single daily platform backtest
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
 
 # Run a standardized experiment with baseline comparison
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
 
 # Run a start-date sensitivity analysis
-.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
 
 # Fetch/Sync latest ETF market prices and metadata
-.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
 
 # Run a simulated portfolio rollover tracking script
-.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint platform\results\platform_sim_portfolio\checkpoint.json --asof-date 2026-05-30
+.\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint platform\results\platform_sim_portfolio\checkpoint.json --asof-date 2026-05-30
+
+# Launch the local read-only dashboard (default port 8501, override with PORT)
+.\env\Scripts\python.exe platform\scripts\run_dashboard.py
 ```
 
 Relative paths in platform commands are resolved from `platform/`.
@@ -45,7 +48,7 @@ Common command (executed from repository root):
 
 ```powershell
 # Screen ETF sleeves and construct candidate portfolios
-.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
+.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
 ```
 
 ETF selection is intentionally independent from the platform engine. It can generate platform configs and optionally call platform experiments, but it owns its own agent instructions, config, reports, and generated configs.

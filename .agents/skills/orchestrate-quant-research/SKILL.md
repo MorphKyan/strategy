@@ -75,7 +75,7 @@ Prompt shape:
 ```text
 Use the harness at .agents/agents/quant_researcher/agent.json.
 In D:\strategy, claim <first|second> suitable unclaimed Todo research topic from research-dashboard/research_backlog.md and complete the repository-required research workflow.
-Use .\env\python.exe for Python commands. Preserve sample isolation: research/training through 2025-06-30, final test only after candidate freeze from 2025-07-01 onward. Write Chinese reports and summarize exact artifact/report paths for review.
+Use .\env\Scripts\python.exe for Python commands. Preserve sample isolation: research/training through 2025-06-30, final test only after candidate freeze from 2025-07-01 onward. Write Chinese reports and summarize exact artifact/report paths for review.
 You are working concurrently with other agents; do not revert or overwrite their changes.
 ```
 

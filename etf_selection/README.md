@@ -8,7 +8,7 @@ This directory owns ETF screening and basket construction. It is intentionally s
 2. Run sleeve screening:
 
 ```powershell
-.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
+.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
 ```
 
 3. Review reports under `etf_selection/reports/<timestamp>/`.
@@ -16,7 +16,7 @@ This directory owns ETF screening and basket construction. It is intentionally s
 5. Optional: run generated configs through the platform:
 
 ```powershell
-.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml --run-experiments
+.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml --run-experiments
 ```
 
 ## Design

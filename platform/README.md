@@ -9,7 +9,7 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 - `scripts/run_sim_portfolio.py`: create or advance a simulated portfolio from a checkpoint.
 - `scripts/sync_platform_data.py`: sync platform market and fundamental data.
 - `scripts/run_sensitivity.py`: start-date sensitivity analysis.
-- `scripts/run_dashboard.py`: launch the local read-only browser dashboard.
+- `scripts/run_dashboard.py`: launch the local read-only browser dashboard (port defaults to 8501, override with the `PORT` environment variable).
 - `scripts/validate_hfq_data.py`: compare platform adjusted close against the research HFQ chain.
 - `src/platform_core/`: platform engine package.
   - `models.py`: assets, bars, positions, orders, trades, portfolio state.
@@ -23,6 +23,9 @@ This directory contains the newer daily event-driven platform runtime. It is sep
   - `data_validation.py`: HFQ data-chain comparison helpers.
   - `sim.py`: simulated portfolio continuation from checkpoints.
   - `storage.py`: SQLite metadata store.
+- `src/platform_dashboard/`: local read-only Streamlit dashboard.
+  - `app.py`: page rendering (overview, run analysis, run comparison, strategy configs).
+  - `artifacts.py`: artifact discovery and derived return analytics (`nav_analytics`, `rebase_benchmark`, `align_navs`, `window_start_date`).
 - `configs/`: platform YAML configs.
 - `data/`: platform-owned market data and SQLite metadata.
 - `docs/`: current platform documentation and planned features.
@@ -35,14 +38,14 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 Run from the repository root:
 
 ```powershell
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
-.\env\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_ewma.yaml --start-date 2019-02-28 --end-date 2025-06-30
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
-.\env\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
-.\env\python.exe platform\scripts\validate_hfq_data.py --codes 510300 518880 511260
-.\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
-.\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
-.\env\python.exe platform\scripts\run_dashboard.py
+.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_ewma.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\validate_hfq_data.py --codes 510300 518880 511260
+.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
+.\env\Scripts\python.exe platform\scripts\run_dashboard.py
 ```
 
 The platform scripts change their working directory to `platform/`, so relative paths such as `configs/baseline_r1_domestic_rolling.yaml`, `data/`, and `results/platform/` are platform-local.
@@ -72,7 +75,7 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 - Standardized experiment reports with optional baseline comparison under `reports/experiments/`.
 - Research-grade metrics: annualized return, volatility, max drawdown, Sharpe, turnover, trade/order counts, rejection counts, pending-intent pressure, and cash drag.
 - CSV-only visualization module for NAV/drawdown, position weights, cash/pending-intent effects, and rejected-order reasons.
-- Local Streamlit dashboard for strategy configs, run metrics, NAV/drawdown, positions, orders, and trades.
+- Local Streamlit dashboard with four pages: overview, run analysis (net-value/return display with trailing-window rebasing, benchmark overlay and excess-return curve, monthly return heatmap, yearly returns, rolling volatility/Sharpe, training vs frozen-sample table, positions with cash layer, orders and trades), run comparison (2-5 runs re-normalized at the selected window start), and strategy configs.
 - Start-date sensitivity analysis for research submissions should use one start date every 2 calendar months with the sample capped at `2025-06-30`; ad hoc diagnostic runs may use other step sizes when clearly labeled.
 - HFQ validation against the old research data chain.
 
