@@ -9,6 +9,7 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 - `scripts/run_sim_portfolio.py`: create or advance a simulated portfolio from a checkpoint.
 - `scripts/sync_platform_data.py`: sync platform market and fundamental data.
 - `scripts/run_sensitivity.py`: start-date sensitivity analysis.
+- `scripts/run_dashboard.py`: launch the local read-only browser dashboard.
 - `scripts/validate_hfq_data.py`: compare platform adjusted close against the research HFQ chain.
 - `src/platform_core/`: platform engine package.
   - `models.py`: assets, bars, positions, orders, trades, portfolio state.
@@ -41,6 +42,7 @@ Run from the repository root:
 .\env\python.exe platform\scripts\validate_hfq_data.py --codes 510300 518880 511260
 .\env\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
+.\env\python.exe platform\scripts\run_dashboard.py
 ```
 
 The platform scripts change their working directory to `platform/`, so relative paths such as `configs/baseline_r1_domestic_rolling.yaml`, `data/`, and `results/platform/` are platform-local.
@@ -70,6 +72,7 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 - Standardized experiment reports with optional baseline comparison under `reports/experiments/`.
 - Research-grade metrics: annualized return, volatility, max drawdown, Sharpe, turnover, trade/order counts, rejection counts, pending-intent pressure, and cash drag.
 - CSV-only visualization module for NAV/drawdown, position weights, cash/pending-intent effects, and rejected-order reasons.
+- Local Streamlit dashboard for strategy configs, run metrics, NAV/drawdown, positions, orders, and trades.
 - Start-date sensitivity analysis for research submissions should use one start date every 2 calendar months with the sample capped at `2025-06-30`; ad hoc diagnostic runs may use other step sizes when clearly labeled.
 - HFQ validation against the old research data chain.
 
