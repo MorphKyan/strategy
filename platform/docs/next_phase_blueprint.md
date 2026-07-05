@@ -102,7 +102,14 @@
 
 推论：**不需要"定期误差抹平"功能。** 整手取整、几个 bp 价差落在策略的 `rebalance_threshold`/`weight_tolerance` 无交易区内，会在下次超阈值时一并修正。用户要的"用现实数据修正回放"入口，就是 ② reconcile 本身。
 
-### A1. 实盘镜像组合 `LivePortfolio`（新模块 `platform/src/platform_core/live.py`）
+### A1. 实盘镜像组合 `LivePortfolio`（已完成最小闭环，2026-07-05）
+
+**竣工说明（as-built，与下方原规格的差异）**：已实现 `platform/src/platform_core/live.py`（`reconcile` + `plan` + 下单票渲染）与入口 `platform/scripts/run_live_cycle.py`（`reconcile`/`plan` 子命令），测试在 `test_platform_live.py`。三处实现决策：
+1. **未接 SQLite store**（最小闭环文件即真相，元数据集成留待 A4 一起做）；
+2. 票面估价强制用 plan 日**收盘价**（覆盖配置的 `execution_price_field`）；
+3. **数据末日日历补丁**：实盘 plan 时 plan 日必然是数据最后一天，而 `is_month_end()` 等节奏判断把"日历末日"当月末，月频策略会天天触发。已在 plan 内给日历补一个"下一工作日"近似未来日，使实盘节奏与回测一致（极端情形：月末最后几个交易日全是节假日时当月触发顺延，可接受）。后续实现 A3/A4/A5 沿用以下原规格。
+
+原规格：
 
 与 `sim.py` 的 `SimPortfolio`（纸面自动撮合）是**两套环路**，不要合并成一个类加 if 分支。`LivePortfolio` 不自动撮合任何订单——现实才是撮合引擎。
 
@@ -137,7 +144,7 @@ class LivePortfolio:
 
 **验收：** pytest 覆盖 reconcile（CSV → state 正确、real_nav 追加）与 plan（有/无目标两分支；dry-run 不改 state_path 落盘内容）；手工端到端一次：造一份假持仓 CSV → reconcile → plan → 检查 ticket 文件人可读、股数是整手。
 
-### A2. 下单票契约
+### A2. 下单票契约（已随 A1 实现，2026-07-05；CSV 列与 TXT 版式按本节契约落地）
 
 `ticket_<date>.csv` 列：
 
@@ -284,8 +291,8 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 ### 9.3 建议施工顺序（每项一个独立会话/PR 即可完成）
 
-1. A1+A2：`live.py` 的 reconcile + plan + 下单票（核心价值，先跑通手动闭环）
-2. A3+A4：notify + `run_live_cycle.py` + 任务计划（闭环自动化）
+1. ~~A1+A2：`live.py` 的 reconcile + plan + 下单票~~ **已完成（2026-07-05）**：`live.py` + `run_live_cycle.py`（reconcile/plan），端到端验证通过（真实配置 + 全真数据出票）。SQLite 集成与 notify/cycle 留给下一步。
+2. A3+A4：notify + `run_live_cycle.py` 加 `cycle` 子命令 + 任务计划（闭环自动化）
 3. ~~B1：收益多尺度视图~~ **已完成（2026-07-05）**：净值/收益率双模式（收益率按区间首日归零）、区间选择、对数坐标、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、月度序列、滚动波动与滚动 Sharpe，持仓面积图含现金层。派生计算在 `artifacts.py`（`nav_analytics`/`rebase_benchmark`/`window_start_date`），测试在 `test_platform_dashboard.py`。
 4. B3+B4：sim/实盘组合页 + 组合总览列表（近 1 周/1 月/3 月/半年收益，配合 A 使用）
 5. A5：月度归因报告
