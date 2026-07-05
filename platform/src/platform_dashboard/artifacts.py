@@ -166,6 +166,22 @@ def nav_analytics(nav: pd.DataFrame) -> dict[str, pd.DataFrame]:
     return out
 
 
+TRAILING_MONTHS = {"近1月": 1, "近3月": 3, "近6月": 6, "近1年": 12, "近2年": 24, "近3年": 36}
+
+
+def window_start_date(last_date: Any, period: str) -> pd.Timestamp | None:
+    """把区间标签换算成起始日期；"全部"或未知标签返回 None（不裁剪）。
+
+    "今年"取 last_date 当年 1 月 1 日；"近N月/年"按日历偏移回看。
+    组合列表页（蓝图 B4）的近 N 期收益也应复用本函数保证口径一致。
+    """
+    if period in TRAILING_MONTHS:
+        return pd.Timestamp(last_date) - pd.DateOffset(months=TRAILING_MONTHS[period])
+    if period == "今年":
+        return pd.Timestamp(year=pd.Timestamp(last_date).year, month=1, day=1)
+    return None
+
+
 def rebase_benchmark(candidate: pd.DataFrame, benchmark: pd.DataFrame) -> pd.DataFrame:
     """把基准净值缩放到候选曲线的坐标系：首个共同交易日两线相交。
 

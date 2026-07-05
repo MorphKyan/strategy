@@ -14,6 +14,7 @@ from src.platform_dashboard.artifacts import (
     nav_analytics,
     read_run_tables,
     rebase_benchmark,
+    window_start_date,
 )
 
 
@@ -123,6 +124,15 @@ def test_rebase_benchmark_returns_empty_without_overlap() -> None:
     candidate = _make_nav("2025-01-01", 5, 0.001)
     benchmark = _make_nav("2025-03-01", 5, 0.001)
     assert rebase_benchmark(candidate, benchmark).empty
+
+
+def test_window_start_date_maps_period_labels() -> None:
+    last = pd.Timestamp("2026-07-03")
+    assert window_start_date(last, "近1月") == pd.Timestamp("2026-06-03")
+    assert window_start_date(last, "近2年") == pd.Timestamp("2024-07-03")
+    assert window_start_date(last, "今年") == pd.Timestamp("2026-01-01")
+    assert window_start_date(last, "全部") is None
+    assert window_start_date(last, "未知标签") is None
 
 
 def test_align_navs_rebases_to_common_window() -> None:

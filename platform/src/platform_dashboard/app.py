@@ -20,6 +20,7 @@ from src.platform_dashboard.artifacts import (
     platform_root,
     read_run_tables,
     rebase_benchmark,
+    window_start_date,
 )
 
 
@@ -162,50 +163,78 @@ def render_run_metrics(run: RunRecord) -> None:
             st.dataframe(frame, width="stretch", hide_index=True)
 
 
+PERFORMANCE_PERIODS = ["近1月", "近3月", "近6月", "今年", "近1年", "近2年", "近3年", "全部"]
+
+
 def render_performance(nav: pd.DataFrame, run: RunRecord, runs: list[RunRecord]) -> None:
     if nav.empty or "net_value" not in nav:
         st.info("该运行没有可展示的净值数据。")
         return
 
-    controls = st.columns([2, 1])
+    controls = st.columns([1.1, 3.2, 1.6, 0.7])
     others = [item for item in runs if item.run_id != run.run_id]
     with controls[0]:
-        benchmark_id = st.selectbox("基准对比", ["无", *[item.run_id for item in others]])
+        mode = st.radio("显示", ["净值", "收益率"], horizontal=True)
     with controls[1]:
-        log_scale = st.toggle("对数坐标", value=False, help="长区间复利曲线建议开启")
+        period = st.radio("区间", PERFORMANCE_PERIODS, index=len(PERFORMANCE_PERIODS) - 1, horizontal=True)
+    with controls[2]:
+        benchmark_id = st.selectbox("基准对比", ["无", *[item.run_id for item in others]])
+    with controls[3]:
+        log_scale = st.toggle("对数", value=False, disabled=mode == "收益率", help="长区间复利曲线建议开启")
 
-    benchmark_nav = pd.DataFrame()
+    start = window_start_date(nav["date"].max(), period)
+    window = nav if start is None else nav[nav["date"] >= start]
+    if len(window) < 2:
+        st.info("所选区间内的净值数据不足两天。")
+        return
+    window = window[["date", "net_value"]].copy()
+    base = float(window["net_value"].iloc[0])
+    if base == 0:
+        st.info("区间首日净值为 0，无法计算。")
+        return
+
+    benchmark_window = pd.DataFrame()
     if benchmark_id != "无":
         benchmark_run = next(item for item in others if item.run_id == benchmark_id)
-        benchmark_nav = rebase_benchmark(nav, run_tables(benchmark_run)["nav"])
-        if benchmark_nav.empty:
-            st.warning("与所选基准无重叠区间，无法对比。")
+        benchmark_window = rebase_benchmark(window, run_tables(benchmark_run)["nav"])
+        if benchmark_window.empty:
+            st.warning("与所选基准在该区间内无重叠，无法对比。")
+
+    as_return = mode == "收益率"
+
+    def display_series(values: pd.Series) -> pd.Series:
+        return values / base - 1.0 if as_return else values
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=nav["date"], y=nav["net_value"], name="本策略", line={"width": 2}))
-    if not benchmark_nav.empty:
+    fig.add_trace(
+        go.Scatter(x=window["date"], y=display_series(window["net_value"]), name="本策略", line={"width": 2})
+    )
+    if not benchmark_window.empty:
         fig.add_trace(
             go.Scatter(
-                x=benchmark_nav["date"],
-                y=benchmark_nav["net_value"],
+                x=benchmark_window["date"],
+                y=display_series(benchmark_window["net_value"]),
                 name=f"基准 · {benchmark_id}",
                 line={"width": 1.5, "dash": "dash", "color": "#888888"},
             )
         )
-    apply_time_axis(fig)
+    if as_return:
+        fig.add_hline(y=0, line_dash="dot", line_color="#999999")
+    fig.update_xaxes(rangeslider={"visible": True, "thickness": 0.06})
     fig.update_layout(
         height=460,
         margin={"l": 10, "r": 10, "t": 30, "b": 10},
-        yaxis_title="净值",
-        yaxis_type="log" if log_scale else "linear",
+        yaxis_title="区间收益" if as_return else "净值",
+        yaxis_tickformat=".1%" if as_return else None,
+        yaxis_type="log" if log_scale and not as_return else "linear",
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02},
     )
     st.plotly_chart(fig, width="stretch")
 
-    if not benchmark_nav.empty:
+    if not benchmark_window.empty:
         merged = pd.merge(
-            nav[["date", "net_value"]],
-            benchmark_nav.rename(columns={"net_value": "benchmark"}),
+            window,
+            benchmark_window.rename(columns={"net_value": "benchmark"}),
             on="date",
             how="inner",
         )
@@ -224,11 +253,14 @@ def render_performance(nav: pd.DataFrame, run: RunRecord, runs: list[RunRecord])
             )
             st.plotly_chart(excess, width="stretch")
 
-    if "drawdown" in nav:
-        drawdown = px.area(nav, x="date", y="drawdown", labels={"date": "日期", "drawdown": "回撤"})
-        drawdown.update_traces(line_color="#d9534f", fillcolor="rgba(217,83,79,0.25)")
-        drawdown.update_layout(height=260, margin={"l": 10, "r": 10, "t": 20, "b": 10}, yaxis_tickformat=".1%")
-        st.plotly_chart(drawdown, width="stretch")
+    drawdown_series = window["net_value"] / window["net_value"].cummax() - 1.0
+    drawdown_frame = pd.DataFrame({"date": window["date"], "drawdown": drawdown_series})
+    drawdown = px.area(drawdown_frame, x="date", y="drawdown", labels={"date": "日期", "drawdown": "回撤"})
+    drawdown.update_traces(line_color="#d9534f", fillcolor="rgba(217,83,79,0.25)")
+    drawdown.update_layout(height=260, margin={"l": 10, "r": 10, "t": 20, "b": 10}, yaxis_tickformat=".1%")
+    st.plotly_chart(drawdown, width="stretch")
+    if start is not None:
+        st.caption(f"区间：{window['date'].iloc[0].date()} → {window['date'].iloc[-1].date()}，回撤按区间内高点计算。")
 
 
 def render_return_decomposition(nav: pd.DataFrame) -> None:
