@@ -529,8 +529,10 @@ def render_configs(configs: list[ConfigRecord]) -> None:
         st.dataframe(assets[wanted] if wanted else assets, width="stretch", hide_index=True)
     with right:
         st.markdown("#### 策略参数")
+        # 值列统一转字符串：参数值有数字也有字符串（如 init_mode: calculate），
+        # 混合类型列无法序列化为 Arrow，会让 Streamlit 每次渲染都刷警告
         params = pd.DataFrame(
-            [{"参数": key, "值": value if not isinstance(value, (dict, list)) else str(value)} for key, value in record.params.items()]
+            [{"参数": str(key), "值": str(value)} for key, value in record.params.items()]
         )
         st.dataframe(params, width="stretch", hide_index=True)
 
