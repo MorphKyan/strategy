@@ -147,3 +147,15 @@ def test_align_navs_rebases_to_common_window() -> None:
     assert firsts["net_value"].tolist() == pytest.approx([1.0, 1.0])
     assert aligned["date"].min() == pd.Timestamp("2025-01-15")
     assert (aligned["drawdown"] <= 1e-12).all()
+
+
+def test_align_navs_rebases_at_start_date() -> None:
+    navs = {
+        "a": _make_nav("2025-01-01", 60, 0.001),
+        "b": _make_nav("2025-01-01", 60, 0.002, base=2.0),
+    }
+    aligned = align_navs(navs, overlap_only=True, start_date=pd.Timestamp("2025-02-01"))
+
+    assert aligned["date"].min() >= pd.Timestamp("2025-02-01")
+    firsts = aligned.groupby("run_id")["net_value"].first()
+    assert firsts.tolist() == pytest.approx([1.0, 1.0])

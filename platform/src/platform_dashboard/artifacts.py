@@ -204,9 +204,14 @@ def rebase_benchmark(candidate: pd.DataFrame, benchmark: pd.DataFrame) -> pd.Dat
     return right
 
 
-def align_navs(nav_map: dict[str, pd.DataFrame], overlap_only: bool = True) -> pd.DataFrame:
+def align_navs(
+    nav_map: dict[str, pd.DataFrame],
+    overlap_only: bool = True,
+    start_date: Any = None,
+) -> pd.DataFrame:
     """多回测净值对齐：可选裁剪到共同重叠区间，各自归一到区间首日 = 1.0。
 
+    start_date 非空时先把各序列裁剪到该日期之后再归一（用于"近N月"区间对比）。
     返回长表：run_id, date, net_value, drawdown。
     """
     cleaned: dict[str, pd.DataFrame] = {}
@@ -228,6 +233,12 @@ def align_navs(nav_map: dict[str, pd.DataFrame], overlap_only: bool = True) -> p
                 for run_id, frame in cleaned.items()
             }
             cleaned = {run_id: frame for run_id, frame in cleaned.items() if len(frame) >= 2}
+
+    if start_date is not None:
+        cleaned = {run_id: frame[frame["date"] >= pd.Timestamp(start_date)] for run_id, frame in cleaned.items()}
+        cleaned = {run_id: frame for run_id, frame in cleaned.items() if len(frame) >= 2}
+    if not cleaned:
+        return pd.DataFrame()
 
     parts: list[pd.DataFrame] = []
     for run_id, frame in cleaned.items():

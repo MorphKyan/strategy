@@ -32,17 +32,6 @@ DOWN_COLOR = "#1b8a3a"
 RETURN_COLORSCALE = [[0.0, "#1b8a3a"], [0.5, "#f7f7f7"], [1.0, "#c62828"]]
 MONTH_LABELS = [f"{month}月" for month in range(1, 13)]
 
-RANGE_BUTTONS = [
-    {"count": 1, "label": "1月", "step": "month", "stepmode": "backward"},
-    {"count": 3, "label": "3月", "step": "month", "stepmode": "backward"},
-    {"count": 6, "label": "6月", "step": "month", "stepmode": "backward"},
-    {"count": 1, "label": "今年", "step": "year", "stepmode": "todate"},
-    {"count": 1, "label": "1年", "step": "year", "stepmode": "backward"},
-    {"count": 3, "label": "3年", "step": "year", "stepmode": "backward"},
-    {"step": "all", "label": "全部"},
-]
-
-
 @st.cache_data(show_spinner=False)
 def cached_configs(root: str) -> list[ConfigRecord]:
     return discover_configs(Path(root))
@@ -74,13 +63,6 @@ def metric_text(value: Any, kind: str = "number") -> str:
     if kind == "integer":
         return f"{int(value):,}"
     return f"{float(value):.3f}"
-
-
-def apply_time_axis(fig: go.Figure, rangeslider: bool = True) -> None:
-    fig.update_xaxes(
-        rangeselector={"buttons": RANGE_BUTTONS},
-        rangeslider={"visible": rangeslider, "thickness": 0.06},
-    )
 
 
 def signed_colors(values: pd.Series) -> list[str]:
@@ -455,7 +437,14 @@ def render_comparison(runs: list[RunRecord]) -> None:
     if len(selected_ids) < 2:
         st.caption("请至少选择两个回测。")
         return
-    overlap_only = st.checkbox("仅对比共同重叠区间（各自归一到区间首日）", value=True)
+
+    controls = st.columns([1.1, 3.2, 2.3])
+    with controls[0]:
+        mode = st.radio("显示", ["净值", "收益率"], horizontal=True)
+    with controls[1]:
+        period = st.radio("区间", PERFORMANCE_PERIODS, index=len(PERFORMANCE_PERIODS) - 1, horizontal=True)
+    with controls[2]:
+        overlap_only = st.checkbox("仅对比共同重叠区间", value=True, help="各回测在区间首日对齐归一")
 
     selected_runs = [item for item in runs if item.run_id in selected_ids]
     nav_map = {item.run_id: run_tables(item)["nav"] for item in selected_runs}
@@ -463,18 +452,32 @@ def render_comparison(runs: list[RunRecord]) -> None:
     if aligned.empty:
         st.warning("所选回测没有可对齐的净值数据。")
         return
+    start = window_start_date(aligned["date"].max(), period)
+    if start is not None:
+        aligned = align_navs(nav_map, overlap_only=overlap_only, start_date=start)
+        if aligned.empty:
+            st.info("所选区间内没有足够的重叠净值数据。")
+            return
 
+    as_return = mode == "收益率"
     fig = go.Figure()
     for run_id, group in aligned.groupby("run_id"):
-        fig.add_trace(go.Scatter(x=group["date"], y=group["net_value"], name=run_id, line={"width": 1.8}))
-    apply_time_axis(fig)
+        values = group["net_value"] - 1.0 if as_return else group["net_value"]
+        fig.add_trace(go.Scatter(x=group["date"], y=values, name=run_id, line={"width": 1.8}))
+    if as_return:
+        fig.add_hline(y=0, line_dash="dot", line_color="#999999")
+    fig.update_xaxes(rangeslider={"visible": True, "thickness": 0.06})
     fig.update_layout(
         height=460,
         margin={"l": 10, "r": 10, "t": 30, "b": 10},
-        yaxis_title="归一净值",
+        yaxis_title="区间收益" if as_return else "归一净值",
+        yaxis_tickformat=".1%" if as_return else None,
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02},
     )
     st.plotly_chart(fig, width="stretch")
+    st.caption(
+        f"区间：{aligned['date'].min().date()} → {aligned['date'].max().date()}，各回测在区间首日对齐归一，回撤按区间内高点计算。"
+    )
 
     drawdown = go.Figure()
     for run_id, group in aligned.groupby("run_id"):
