@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -17,7 +18,7 @@ def main() -> int:
         "--server.address",
         "127.0.0.1",
         "--server.port",
-        "8501",
+        os.environ.get("PORT", "8501"),
         "--server.headless",
         "true",
         "--browser.gatherUsageStats",

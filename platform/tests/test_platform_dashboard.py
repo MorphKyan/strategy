@@ -6,7 +6,15 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.platform_dashboard.artifacts import discover_configs, discover_runs, latest_positions, read_run_tables
+from src.platform_dashboard.artifacts import (
+    align_navs,
+    discover_configs,
+    discover_runs,
+    latest_positions,
+    nav_analytics,
+    read_run_tables,
+    rebase_benchmark,
+)
 
 
 def test_discover_configs_reads_strategy_and_assets(tmp_path: Path) -> None:
@@ -71,3 +79,61 @@ def test_discover_runs_ignores_non_backtest_manifests(tmp_path: Path) -> None:
     report_dir.mkdir(parents=True)
     (report_dir / "manifest.json").write_text("{}", encoding="utf-8")
     assert discover_runs(tmp_path) == []
+
+
+def _make_nav(start: str, periods: int, daily_ret: float, base: float = 1.0) -> pd.DataFrame:
+    dates = pd.bdate_range(start, periods=periods)
+    values = base * (1 + daily_ret) ** pd.RangeIndex(periods)
+    return pd.DataFrame({"date": dates, "net_value": values})
+
+
+def test_nav_analytics_derives_multi_scale_returns() -> None:
+    nav = _make_nav("2024-07-01", 300, 0.001)
+    analytics = nav_analytics(nav)
+
+    assert analytics["daily"]["ret"].iloc[0] == pytest.approx(0.001)
+    monthly_pivot = analytics["monthly_pivot"]
+    assert set(monthly_pivot.index) == {2024, 2025}
+    assert list(monthly_pivot.columns) == list(range(1, 13))
+    # 2024 年度收益 = 2024 年内净值终点 / 起点 - 1
+    year_2024 = analytics["yearly"].set_index("year").loc["2024", "ret"]
+    nav_2024 = nav[nav["date"].dt.year == 2024]["net_value"]
+    assert year_2024 == pytest.approx(nav_2024.iloc[-1] / nav["net_value"].iloc[0] - 1)
+    assert "vol_60d" in analytics["rolling"].columns
+
+
+def test_nav_analytics_handles_empty_and_short_input() -> None:
+    for nav in (pd.DataFrame(), _make_nav("2025-01-01", 1, 0.0)):
+        analytics = nav_analytics(nav)
+        assert all(frame.empty for frame in analytics.values())
+
+
+def test_rebase_benchmark_intersects_and_scales() -> None:
+    candidate = _make_nav("2025-01-01", 10, 0.001)
+    benchmark = _make_nav("2025-01-08", 10, 0.002, base=100.0)
+    rebased = rebase_benchmark(candidate, benchmark)
+
+    common_start = rebased["date"].min()
+    candidate_at_start = candidate.loc[candidate["date"] == common_start, "net_value"].iloc[0]
+    assert rebased["net_value"].iloc[0] == pytest.approx(candidate_at_start)
+    assert rebased["date"].max() <= candidate["date"].max()
+
+
+def test_rebase_benchmark_returns_empty_without_overlap() -> None:
+    candidate = _make_nav("2025-01-01", 5, 0.001)
+    benchmark = _make_nav("2025-03-01", 5, 0.001)
+    assert rebase_benchmark(candidate, benchmark).empty
+
+
+def test_align_navs_rebases_to_common_window() -> None:
+    navs = {
+        "a": _make_nav("2025-01-01", 30, 0.001),
+        "b": _make_nav("2025-01-15", 30, -0.001, base=2.0),
+    }
+    aligned = align_navs(navs, overlap_only=True)
+
+    assert set(aligned["run_id"]) == {"a", "b"}
+    firsts = aligned.groupby("run_id").first()
+    assert firsts["net_value"].tolist() == pytest.approx([1.0, 1.0])
+    assert aligned["date"].min() == pd.Timestamp("2025-01-15")
+    assert (aligned["drawdown"] <= 1e-12).all()
