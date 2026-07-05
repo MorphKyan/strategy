@@ -22,6 +22,7 @@ This directory contains the newer daily event-driven platform runtime. It is sep
   - `experiment.py`: experiment orchestration and report/archive writing.
   - `data_validation.py`: HFQ data-chain comparison helpers.
   - `sim.py`: simulated portfolio continuation from checkpoints.
+  - `corporate_actions.py`: shared split loading and effective-date application for engine and sim.
   - `storage.py`: SQLite metadata store.
 - `src/platform_dashboard/`: local read-only Streamlit dashboard.
   - `app.py`: page rendering (overview, run analysis, run comparison, strategy configs).
@@ -64,7 +65,7 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 
 - Daily event loop with per-day checkpoints.
 - Raw (unadjusted) price-based valuation and trade execution engine, which eliminates implicit compounding and cash drag.
-- Corporate action modeling: stock splits are processed on `split_date` by scaling held positions, and cash dividends are recorded as `dividend_receivables` on `ex_date` and paid out on `payment_date`.
+- Corporate action modeling: share splits take effect on the first real bar date after `split_date` (prices reflect the split only from that day; see `corporate_actions.py` and `reports/split_effective_date_fix_report.md`), and cash dividends are recorded as `dividend_receivables` on `ex_date` and paid out on `payment_date`.
 - Single target-weight strategy configuration per platform config (strategies calculate signals on smooth `adj_close`).
 - Cash, position, cost-basis, pending-intent, and cooldown state.
 - Fee, lot-size, suspension, limit-up, and limit-down execution checks.

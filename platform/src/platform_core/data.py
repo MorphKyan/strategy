@@ -205,6 +205,18 @@ class LocalCsvBarData:
     def prices_on(self, current_date: date) -> dict[str, float]:
         return {asset_id: bar.close for asset_id, bar in self.bars_on(current_date).items()}
 
+    def first_bar_date_after(self, asset_id: str, after_date: date) -> date | None:
+        """该资产在 after_date 之后第一个有真实行情行的日期。
+
+        bars_on() 对缺失日会用前收合成停牌 bar，那种日期不算；只认 CSV 里真实存在的行。
+        用于份额拆分生效日解析：价格要到拆分基准日后的首个真实交易日才反映除权。
+        """
+        frame = self.frames.get(asset_id)
+        if frame is None:
+            return None
+        later = [d for d in frame.index if d > after_date]
+        return min(later) if later else None
+
     def is_month_end(self, current_date: date) -> bool:
         try:
             idx = self.calendar.index(current_date)

@@ -10,6 +10,7 @@ from typing import Any
 
 import yaml
 
+from src.platform_core.corporate_actions import apply_due_splits, load_splits, resolve_split_effective_dates
 from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import MarketDataStore
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
@@ -96,7 +97,7 @@ class PlatformBacktestEngine:
         
         self.code_to_asset_id = {asset.code: asset_id for asset_id, asset in self.assets.items()}
         self.dividends = self._load_dividends()
-        self.splits = self._load_splits()
+        self.splits = load_splits(self.config)
 
     def _load_dividends(self) -> list[dict[str, Any]]:
         platform_dir = Path(__file__).resolve().parent.parent.parent
@@ -115,27 +116,12 @@ class PlatformBacktestEngine:
                 })
         return dividends
 
-    def _load_splits(self) -> list[dict[str, Any]]:
-        platform_dir = Path(__file__).resolve().parent.parent.parent
-        path = platform_dir / "data" / "platform_splits.csv"
-        if not path.exists():
-            return []
-        splits = []
-        with path.open("r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                splits.append({
-                    "code": row["code"].strip(),
-                    "split_date": parse_date(row["split_date"].strip()),
-                    "split_ratio": float(row["split_ratio"].strip()),
-                })
-        return splits
-
     def run(self) -> PlatformBacktestResult:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self._write_config_snapshot()
         backtest_id = self.store.record_backtest(self.run_id, self.config, self.output_dir)
+        resolve_split_effective_dates(self.splits, self.code_to_asset_id, self.data)
 
         state = self._initial_state()
         nav_rows: list[dict[str, Any]] = []
@@ -148,15 +134,8 @@ class PlatformBacktestEngine:
         active_strategy_version_id: int | None = None
 
         for current_date in self.data.calendar:
-            # 1. Process Splits
-            for split in self.splits:
-                if split["split_date"] == current_date:
-                    asset_id = self.code_to_asset_id.get(split["code"])
-                    if asset_id and asset_id in state.positions:
-                        pos = state.positions[asset_id]
-                        if pos.quantity > 0:
-                            pos.quantity *= split["split_ratio"]
-                            pos.cost_basis /= split["split_ratio"]
+            # 1. Process Splits（在 split_date 后首个真实交易日生效，见 corporate_actions）
+            apply_due_splits(self.splits, state, self.code_to_asset_id, current_date)
 
             # 2. Process Ex-Dividends
             for div in self.dividends:

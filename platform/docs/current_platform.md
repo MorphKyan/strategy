@@ -18,7 +18,7 @@
 1. 平台回测使用日频事件驱动引擎，入口是 `platform/scripts/run_platform_backtest.py`。
 2. 策略只返回目标权重；订单生成、费用、lot size、涨跌停、停牌、未成交重试和交易记录由执行层负责。
 3. 回测估值和交易执行使用无复权原始价格；策略信号可以读取平滑后的 `adj_close`。
-4. 企业行为在平台内显式建模：拆分在 `split_date` 调整持仓数量和成本，现金分红在 `ex_date` 记入 `dividend_receivables`，在 `payment_date` 转入现金。
+4. 企业行为在平台内显式建模：份额拆分在 `split_date`（基准日）之后该资产**首个真实行情日**生效（数据源价格届时才除权，基准日常停牌或价格未除权；共享逻辑在 `corporate_actions.py`，背景见 `reports/split_effective_date_fix_report.md`）；现金分红在 `ex_date` 记入 `dividend_receivables`，在 `payment_date` 转入现金。
 5. checkpoint 保存完整组合状态，包括现金、持仓、成本、待执行意图、冷却池、策略状态、最后处理日期和应收分红。
 6. 旧 `run_strategy(df, config)` 接口不迁移；平台策略必须实现 `Strategy.generate_targets(context)`。
 

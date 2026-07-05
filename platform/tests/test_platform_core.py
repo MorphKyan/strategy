@@ -443,6 +443,135 @@ def test_platform_backtest_executes_signal_next_day_at_open(tmp_path: Path):
     assert float(trades[0]["quantity"]) == pytest.approx(99.0)
 
 
+def _split_config(tmp_path: Path, data_dir: Path, splits_csv: Path, universe: list[str], assets: list[dict], end_date: str) -> dict:
+    return {
+        "platform": {"run_name": "split_test"},
+        "data": {"data_dir": str(data_dir), "splits_csv": str(splits_csv)},
+        "assets": assets,
+        "portfolio": {"initial_cash": 10000.0, "initial_equity": 10000.0, "initial_positions": []},
+        "backtest": {"start_date": "2024-01-02", "end_date": end_date},
+        "execution": {"fee": {"rate": 0.0, "min_fee": 0.0}, "weight_tolerance": 0.0001},
+        "strategy": {
+            "strategy_name": "monthly_equal_weight",
+            "strategy_version_id": None,
+            "params": {"universe": universe, "rebalance_on_start": True},
+        },
+        "output": {"results_dir": str(tmp_path / "results")},
+    }
+
+
+def _read_rows(path: Path) -> list[dict]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def test_split_on_suspended_date_applies_on_resumption_without_nav_spike(tmp_path: Path):
+    """512890 型：拆分基准日停牌（无行情行），复牌日价格减半。
+
+    旧逻辑在基准日把份额翻倍、却用停牌前向填充的旧价估值，产生单日净值假尖峰；
+    现在拆分应在复牌日（首个真实 bar）生效，净值全程连续。
+    """
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    # AAA 在 2024-01-04（拆分基准日）停牌缺行，2024-01-05 复牌价减半
+    (data_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor",
+                "AAA,2024-01-02,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-03,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-05,5,5,5,5,2000,10000,1",
+                "AAA,2024-01-08,5,5,5,5,2000,10000,1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    # BBB 每天都有行情，保证 2024-01-04 在交易日历里（复现真实组合场景）
+    (data_dir / "BBB.csv").write_text(
+        "\n".join(
+            [
+                "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor",
+                "BBB,2024-01-02,10,10,10,10,1000,10000,1",
+                "BBB,2024-01-03,10,10,10,10,1000,10000,1",
+                "BBB,2024-01-04,10,10,10,10,1000,10000,1",
+                "BBB,2024-01-05,10,10,10,10,1000,10000,1",
+                "BBB,2024-01-08,10,10,10,10,1000,10000,1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    splits_csv = tmp_path / "splits.csv"
+    splits_csv.write_text(
+        "code,split_date,split_ratio\nAAA,2024-01-04,2.0\n",
+        encoding="utf-8",
+    )
+    assets = [
+        {"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None},
+        {"asset_id": "B", "code": "BBB", "name": "BBB", "lot_size": 1, "price_limit_pct": None},
+    ]
+    config = _split_config(tmp_path, data_dir, splits_csv, ["A", "B"], assets, "2024-01-08")
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+    finally:
+        store.close()
+
+    nav_rows = _read_rows(result.output_dir / "nav.csv")
+    values = [float(row["net_value"]) for row in nav_rows]
+    daily_moves = [abs(b / a - 1.0) for a, b in zip(values, values[1:])]
+    assert max(daily_moves) < 0.01, f"净值出现拆分假尖峰: {values}"
+
+    position_rows = _read_rows(result.output_dir / "positions.csv")
+    qty_by_date = {row["date"]: float(row["quantity"]) for row in position_rows if row["asset_id"] == "A"}
+    # 基准日（停牌）数量不变，复牌日翻倍
+    assert qty_by_date["2024-01-04"] == pytest.approx(qty_by_date["2024-01-03"])
+    assert qty_by_date["2024-01-05"] == pytest.approx(qty_by_date["2024-01-03"] * 2.0)
+
+
+def test_split_on_traded_but_unadjusted_date_applies_next_bar(tmp_path: Path):
+    """510500 型：拆分基准日有成交但价格仍未除权，次日才除权。
+
+    拆分应在基准日之后的首个真实 bar（次日）生效，而不是基准日当天。
+    """
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor",
+                "AAA,2024-01-02,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-03,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-04,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-05,5,5,5,5,2000,10000,1",
+                "AAA,2024-01-08,5,5,5,5,2000,10000,1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    splits_csv = tmp_path / "splits.csv"
+    splits_csv.write_text(
+        "code,split_date,split_ratio\nAAA,2024-01-04,2.0\n",
+        encoding="utf-8",
+    )
+    assets = [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None}]
+    config = _split_config(tmp_path, data_dir, splits_csv, ["A"], assets, "2024-01-08")
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+    finally:
+        store.close()
+
+    nav_rows = _read_rows(result.output_dir / "nav.csv")
+    values = [float(row["net_value"]) for row in nav_rows]
+    daily_moves = [abs(b / a - 1.0) for a, b in zip(values, values[1:])]
+    assert max(daily_moves) < 0.01, f"净值出现拆分假尖峰: {values}"
+
+    position_rows = _read_rows(result.output_dir / "positions.csv")
+    qty_by_date = {row["date"]: float(row["quantity"]) for row in position_rows if row["asset_id"] == "A"}
+    assert qty_by_date["2024-01-04"] == pytest.approx(qty_by_date["2024-01-03"])
+    assert qty_by_date["2024-01-05"] == pytest.approx(qty_by_date["2024-01-03"] * 2.0)
+
+
 def test_platform_backtest_uses_full_data_when_dates_are_omitted(tmp_path: Path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
