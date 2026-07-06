@@ -25,9 +25,10 @@ import json
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from src.platform_core.data import LocalCsvBarData
+from src.platform_core.data_store import MarketDataStore
 from src.platform_core.engine import load_strategy_config
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
 from src.platform_core.models import (
@@ -71,6 +72,17 @@ class PlanResult:
     text: str
 
 
+@dataclass
+class CycleResult:
+    portfolio_id: str
+    asof_date: date
+    synced: bool
+    skipped_non_trading: bool
+    reconciled: bool
+    plan: PlanResult | None
+    notified: bool
+
+
 TICKET_COLUMNS = [
     "date",
     "asset_id",
@@ -96,6 +108,7 @@ class LivePortfolio:
         self.strategy_config = load_strategy_config(config.get("strategy"))
 
         data_config = config.get("data", {})
+        self.data_fetch = bool(data_config.get("fetch", False))
         self.market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
 
         execution_config = config.get("execution", {})
@@ -254,6 +267,55 @@ class LivePortfolio:
         ticket_txt.write_text(text + "\n", encoding="utf-8")
         actionable = [row for row in rows if row["note"] == ""]
         return PlanResult(self.portfolio_id, plan_date, True, len(actionable), ticket_csv, ticket_txt, text)
+
+    # ---------------------------------------------------------------- cycle
+
+    def cycle(
+        self,
+        asof_date: str | date,
+        holdings_csv: str | Path | None = None,
+        cash: float | None = None,
+        do_sync: bool | None = None,
+        notifier: Callable[[str, str], bool] | None = None,
+        force: bool = False,
+    ) -> CycleResult:
+        """一条命令跑完整环路：sync →（可选）reconcile → plan →（可选）notify。
+
+        - holdings_csv 缺省时跳过 reconcile，直接用上次对齐的状态 plan（推荐的
+          自动化节奏：定时任务每天只 plan，用户实际下单后才手动 reconcile）。
+        - asof 不在交易日历里（周末/节假日/数据未同步到位）时直接跳过，
+          避免用陈旧 bar 重复出票；`force=True` 可强制按最近交易日出票。
+        - notifier 为 (title, text) -> bool 的可调用对象；推送失败不影响主流程。
+        """
+        asof = parse_date(asof_date)
+        synced = False
+        if do_sync or (do_sync is None and self.data_fetch):
+            self._sync_data(asof)
+            synced = True
+
+        data = self._load_data(asof)
+        if asof not in set(data.calendar) and not force:
+            return CycleResult(self.portfolio_id, asof, synced, True, False, None, False)
+
+        reconciled = False
+        if holdings_csv is not None:
+            if cash is None:
+                raise ValueError("reconcile 需要同时提供 cash（真实账户现金余额）。")
+            self.reconcile(holdings_csv, cash=cash, asof_date=asof)
+            reconciled = True
+
+        plan_result = self.plan(asof)
+        notified = False
+        if notifier is not None:
+            title = f"调仓提醒 {date_str(plan_result.plan_date)}" if plan_result.has_target else f"组合无操作 {date_str(plan_result.plan_date)}"
+            notified = bool(notifier(title, plan_result.text))
+        return CycleResult(self.portfolio_id, asof, synced, False, reconciled, plan_result, notified)
+
+    def _sync_data(self, end: date) -> None:
+        market_store = MarketDataStore(self.market_dir)
+        state = self._load_state()
+        start = date_str(state.last_date) if state and state.last_date else (self.config.get("backtest") or {}).get("start_date")
+        market_store.sync_assets(list(self.assets.values()), start=start, end=date_str(end), fetch=True)
 
     # ---------------------------------------------------------------- helpers
 

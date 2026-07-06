@@ -165,13 +165,17 @@ weight_before, weight_target, est_fee, note
 
 无调仓日的正文固定为一行："【无操作】<date> 组合权重在阈值带内，今日无需交易。"
 
-### A3. 通知模块（新文件 `platform/src/platform_core/notify.py`）
+### A3. 通知模块（已完成，2026-07-05）
+
+**竣工说明**：`notify.py` 已实现，Server酱 + SMTP 双渠道，`send_notification()` 永不抛异常。比原规格多一项：**渠道零配置自动发现**——设了 `RQ_SERVERCHAN_KEY` 或 `RQ_SMTP_HOST/USERNAME/PASSWORD/TO` 环境变量即自动启用对应渠道，YAML 里的 `notify.channels` 块变成可选的显式覆盖（存在时优先）。原规格：
 
 - 接口：`def send_notification(title: str, text: str, config: dict) -> bool`，失败打日志返回 False，**绝不抛异常中断主流程**（票已落盘，推送失败无非手动去看）。
 - 首选实现两个渠道即可：**Server 酱（微信）** 和 **SMTP 邮件**（互为备份，都是 ~30 行的 HTTP GET / smtplib）。Telegram/企业微信等以后按需加。
 - 密钥走环境变量（如 `RQ_SERVERCHAN_KEY`），配置文件里只写渠道名，**密钥不入库不入 git**。
 
-### A4. 统一入口脚本 + 调度（新脚本 `platform/scripts/run_live_cycle.py`）
+### A4. 统一入口脚本 + 调度（已完成，2026-07-05）
+
+**竣工说明**：`run_live_cycle.py` 三个子命令齐了（reconcile/plan/cycle）。`cycle` = （`--sync` 或 config `data.fetch` 时）同步行情 → （给了 `--holdings --cash` 时）reconcile → plan → （`--notify` 时）推送；asof 不在交易日历（周末/节假日/数据未更新到当日）时直接跳过不重复出票，`--force` 可强制按最近交易日出票。编排逻辑在 `LivePortfolio.cycle()`（notifier 可注入，便于测试）。任务计划注册命令见脚本 docstring（**未替用户注册**——需先设好通知环境变量再自行执行 schtasks）。原规格：
 
 ```
 run_live_cycle.py reconcile --portfolio <id> --holdings <csv> --cash <float> [--asof-date d]
@@ -292,7 +296,7 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 ### 9.3 建议施工顺序（每项一个独立会话/PR 即可完成）
 
 1. ~~A1+A2：`live.py` 的 reconcile + plan + 下单票~~ **已完成（2026-07-05）**：`live.py` + `run_live_cycle.py`（reconcile/plan），端到端验证通过（真实配置 + 全真数据出票）。SQLite 集成与 notify/cycle 留给下一步。
-2. A3+A4：notify + `run_live_cycle.py` 加 `cycle` 子命令 + 任务计划（闭环自动化）
+2. ~~A3+A4：notify + cycle + 任务计划~~ **已完成（2026-07-05）**：`notify.py`（Server酱/SMTP，环境变量零配置自动发现）+ `cycle` 子命令（非交易日自动跳过）。任务计划命令已写进脚本 docstring，由用户设好推送密钥后自行注册。
 3. ~~B1：收益多尺度视图~~ **已完成（2026-07-05）**：净值/收益率双模式（收益率按区间首日归零）、区间选择、对数坐标、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、月度序列、滚动波动与滚动 Sharpe，持仓面积图含现金层。派生计算在 `artifacts.py`（`nav_analytics`/`rebase_benchmark`/`window_start_date`），测试在 `test_platform_dashboard.py`。
 4. B3+B4：sim/实盘组合页 + 组合总览列表（近 1 周/1 月/3 月/半年收益，配合 A 使用）
 5. A5：月度归因报告
