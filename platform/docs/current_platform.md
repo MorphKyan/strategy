@@ -39,7 +39,7 @@
 - 起始日期敏感性分析入口。
 - HFQ 数据链校验入口。
 - 平台市场数据同步入口。
-- 实盘镜像组合最小闭环（`platform/src/platform_core/live.py` + `scripts/run_live_cycle.py`）：`reconcile` 导入真实持仓+现金覆盖组合状态并记录真实净值（mark-to-real，误差每日清零不累积）；`plan` 用真实权重+最新数据算目标，对执行引擎做 dry-run（整手取整/现金上限/费用与回测同口径）产出人可照做的"明日下单票"（`tickets/ticket_<date>.csv/.txt`），绝不模拟成交。产物在 `results/live_portfolios/<id>/`。
+- 实盘镜像组合闭环（`platform/src/platform_core/live.py` + `notify.py` + `scripts/run_live_cycle.py`）：`reconcile` 导入真实持仓+现金覆盖组合状态并记录真实净值（mark-to-real，误差每日清零不累积）；`plan` 用真实权重+最新数据算目标，对执行引擎做 dry-run（整手取整/现金上限/费用与回测同口径）产出人可照做的"明日下单票"（`tickets/ticket_<date>.csv/.txt`），绝不模拟成交；`cycle` 一键编排 sync→reconcile→plan→notify（非交易日自动跳过），推送支持 Server酱/SMTP（环境变量 `RQ_SERVERCHAN_KEY` 或 `RQ_SMTP_*` 零配置启用，失败不中断主流程）。产物在 `results/live_portfolios/<id>/`。
 - 本地只读 Streamlit 看板（`platform/src/platform_dashboard/`）：概览、回测分析（净值/收益率双模式 + 近N月区间归零、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、滚动波动/Sharpe、训练 vs 冻结样本对照、含现金层的持仓面积图、订单与交易表）、回测对比（2–5 个回测在所选区间首日对齐归一 + 指标对照表）、策略配置浏览。
 
 ## 内置策略范围
@@ -74,10 +74,11 @@
 .\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date <YYYY-MM-DD>
 .\env\Scripts\python.exe platform\scripts\run_dashboard.py
 .\env\Scripts\python.exe platform\scripts\run_live_cycle.py reconcile --config configs\baseline_r1_domestic_rolling.yaml --holdings <holdings.csv> --cash <float> [--asof-date YYYY-MM-DD]
-.\env\Scripts\python.exe platform\scripts\run_live_cycle.py plan --config configs\baseline_r1_domestic_rolling.yaml [--asof-date YYYY-MM-DD]
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py plan --config configs\baseline_r1_domestic_rolling.yaml [--asof-date YYYY-MM-DD] [--notify]
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\baseline_r1_domestic_rolling.yaml [--sync] [--notify] [--holdings <csv> --cash <float>] [--force]
 ```
 
-看板默认端口 8501，可用 `PORT` 环境变量覆盖。实盘 `run_live_cycle.py` 的持仓文件表头为 `code,quantity[,cost_basis]`；跑之前先同步行情，否则被 7 天数据新鲜度闸门拦下。
+看板默认端口 8501，可用 `PORT` 环境变量覆盖。实盘 `run_live_cycle.py` 的持仓文件表头为 `code,quantity[,cost_basis]`；`reconcile`/`plan` 单独使用时先同步行情（否则被 7 天数据新鲜度闸门拦下），`cycle --sync` 会自动同步；每个工作日收盘后定时跑 `cycle --sync --notify` 的任务计划注册命令见脚本 docstring。
 
 平台脚本会把工作目录切到 `platform/`，因此脚本参数中的 `configs/`、`data/`、`results/` 等相对路径均按平台目录解析。
 
