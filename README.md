@@ -36,6 +36,10 @@ Common commands (executed from repository root):
 
 # Launch the local read-only dashboard (default port 8501, override with PORT)
 .\env\Scripts\python.exe platform\scripts\run_dashboard.py
+
+# Live-mirror portfolio: import real holdings, then plan next-day order tickets
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py reconcile --config configs\baseline_r1_domestic_rolling.yaml --holdings my_holdings.csv --cash 12345.67
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\baseline_r1_domestic_rolling.yaml --sync --notify
 ```
 
 Relative paths in platform commands are resolved from `platform/`.
