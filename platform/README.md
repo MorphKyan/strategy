@@ -10,6 +10,7 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 - `scripts/sync_platform_data.py`: sync platform market and fundamental data.
 - `scripts/run_sensitivity.py`: start-date sensitivity analysis.
 - `scripts/run_dashboard.py`: launch the local read-only browser dashboard (port defaults to 8501, override with the `PORT` environment variable).
+- `scripts/run_live_cycle.py`: live-mirror portfolio entry — `reconcile` overwrites state from real holdings, `plan` renders the next-day order ticket, `cycle` chains sync/reconcile/plan/notify and skips non-trading days (Task Scheduler command in the docstring).
 - `scripts/validate_hfq_data.py`: compare platform adjusted close against the research HFQ chain.
 - `src/platform_core/`: platform engine package.
   - `models.py`: assets, bars, positions, orders, trades, portfolio state.
@@ -22,6 +23,8 @@ This directory contains the newer daily event-driven platform runtime. It is sep
   - `experiment.py`: experiment orchestration and report/archive writing.
   - `data_validation.py`: HFQ data-chain comparison helpers.
   - `sim.py`: simulated portfolio continuation from checkpoints.
+  - `live.py`: live-mirror portfolio (mark-to-real reconcile + dry-run order-ticket planning + cycle orchestration; never simulates fills).
+  - `notify.py`: push notifications (ServerChan/WeChat and SMTP; auto-enabled via RQ_SERVERCHAN_KEY or RQ_SMTP_* env vars; failures never break the flow).
   - `corporate_actions.py`: shared split loading and effective-date application for engine and sim.
   - `storage.py`: SQLite metadata store.
 - `src/platform_dashboard/`: local read-only Streamlit dashboard.
@@ -48,6 +51,9 @@ Use `.\env\Scripts\python.exe` for venv/uv layouts, or substitute `.\env\python.
 .\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
 .\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
 .\env\Scripts\python.exe platform\scripts\run_dashboard.py
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py reconcile --config configs\baseline_r1_domestic_rolling.yaml --holdings <holdings.csv> --cash <float>
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py plan --config configs\baseline_r1_domestic_rolling.yaml
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\baseline_r1_domestic_rolling.yaml --sync --notify
 ```
 
 The platform scripts change their working directory to `platform/`, so relative paths such as `configs/baseline_r1_domestic_rolling.yaml`, `data/`, and `results/platform/` are platform-local.
