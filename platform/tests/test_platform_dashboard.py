@@ -159,3 +159,12 @@ def test_align_navs_rebases_at_start_date() -> None:
     assert aligned["date"].min() >= pd.Timestamp("2025-02-01")
     firsts = aligned.groupby("run_id")["net_value"].first()
     assert firsts.tolist() == pytest.approx([1.0, 1.0])
+
+
+def test_align_navs_returns_empty_when_overlap_required_but_absent() -> None:
+    navs = {
+        "a": _make_nav("2025-01-01", 5, 0.001),
+        "b": _make_nav("2025-03-01", 5, 0.002),
+    }
+
+    assert align_navs(navs, overlap_only=True).empty

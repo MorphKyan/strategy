@@ -6,6 +6,7 @@ This directory owns ETF screening and basket construction. It is intentionally s
 
 1. Define ETF candidates by sleeve in `config/etf_universe.yaml`.
 2. Run sleeve screening:
+Use `.\env\Scripts\python.exe` for venv/uv layouts, or substitute `.\env\python.exe` when the local environment exposes Python there.
 
 ```powershell
 .\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml

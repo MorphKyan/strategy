@@ -46,6 +46,7 @@ class LocalCsvBarData:
         if self.end_date and hasattr(self.end_date, "date"):
             self.end_date = self.end_date.date()
         self.quality = DataQualityReport()
+        self.real_bar_dates: dict[str, list[date]] = {}
         self.frames = self._load_frames()
         self.calendar = self._build_calendar()
         self._aligned_adj_close = pd.DataFrame({
@@ -128,6 +129,7 @@ class LocalCsvBarData:
                     normalized[field_name] = pd.to_numeric(raw[source], errors="coerce").fillna(0.0)
 
             normalized = normalized.sort_values("date").dropna(subset=["close"])
+            self.real_bar_dates[asset.asset_id] = normalized["date"].tolist()
             if self.start_date:
                 normalized = normalized[normalized["date"] >= self.start_date]
             if self.end_date:
@@ -211,10 +213,10 @@ class LocalCsvBarData:
         bars_on() 对缺失日会用前收合成停牌 bar，那种日期不算；只认 CSV 里真实存在的行。
         用于份额拆分生效日解析：价格要到拆分基准日后的首个真实交易日才反映除权。
         """
-        frame = self.frames.get(asset_id)
-        if frame is None:
+        dates = self.real_bar_dates.get(asset_id)
+        if not dates:
             return None
-        later = [d for d in frame.index if d > after_date]
+        later = [d for d in dates if d > after_date]
         return min(later) if later else None
 
     def is_month_end(self, current_date: date) -> bool:

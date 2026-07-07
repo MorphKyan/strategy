@@ -227,12 +227,13 @@ def align_navs(
     if overlap_only:
         start = max(frame["date"].min() for frame in cleaned.values())
         end = min(frame["date"].max() for frame in cleaned.values())
-        if start < end:
-            cleaned = {
-                run_id: frame[(frame["date"] >= start) & (frame["date"] <= end)]
-                for run_id, frame in cleaned.items()
-            }
-            cleaned = {run_id: frame for run_id, frame in cleaned.items() if len(frame) >= 2}
+        if start >= end:
+            return pd.DataFrame()
+        cleaned = {
+            run_id: frame[(frame["date"] >= start) & (frame["date"] <= end)]
+            for run_id, frame in cleaned.items()
+        }
+        cleaned = {run_id: frame for run_id, frame in cleaned.items() if len(frame) >= 2}
 
     if start_date is not None:
         cleaned = {run_id: frame[frame["date"] >= pd.Timestamp(start_date)] for run_id, frame in cleaned.items()}

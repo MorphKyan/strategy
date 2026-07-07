@@ -74,6 +74,8 @@
 .\env\Scripts\python.exe platform\scripts\run_dashboard.py
 ```
 
+上述命令默认使用 venv/uv 布局的 `.\env\Scripts\python.exe`；如果本地环境使用 conda/root 布局，可等价替换为 `.\env\python.exe`。
+
 看板默认端口 8501，可用 `PORT` 环境变量覆盖。
 
 平台脚本会把工作目录切到 `platform/`，因此脚本参数中的 `configs/`、`data/`、`results/` 等相对路径均按平台目录解析。

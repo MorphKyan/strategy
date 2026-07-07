@@ -271,7 +271,7 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 ### 9.1 环境与文档坑（实测核对于 2026-07-05）
 
-- **Python 解释器在 `env\Scripts\python.exe`**（uv venv 布局）。活文档（`AGENTS.md`/README/docs/SKILL.md）中曾写错为 `env\python.exe`，已于 2026-07-05 统一改正；`platform/reports/`、`research-dashboard/notes/` 等历史报告中的旧命令未改（历史产物不回写），复制历史报告里的命令时注意替换。
+- **Python 解释器允许两种本地布局**：uv/venv 布局使用 `env\Scripts\python.exe`，conda/root 布局使用 `env\python.exe`。活文档（`AGENTS.md`/README/docs/SKILL.md）中的命令优先展示 `env\Scripts\python.exe`，但可按本机布局等价替换；`platform/reports/`、`research-dashboard/notes/` 等历史报告中的旧命令未改（历史产物不回写），复制历史报告里的命令时注意按本机布局替换。
 - 平台脚本会把 cwd 切到 `platform/`，参数里 `configs/ data/ results/` 相对路径按 platform 目录解析。
 - 回测前先 `sync_all_market_data.py`，否则数据新鲜度闸门（7 天）会拦截。
 - 部分文档提到的 `baseline_mvp_equal_weight.yaml` 等旧配置名已不存在，现行基线是 `baseline_r0/r1_*` 系列，以 `platform/configs/` 实际文件为准。

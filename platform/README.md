@@ -37,6 +37,7 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 ## Commands
 
 Run from the repository root:
+Use `.\env\Scripts\python.exe` for venv/uv layouts, or substitute `.\env\python.exe` when the local environment exposes Python there.
 
 ```powershell
 .\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30

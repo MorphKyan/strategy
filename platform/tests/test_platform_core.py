@@ -572,6 +572,46 @@ def test_split_on_traded_but_unadjusted_date_applies_next_bar(tmp_path: Path):
     assert qty_by_date["2024-01-05"] == pytest.approx(qty_by_date["2024-01-03"] * 2.0)
 
 
+def test_historical_split_before_backtest_window_is_not_reapplied(tmp_path: Path):
+    """拆分真实生效日早于回测窗口时，不应漂移到窗口首日重复应用。"""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "AAA.csv").write_text(
+        "\n".join(
+            [
+                "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor",
+                "AAA,2024-01-03,10,10,10,10,1000,10000,1",
+                "AAA,2024-01-05,5,5,5,5,2000,10000,1",
+                "AAA,2024-01-08,5,5,5,5,2000,10000,1",
+                "AAA,2024-01-09,5,5,5,5,2000,10000,1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    splits_csv = tmp_path / "splits.csv"
+    splits_csv.write_text(
+        "code,split_date,split_ratio\nAAA,2024-01-04,2.0\n",
+        encoding="utf-8",
+    )
+    assets = [{"asset_id": "A", "code": "AAA", "name": "AAA", "lot_size": 1, "price_limit_pct": None}]
+    config = _split_config(tmp_path, data_dir, splits_csv, ["A"], assets, "2024-01-09")
+    config["backtest"]["start_date"] = "2024-01-08"
+    config["portfolio"]["initial_cash"] = 0.0
+    config["portfolio"]["initial_equity"] = 500.0
+    config["portfolio"]["initial_positions"] = [{"asset_id": "A", "quantity": 100.0, "cost_basis": 5.0}]
+
+    store = SQLiteStore(tmp_path / "platform.sqlite3")
+    try:
+        result = PlatformBacktestEngine(config, store).run()
+    finally:
+        store.close()
+
+    position_rows = _read_rows(result.output_dir / "positions.csv")
+    qty_by_date = {row["date"]: float(row["quantity"]) for row in position_rows if row["asset_id"] == "A"}
+    assert qty_by_date["2024-01-08"] == pytest.approx(100.0)
+    assert qty_by_date["2024-01-09"] == pytest.approx(100.0)
+
+
 def test_platform_backtest_uses_full_data_when_dates_are_omitted(tmp_path: Path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
