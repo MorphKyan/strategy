@@ -1,0 +1,1 @@
+D:\qcy_project\strategy\platform\results\backtests\r038_fixed_weight_threshold_train_stress\20260709_231549\monthly_equal_weight\r8_permanent_real_equal_weight_monthly_stress_baseline_20260709_231550_778362
