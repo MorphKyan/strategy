@@ -1456,3 +1456,8 @@ class RiskParityEWMACovStrategy(RiskParityLWCovStrategy):
 
 
 BUILTIN_STRATEGIES[RiskParityEWMACovStrategy.name] = RiskParityEWMACovStrategy
+
+# 扩展策略统一放在 strategies/ 包内（蓝图 C1 规范），在此 import 并注册
+from src.platform_core.strategies.fixed_weight import FixedWeightThresholdStrategy  # noqa: E402
+
+BUILTIN_STRATEGIES[FixedWeightThresholdStrategy.name] = FixedWeightThresholdStrategy

@@ -133,3 +133,6 @@ data_manifest.json
 
 # Local-only project map (shared between user and Claude, not for the repo)
 /PROJECT_MAP.md
+
+# Local Claude Code tooling config (preview launch config, etc.)
+/.claude/
