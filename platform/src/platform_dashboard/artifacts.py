@@ -63,6 +63,11 @@ def discover_configs(root: Path | None = None) -> list[ConfigRecord]:
     return records
 
 
+# 研究内部产物目录：单次敏感性分析会产生数百个原始 run（38 起点 × 3 场景 × 配置数），
+# 全部进看板会把启动拖到分钟级；结论看 reports/sensitivity 的汇总即可。
+EXCLUDED_RESULT_DIRS = {"sensitivity_raw", "backtest_cache"}
+
+
 def discover_runs(root: Path | None = None) -> list[RunRecord]:
     root = (root or platform_root()).resolve()
     results_dir = root / "results"
@@ -72,6 +77,8 @@ def discover_runs(root: Path | None = None) -> list[RunRecord]:
 
     for manifest_path in results_dir.rglob("manifest.json"):
         run_dir = manifest_path.parent
+        if EXCLUDED_RESULT_DIRS.intersection(manifest_path.parts):
+            continue
         if not (run_dir / "nav.csv").exists():
             continue
         try:

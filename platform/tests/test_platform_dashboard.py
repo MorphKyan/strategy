@@ -82,6 +82,16 @@ def test_discover_runs_ignores_non_backtest_manifests(tmp_path: Path) -> None:
     assert discover_runs(tmp_path) == []
 
 
+def test_discover_runs_skips_sensitivity_raw_and_cache(tmp_path: Path) -> None:
+    # 敏感性/缓存原始目录数量巨大（38 起点 × 3 场景），不进看板
+    for excluded in ("sensitivity_raw", "backtest_cache"):
+        run_dir = tmp_path / "results" / excluded / "strategy_x" / "run_1"
+        run_dir.mkdir(parents=True)
+        (run_dir / "manifest.json").write_text(json.dumps({"run_id": f"{excluded}_run"}), encoding="utf-8")
+        pd.DataFrame([{"date": "2025-01-01", "net_value": 1.0}]).to_csv(run_dir / "nav.csv", index=False)
+    assert discover_runs(tmp_path) == []
+
+
 def _make_nav(start: str, periods: int, daily_ret: float, base: float = 1.0) -> pd.DataFrame:
     dates = pd.bdate_range(start, periods=periods)
     values = base * (1 + daily_ret) ** pd.RangeIndex(periods)
