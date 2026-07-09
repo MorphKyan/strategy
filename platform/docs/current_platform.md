@@ -57,6 +57,7 @@
 - `cluster_representative_damped_risk_parity`
 - `risk_parity_gerber`
 - `risk_parity_ewma_cov`
+- `fixed_weight_threshold`（R038，永久组合式固定权重 + 5/25 阈值带；扩展策略按蓝图 C1 放在 `platform/src/platform_core/strategies/` 包内）
 
 失败或 research-only 策略不应继续注册在 `BUILTIN_STRATEGIES` 中。
 

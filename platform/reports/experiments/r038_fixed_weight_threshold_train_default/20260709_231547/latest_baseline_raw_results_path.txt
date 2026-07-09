@@ -1,0 +1,1 @@
+D:\qcy_project\strategy\platform\results\backtests\r038_fixed_weight_threshold_train_default\20260709_231547\monthly_equal_weight\r8_permanent_real_equal_weight_monthly_default_baseline_20260709_231548_887198
