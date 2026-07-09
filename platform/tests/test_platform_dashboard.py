@@ -83,8 +83,9 @@ def test_discover_runs_ignores_non_backtest_manifests(tmp_path: Path) -> None:
 
 
 def test_discover_runs_skips_sensitivity_raw_and_cache(tmp_path: Path) -> None:
-    # 敏感性/缓存原始目录数量巨大（38 起点 × 3 场景），不进看板
-    for excluded in ("sensitivity_raw", "backtest_cache"):
+    # 敏感性/缓存原始目录数量巨大（38 起点 × 3 场景），不进看板；
+    # sim/live 组合推进产物属于组合页（蓝图 B3/B4），混进回测列表会出现空行
+    for excluded in ("sensitivity_raw", "backtest_cache", "sim_portfolios", "live_portfolios"):
         run_dir = tmp_path / "results" / excluded / "strategy_x" / "run_1"
         run_dir.mkdir(parents=True)
         (run_dir / "manifest.json").write_text(json.dumps({"run_id": f"{excluded}_run"}), encoding="utf-8")
