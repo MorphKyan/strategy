@@ -39,7 +39,8 @@
 - 起始日期敏感性分析入口。
 - HFQ 数据链校验入口。
 - 平台市场数据同步入口。
-- 实盘镜像组合闭环（`platform/src/platform_core/live.py` + `notify.py` + `scripts/run_live_cycle.py`）：`reconcile` 导入真实持仓+现金覆盖组合状态并记录真实净值（mark-to-real，误差每日清零不累积）；`plan` 用真实权重+最新数据算目标，对执行引擎做 dry-run（整手取整/现金上限/费用与回测同口径）产出人可照做的"明日下单票"（`tickets/ticket_<date>.csv/.txt`），绝不模拟成交；`cycle` 一键编排 sync→reconcile→plan→每日估值→notify（非交易日自动跳过），推送支持 Server酱/SMTP（环境变量 `RQ_SERVERCHAN_KEY` 或 `RQ_SMTP_*` 零配置启用，失败不中断主流程）。每个交易日按收盘价对真实持仓 mark-to-market 并追加进 `real_nav.csv`（真实净值日频序列，供月度归因与组合列表页使用）；推送分两条——markdown 组合日报（总值/日变动/现金/各资产权重/阈值带状态）交易日必发，触发调仓时下单票作为独立第二条。产物在 `results/live_portfolios/<id>/`。
+- 实盘镜像组合闭环（`platform/src/platform_core/live.py` + `notify.py` + `scripts/run_live_cycle.py`）：`reconcile` 导入真实持仓+现金覆盖组合状态并记录真实净值（mark-to-real，误差每日清零不累积）；`plan` 用真实权重+最新数据算目标，对执行引擎做 dry-run（整手取整/现金上限/费用与回测同口径）产出人可照做的"明日下单票"（`tickets/ticket_<date>.csv/.txt`），绝不模拟成交；`cycle` 一键编排 sync→reconcile→plan→每日估值→notify（非交易日自动跳过），推送支持 Server酱/SMTP（环境变量 `RQ_SERVERCHAN_KEY` 或 `RQ_SMTP_*` 零配置启用，失败不中断主流程）。每个交易日按收盘价对真实持仓 mark-to-market 并追加进 `real_nav.csv`（真实净值日频序列，供月度归因与组合列表页使用）；推送分两条——markdown 组合日报（总值/日变动/现金/各资产权重/阈值带状态）交易日必发，触发调仓时下单票作为独立第二条。产物在 `results/live_portfolios/<id>/`。`cycle --shadow <sim_id>` 可让影子模拟组合每交易日增量跟跑（`SimPortfolio.load()` 从持久化状态恢复）。
+- 实盘月度归因（`platform/src/platform_core/attribution.py` + `scripts/report_live_attribution.py`）：对齐真实 `real_nav.csv` 与影子组合净值，输出区间收益差、年化 tracking error 与粗拆（现金拖累差 + 执行/结构残差），**只记录不改持仓**；收益观测不足 5 个判"样本不足仅存档"。报告写入 `reports/live/`（含真实账户金额，已 gitignore 不入库）。
 - 本地只读 Streamlit 看板（`platform/src/platform_dashboard/`）：概览、回测分析（净值/收益率双模式 + 近N月区间归零、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、滚动波动/Sharpe、训练 vs 冻结样本对照、含现金层的持仓面积图、订单与交易表）、回测对比（2–5 个回测在所选区间首日对齐归一 + 指标对照表）、策略配置浏览。
 
 ## 内置策略范围
@@ -76,7 +77,8 @@
 .\env\Scripts\python.exe platform\scripts\run_dashboard.py
 .\env\Scripts\python.exe platform\scripts\run_live_cycle.py reconcile --config configs\baseline_r1_domestic_rolling.yaml --holdings <holdings.csv> --cash <float> [--asof-date YYYY-MM-DD]
 .\env\Scripts\python.exe platform\scripts\run_live_cycle.py plan --config configs\baseline_r1_domestic_rolling.yaml [--asof-date YYYY-MM-DD] [--notify]
-.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\baseline_r1_domestic_rolling.yaml [--sync] [--notify] [--holdings <csv> --cash <float>] [--force]
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\baseline_r1_domestic_rolling.yaml [--sync] [--notify] [--holdings <csv> --cash <float>] [--force] [--shadow <sim_id>]
+.\env\Scripts\python.exe platform\scripts\report_live_attribution.py --live-id <live_id> --shadow-id <sim_id> [--month YYYY-MM] [--notify]
 ```
 
 上述命令默认使用 venv/uv 布局的 `.\env\Scripts\python.exe`；如果本地环境使用 conda/root 布局，可等价替换为 `.\env\python.exe`。
