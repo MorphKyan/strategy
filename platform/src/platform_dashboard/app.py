@@ -21,6 +21,8 @@ from src.platform_dashboard.artifacts import (
     read_run_tables,
     rebase_benchmark,
     window_start_date,
+    get_runs_signature,
+    get_configs_signature,
 )
 
 
@@ -33,12 +35,14 @@ RETURN_COLORSCALE = [[0.0, "#1b8a3a"], [0.5, "#f7f7f7"], [1.0, "#c62828"]]
 MONTH_LABELS = [f"{month}月" for month in range(1, 13)]
 
 @st.cache_data(show_spinner=False)
-def cached_configs(root: str) -> list[ConfigRecord]:
+def cached_configs(root: str, signature: str) -> list[ConfigRecord]:
+    del signature
     return discover_configs(Path(root))
 
 
 @st.cache_data(show_spinner=False)
-def cached_runs(root: str) -> list[RunRecord]:
+def cached_runs(root: str, signature: str) -> list[RunRecord]:
+    del signature
     return discover_runs(Path(root))
 
 
@@ -544,9 +548,14 @@ def render_configs(configs: list[ConfigRecord]) -> None:
 
 
 def main() -> None:
-    root = str(platform_root())
-    configs = cached_configs(root)
-    runs = cached_runs(root)
+    root_path = platform_root()
+    root = str(root_path)
+    
+    configs_sig = get_configs_signature(root_path)
+    runs_sig = get_runs_signature(root_path)
+    
+    configs = cached_configs(root, configs_sig)
+    runs = cached_runs(root, runs_sig)
     render_header()
     with st.sidebar:
         page = st.radio("导航", ["概览", "回测分析", "回测对比", "策略配置"])

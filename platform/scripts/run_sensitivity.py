@@ -44,7 +44,13 @@ def calendar_for_config(config: dict) -> list[str]:
         start_date=backtest.get("start_date"),
         end_date=backtest.get("end_date"),
     )
-    return [item.isoformat() for item in data.calendar]
+    if not data.calendar:
+        return []
+    universe = list(data.assets)
+    aligned = data.get_price_frame(universe, data.calendar[-1])
+    if aligned is None or aligned.empty:
+        return []
+    return [pd.Timestamp(item).date().isoformat() for item in aligned.index]
 
 
 def main() -> int:
@@ -52,6 +58,11 @@ def main() -> int:
     parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Platform config path.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
     parser.add_argument("--step", type=int, default=3, help="Trading-day step between start dates. Default: 3.")
+    parser.add_argument(
+        "--calendar-month-step",
+        type=int,
+        help="按自然月生成锚点，并取锚点当日或其后首个交易日；设置后优先于 --step。",
+    )
     parser.add_argument("--raw-root", default="results/sensitivity_raw", help="Root for raw sensitivity run artifacts.")
     parser.add_argument("--report-root", default="reports/sensitivity", help="Root for sensitivity summary reports.")
     parser.add_argument("--charts", action="store_true", help="Render per-run charts. Off by default because sensitivity can produce many runs.")
@@ -66,6 +77,8 @@ def main() -> int:
 
     if args.step <= 0:
         raise ValueError("--step must be positive.")
+    if args.calendar_month_step is not None and args.calendar_month_step <= 0:
+        raise ValueError("--calendar-month-step must be positive.")
 
     config_path = (ROOT / args.config).resolve() if not Path(args.config).is_absolute() else Path(args.config)
     db_path = (ROOT / args.db).resolve() if not Path(args.db).is_absolute() else Path(args.db)
@@ -80,7 +93,23 @@ def main() -> int:
     report_dir.mkdir(parents=True, exist_ok=True)
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    dates = calendar_for_config(base_config)[:: args.step]
+    calendar = calendar_for_config(base_config)
+    if args.calendar_month_step is None:
+        dates = calendar[:: args.step]
+    elif calendar:
+        trading_dates = pd.DatetimeIndex(pd.to_datetime(calendar))
+        anchors = pd.date_range(
+            trading_dates[0], trading_dates[-1], freq=pd.DateOffset(months=args.calendar_month_step)
+        )
+        positions = trading_dates.searchsorted(anchors, side="left")
+        dates = []
+        for position in positions:
+            if position < len(trading_dates):
+                value = trading_dates[position].date().isoformat()
+                if not dates or dates[-1] != value:
+                    dates.append(value)
+    else:
+        dates = []
     rows = []
     enable_db = (base_config.get("backtest") or {}).get("enable_database", False)
     if enable_db:
@@ -104,6 +133,7 @@ def main() -> int:
                     "sharpe_ratio",
                     "annualized_turnover",
                     "trade_count",
+                    "order_count",
                     "rejected_order_count",
                     "max_pending_intent_count",
                     "average_cash_weight",
@@ -119,6 +149,7 @@ def main() -> int:
     payload = {
         "config": str(config_path),
         "step": args.step,
+        "calendar_month_step": args.calendar_month_step,
         "slippage_scenario": args.slippage_scenario,
         "required_slippage_scenarios": list(REQUIRED_SLIPPAGE_SCENARIOS),
         "sample_count": len(rows),

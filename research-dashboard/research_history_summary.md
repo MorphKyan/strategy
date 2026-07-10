@@ -138,3 +138,9 @@ isk_parity_kernel_ncm | 最早可用有行情日至 2026-06-17 | IS: 0.65~1.72 v
 - 候选能降低部分 annualized_turnover，但没有换来稳定的 Sharpe 或更低回撤，不满足合入验收。
 
 **报告**：`platform/reports/r040_herc_cluster_risk_parity_failed_report.md`
+# R042 虚拟 30 年国债中国永久组合（Research-Only，2026-07-10）
+
+固定 `511260.SH` 后复权日收益乘 3 构造 `511260_3X.SH`，在 510300/512890/518880/虚拟债各 25% 与固定 5/25 阈值下完成三滑点训练、39 个严格自然月起点（936 runs）及冻结后最终测试。训练 Sharpe 相对 10Y 基线上升 0.270~0.277，主最终测试差为 -0.046~+0.006，均通过主门槛；但 `risk_parity` 与 `risk_parity_ewma` 两类迁移审计最终 Sharpe 均明显退化且回撤扩大超过 2 个百分点，故按预冻结规则标为 `Research-Only`，不替换 R038 真实 10Y 基线。详见 `platform/reports/r042_virtual_30y_permanent_portfolio_report.md`。
+# R043 补充（2026-07-11）
+
+`risk_parity_gerber_duration_trend` 按冻结的 252 日信号和 `1/1/3` 档位完成三滑点训练与 48 个自然月起点敏感性。主训练 Sharpe 基本持平但回撤恶化；敏感性 Sharpe 差中位数约 `-0.108~-0.109`，仅 `20.8%~22.9%` 起点达到 `-0.05` 下限。结论为 `Failed`，未运行最终测试，候选代码和配置已清理。详见 `platform/reports/r043_gerber_duration_trend_report.md`。

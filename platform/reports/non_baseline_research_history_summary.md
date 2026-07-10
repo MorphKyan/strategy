@@ -1277,3 +1277,9 @@
 **判定结果**：`Failed` / 物理拒绝。
 
 已从 `platform/src/platform_core/strategy.py` 删除 `HERCClusterRiskParityStrategy` 和 `BUILTIN_STRATEGIES` 注册；已删除 `platform/configs/r040_baseline_r7_cluster_representative_damped_3x.yaml`、`platform/configs/r040_herc_cluster_r2_global_ewma.yaml`、`platform/configs/r040_herc_cluster_r3_global_nasdaq_all_weather_ewma.yaml`、`platform/configs/r040_herc_cluster_r7_cluster_representative_damped_3x.yaml` 和 `tmp_r040_calendar_sensitivity.py`。历史实验报告和 raw artifacts 保留用于复核。完整报告见 `platform/reports/r040_herc_cluster_risk_parity_failed_report.md`。
+# R042 虚拟 30 年国债中国永久组合（Research-Only）
+
+固定 3 倍 10Y 后复权日收益的虚拟债在固定 25%/5-25 阈值主组合中通过训练、自然月起点敏感性和主最终测试容忍门槛，但两类风险平价迁移审计在最终测试同时退化，显示优势不具算法普适性。未调参，未合入候选配置；保留报告 `r042_virtual_30y_permanent_portfolio_report.md` 与原始产物供复核。
+# R043 补充（2026-07-11）
+
+Gerber 风险平价长久期趋势保护候选在主训练三滑点下未产生显著 Sharpe 或回撤改善，并在 48 个严格自然月起点下稳定落后基线，判定 `Failed`。没有运行最终测试，也没有保留候选注册、源码或配置。完整证据见 `platform/reports/r043_gerber_duration_trend_report.md`。

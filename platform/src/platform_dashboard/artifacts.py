@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -79,29 +80,129 @@ def discover_runs(root: Path | None = None) -> list[RunRecord]:
     if not results_dir.exists():
         return records
 
-    for manifest_path in results_dir.rglob("manifest.json"):
-        run_dir = manifest_path.parent
-        if EXCLUDED_RESULT_DIRS.intersection(manifest_path.parts):
-            continue
-        if not (run_dir / "nav.csv").exists():
-            continue
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            metrics = build_platform_metrics(run_dir)
-        except (OSError, ValueError, json.JSONDecodeError):
-            continue
-        records.append(
-            RunRecord(
-                run_id=str(manifest.get("run_id") or run_dir.name),
-                path=run_dir,
-                generated_at=str(manifest.get("generated_at") or ""),
-                start_date=str(metrics.get("start_date") or ""),
-                end_date=str(metrics.get("end_date") or ""),
-                metrics=metrics,
-                manifest=manifest,
-            )
-        )
+    for dirpath, dirnames, filenames in os.walk(results_dir):
+        # Prune internal research, sweeps, raw folders to avoid scanning thousands of files
+        pruned_dirs = []
+        for d in dirnames:
+            d_lower = d.lower()
+            if (
+                d in EXCLUDED_RESULT_DIRS or
+                "sensitivity_raw" in d_lower or
+                "backtest_cache" in d_lower or
+                "sim_portfolios" in d_lower or
+                "live_portfolios" in d_lower or
+                "backtests_sweep" in d_lower or
+                "research" in d_lower or
+                "_sweep" in d_lower or
+                "_raw" in d_lower or
+                "compare" in d_lower
+            ):
+                continue
+            pruned_dirs.append(d)
+        dirnames[:] = pruned_dirs
+
+        if "manifest.json" in filenames and "nav.csv" in filenames:
+            run_dir = Path(dirpath)
+            manifest_path = run_dir / "manifest.json"
+            metrics_path = run_dir / "metrics.json"
+
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                
+                # Freshness check for cached metrics.json
+                use_cache = False
+                if metrics_path.exists():
+                    try:
+                        if metrics_path.stat().st_mtime >= manifest_path.stat().st_mtime:
+                            use_cache = True
+                    except OSError:
+                        pass
+
+                metrics = None
+                if use_cache:
+                    try:
+                        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+                    except (OSError, ValueError, json.JSONDecodeError):
+                        use_cache = False
+
+                if not use_cache or metrics is None:
+                    metrics = build_platform_metrics(run_dir)
+                    try:
+                        metrics_path.write_text(json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8")
+                    except OSError:
+                        pass
+
+                records.append(
+                    RunRecord(
+                        run_id=str(manifest.get("run_id") or run_dir.name),
+                        path=run_dir,
+                        generated_at=str(manifest.get("generated_at") or ""),
+                        start_date=str(metrics.get("start_date") or ""),
+                        end_date=str(metrics.get("end_date") or ""),
+                        metrics=metrics,
+                        manifest=manifest,
+                    )
+                )
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+
     return sorted(records, key=lambda item: (item.generated_at, item.run_id), reverse=True)
+
+
+def get_runs_signature(root: Path | None = None) -> str:
+    root = (root or platform_root()).resolve()
+    results_dir = root / "results"
+    if not results_dir.exists():
+        return ""
+
+    items: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(results_dir):
+        pruned_dirs = []
+        for d in dirnames:
+            d_lower = d.lower()
+            if (
+                d in EXCLUDED_RESULT_DIRS or
+                "sensitivity_raw" in d_lower or
+                "backtest_cache" in d_lower or
+                "sim_portfolios" in d_lower or
+                "live_portfolios" in d_lower or
+                "backtests_sweep" in d_lower or
+                "research" in d_lower or
+                "_sweep" in d_lower or
+                "_raw" in d_lower or
+                "compare" in d_lower
+            ):
+                continue
+            pruned_dirs.append(d)
+        dirnames[:] = pruned_dirs
+
+        if "manifest.json" in filenames and "nav.csv" in filenames:
+            manifest_path = Path(dirpath) / "manifest.json"
+            try:
+                mtime = manifest_path.stat().st_mtime
+                items.append(f"{dirpath}:{mtime}")
+            except OSError:
+                pass
+    return ",".join(sorted(items))
+
+
+def get_configs_signature(root: Path | None = None) -> str:
+    root = (root or platform_root()).resolve()
+    config_dir = root / "configs"
+    if not config_dir.exists():
+        return ""
+
+    items: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(config_dir):
+        for f in filenames:
+            if f.endswith(".yaml"):
+                path = Path(dirpath) / f
+                try:
+                    mtime = path.stat().st_mtime
+                    items.append(f"{path.as_posix()}:{mtime}")
+                except OSError:
+                    pass
+    return ",".join(sorted(items))
 
 
 def read_run_tables(run_dir: Path) -> dict[str, pd.DataFrame]:
