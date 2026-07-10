@@ -56,6 +56,7 @@ strategy:
   cancel_pending_on_start: false
   params:
     rebalance_threshold: 0.05
+    rebalance_relative_threshold: 0.25
     init_mode: calculate
     init_calc_days: 30
     universe:

@@ -49,7 +49,92 @@ class Strategy:
         return None
 
     def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+        if not self.should_check_rebalance(context):
+            return None
+
+        target = self.generate_theoretical_targets(context)
+        if target is None:
+            return None
+
+        if self.should_rebalance(context, target):
+            return self.post_process_target(context, target)
+
+        return None
+
+    def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         raise NotImplementedError
+
+    def should_check_rebalance(self, context: StrategyContext) -> bool:
+        return self._is_rebalance_day(context)
+
+    def should_rebalance(self, context: StrategyContext, target: TargetPortfolio) -> bool:
+        has_position = any(
+            position.quantity > 1e-9 for position in context.state.positions.values()
+        )
+        if not has_position:
+            return True
+
+        abs_threshold = float(context.params.get("rebalance_threshold", 0.0))
+        rel_threshold = float(context.params.get("rebalance_relative_threshold", 0.0))
+        if abs_threshold <= 1e-9 and rel_threshold <= 1e-9:
+            return True
+
+        prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
+        current_weights = context.state.weights(prices)
+        all_assets = set(target.weights.keys()) | set(current_weights.keys())
+        for asset_id in all_assets:
+            target_weight = target.weights.get(asset_id, 0.0)
+            curr_weight = current_weights.get(asset_id, 0.0)
+            deviation = abs(curr_weight - target_weight)
+            if abs_threshold > 1e-9 and deviation > abs_threshold:
+                return True
+            if rel_threshold > 1e-9:
+                if target_weight <= 1e-9 and curr_weight > 1e-9:
+                    return True
+                if target_weight > 1e-9 and deviation > rel_threshold * target_weight:
+                    return True
+        return False
+
+
+
+    def post_process_target(self, context: StrategyContext, target: TargetPortfolio) -> TargetPortfolio:
+        return target
+
+    @staticmethod
+    def _calendar_index(context: StrategyContext) -> int:
+        if context.data is None or not hasattr(context.data, "calendar") or context.data.calendar is None:
+            return -1
+        try:
+            return context.data.calendar.index(context.date)
+        except ValueError:
+            return -1
+
+    @staticmethod
+    def _is_rebalance_day(context: StrategyContext) -> bool:
+        if context.data is None or not hasattr(context.data, "calendar") or context.data.calendar is None:
+            return True
+        idx = Strategy._calendar_index(context)
+        if idx < 0:
+            return False
+        if idx == len(context.data.calendar) - 1:
+            return True
+        current = context.date
+        next_date = context.data.calendar[idx + 1]
+
+        freq = context.runtime.get("rebalance_frequency", "quarterly")
+        if freq == "daily":
+            return True
+        if freq == "semiannually":
+            current_q = (current.month - 1) // 3
+            next_q = (next_date.month - 1) // 3
+            return current_q != next_q and current_q in (0, 2)
+        elif freq == "monthly":
+            return current.year != next_date.year or current.month != next_date.month
+        else: # quarterly
+            current_quarter = (current.month - 1) // 3
+            next_quarter = (next_date.month - 1) // 3
+            return current.year != next_date.year or current_quarter != next_quarter
+
 
 
 class MonthlyEqualWeightStrategy(Strategy):
@@ -60,15 +145,18 @@ class MonthlyEqualWeightStrategy(Strategy):
         context.set_cooldown(int(context.params.get("cooldown_days", 0)))
         context.set_rebalance_frequency("monthly")
 
-    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
-        if not context.params.get("rebalance_on_start", True) and context.state.last_date is None:
-            return None
-        if context.state.last_date is not None and not context.is_month_end():
-            return None
-
+    def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         universe = context.params.get("universe") or context.available_asset_ids()
         universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
         return TargetPortfolio.equal_weight(universe)
+
+    def should_check_rebalance(self, context: StrategyContext) -> bool:
+        if not context.params.get("rebalance_on_start", True) and context.state.last_date is None:
+            return False
+        if context.state.last_date is not None and not context.is_month_end():
+            return False
+        return True
+
 
 class RiskParityStrategy(Strategy):
     name = "risk_parity"
@@ -78,7 +166,12 @@ class RiskParityStrategy(Strategy):
         context.runtime["opened"] = context.params.get("init_mode", "calculate") == "manual"
         context.runtime["rebalance_frequency"] = context.params.get("rebalance_frequency", "quarterly")
 
-    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+    def should_check_rebalance(self, context: StrategyContext) -> bool:
+        if not bool(context.runtime.get("opened", False)):
+            return True
+        return self._is_rebalance_day(context)
+
+    def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         universe = context.params.get("universe") or context.available_asset_ids()
         universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
         if not universe:
@@ -86,28 +179,13 @@ class RiskParityStrategy(Strategy):
 
         if not bool(context.runtime.get("opened", False)):
             target = self._initial_target(context, universe)
-            if target is None:
-                return None
-            context.runtime["opened"] = True
+            if target is not None:
+                context.runtime["opened"] = True
             return target
 
-        if not self._is_rebalance_day(context):
-            return None
+        return self._inverse_vol_target(context, universe)
 
-        target = self._inverse_vol_target(context, universe)
-        if target is None:
-            return None
 
-        prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
-        current_weights = context.state.weights(prices)
-        threshold = float(context.params.get("rebalance_threshold", 0.05))
-        all_assets = set(target.weights.keys()) | set(current_weights.keys())
-        for asset_id in all_assets:
-            target_weight = target.weights.get(asset_id, 0.0)
-            curr_weight = current_weights.get(asset_id, 0.0)
-            if abs(curr_weight - target_weight) > threshold:
-                return target
-        return None
 
     def _initial_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         init_mode = context.params.get("init_mode", "calculate")
@@ -215,36 +293,7 @@ class RiskParityStrategy(Strategy):
         w = x / np.maximum(x.sum(), 1e-8)
         return w
 
-    @staticmethod
-    def _calendar_index(context: StrategyContext) -> int:
-        try:
-            return context.data.calendar.index(context.date)
-        except ValueError:
-            return -1
 
-    @staticmethod
-    def _is_rebalance_day(context: StrategyContext) -> bool:
-        idx = RiskParityStrategy._calendar_index(context)
-        if idx < 0:
-            return False
-        if idx == len(context.data.calendar) - 1:
-            return True
-        current = context.date
-        next_date = context.data.calendar[idx + 1]
-        
-        freq = context.runtime.get("rebalance_frequency", "quarterly")
-        if freq == "daily":
-            return True
-        if freq == "semiannually":
-            current_q = (current.month - 1) // 3
-            next_q = (next_date.month - 1) // 3
-            return current_q != next_q and current_q in (0, 2)
-        elif freq == "monthly":
-            return current.year != next_date.year or current.month != next_date.month
-        else: # quarterly
-            current_quarter = (current.month - 1) // 3
-            next_quarter = (next_date.month - 1) // 3
-            return current.year != next_date.year or current_quarter != next_quarter
 class RiskParityEWMAStrategy(RiskParityStrategy):
     name = "risk_parity_ewma"
     version = "0.1.0"
@@ -890,36 +939,25 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
                 
         return target
 
-    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+    def should_rebalance(self, context: StrategyContext, target: TargetPortfolio) -> bool:
         import numpy as np
-        
+
+        has_position = any(
+            position.quantity > 1e-9 for position in context.state.positions.values()
+        )
+        if not has_position:
+            return True
+
         universe = context.params.get("universe") or context.available_asset_ids()
         universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
         if not universe:
-            return None
+            return False
 
-        # 1. 首次建仓决策
-        if not bool(context.runtime.get("opened", False)):
-            target = self._initial_target(context, universe)
-            if target is None:
-                return None
-            context.runtime["opened"] = True
-            return target
-
-        # 2. 是否是调仓检测日（在 daily 下，每天均是检测日）
-        if not self._is_rebalance_day(context):
-            return None
-
-        # 3. 计算最新的风险平价目标权重
-        target = self._inverse_vol_target(context, universe)
-        if target is None:
-            return None
-
-        # 4. 获取当前组合中各资产的实际持仓权重
+        # 1. 获取当前组合中各资产的实际持仓权重
         prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
         current_weights = context.state.weights(prices)
 
-        # 5. 估计短期和长期的协方差矩阵以测度系统波动状态
+        # 2. 估计短期和长期的协方差矩阵以测度系统波动状态
         rolling_window = int(context.params.get("rolling_window", 120))  # 长期波动中枢窗口
         short_window = int(context.params.get("short_window", 20))       # 短期冲击窗口
         min_periods = int(context.params.get("min_periods", 20))
@@ -927,22 +965,22 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
         
         price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
         if price_frame is None or price_frame.empty:
-            return None
+            return False
         price_frame.index = pd.to_datetime(price_frame.index)
         
         if len(price_frame) < min_periods + 1:
-            return None
+            return False
             
         returns = price_frame.pct_change().dropna()
         if len(returns) < min_periods:
-            return None
+            return False
 
         # 分别截取长期和短期窗口的收益率序列
         returns_long = returns.tail(rolling_window)
         returns_short = returns.tail(short_window)
         
         if len(returns_long) < min_periods or len(returns_short) < max(2, int(short_window / 2)):
-            return None
+            return False
             
         X_long = returns_long.values
         X_short = returns_short.values
@@ -967,7 +1005,7 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
             
         vol_ratio = vol_short / vol_long
         
-        # 6. 确定自适应偏离容忍值
+        # 3. 确定自适应偏离容忍值
         rebalance_threshold_base = float(context.params.get("rebalance_threshold", 0.05))
         threshold_sensitivity = float(context.params.get("threshold_sensitivity", 1.0))
         
@@ -979,11 +1017,11 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
         max_threshold = float(context.params.get("max_threshold", 0.20))
         adaptive_threshold = np.clip(adaptive_threshold, min_threshold, max_threshold)
         
-        # 7. 危机触发判定 (Crisis Trigger / Systematic Volatility Trigger)
+        # 4. 危机触发判定 (Crisis Trigger / Systematic Volatility Trigger)
         vol_trigger_ratio = float(context.params.get("vol_trigger_ratio", 2.0))
         crisis_triggered = vol_ratio > vol_trigger_ratio
         
-        # 8. 计算实际持仓偏离度 (基于最大单资产权重绝对偏离，考虑 target.weights 和 current_weights 并集)
+        # 5. 计算实际持仓偏离度 (基于最大单资产权重绝对偏离，考虑 target.weights 和 current_weights 并集)
         max_deviation = 0.0
         all_assets = set(target.weights.keys()) | set(current_weights.keys())
         for asset_id in all_assets:
@@ -993,14 +1031,15 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
             if dev > max_deviation:
                 max_deviation = dev
                 
-        # 9. 决策是否执行再平衡
+        # 6. 决策是否执行再平衡
         rebalance_triggered = (max_deviation > adaptive_threshold) or crisis_triggered
         
         if rebalance_triggered:
             context.runtime["last_rebalance_reason"] = "crisis" if crisis_triggered else f"deviation({max_deviation:.4f}>{adaptive_threshold:.4f})"
-            return target
+            return True
             
-        return None
+        return False
+
 
 
 
@@ -1159,71 +1198,43 @@ class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
             
         return TargetPortfolio({asset_id: float(weights_full[i]) for i, asset_id in enumerate(universe)})
 
-    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
-        # 1. 首次建仓决策
-        universe = context.params.get("universe") or context.available_asset_ids()
-        universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
-        if not universe:
-            return None
-
-        if not bool(context.runtime.get("opened", False)):
-            target = self._initial_target(context, universe)
-            if target is None:
-                return None
-            context.runtime["opened"] = True
-            return target
-
-        # 2. 调仓检测日判断
-        if not self._is_rebalance_day(context):
-            return None
-
-        # 3. 求解最新的目标权重
-        target = self._inverse_vol_target(context, universe)
-        if target is None:
-            return None
-
-        # 4. 判断是否触发再平衡
+    def should_rebalance(self, context: StrategyContext, target: TargetPortfolio) -> bool:
         prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
         current_weights = context.state.weights(prices)
         
+        universe = context.params.get("universe") or context.available_asset_ids()
+        universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
+
         # 判断是否有资产发生了进出变化（轮动）
         last_selected = context.runtime.get("selected_assets", [])
         current_selected = [asset_id for asset_id in universe if current_weights.get(asset_id, 0.0) > 1e-4]
         
         # 如果当前持仓的资产组合与筛选出来的资产组合不同，则必须触发调仓
         portfolio_changed = set(last_selected) != set(current_selected)
+        deviation_triggered = super().should_rebalance(context, target)
         
-        # 或者是权重绝对偏离度超标 (考虑 target.weights 和 current_weights 并集)
-        deviation_triggered = False
-        threshold = float(context.params.get("rebalance_threshold", 0.05))
-        all_assets = set(target.weights.keys()) | set(current_weights.keys())
-        for asset_id in all_assets:
-            target_weight = target.weights.get(asset_id, 0.0)
-            curr_weight = current_weights.get(asset_id, 0.0)
-            if abs(curr_weight - target_weight) > threshold:
-                deviation_triggered = True
-                break
-                
-        if not (portfolio_changed or deviation_triggered):
-            return None
-            
-        # 5. 权重平滑阻尼控制 (Damping Factor)
+        return portfolio_changed or deviation_triggered
+
+    def post_process_target(self, context: StrategyContext, target: TargetPortfolio) -> TargetPortfolio:
         damping_factor = float(context.params.get("damping_factor", 1.0))
-        if damping_factor < 1.0 and current_weights:
-            # w_actual = (1 - lambda) * w_current + lambda * w_target
-            damped_weights = {}
-            for asset_id in universe:
-                w_curr = current_weights.get(asset_id, 0.0)
-                w_targ = target.weights.get(asset_id, 0.0)
-                damped_weights[asset_id] = (1.0 - damping_factor) * w_curr + damping_factor * w_targ
-                
-            # 仅在总权重超出 100% 时进行比例缩减归一化，以保留可能存在的现金占款 (如 Volatility Targeting)
-            total_w = sum(damped_weights.values())
-            if total_w > 1.0 + 1e-9:
-                damped_weights = {asset_id: w / total_w for asset_id, w in damped_weights.items()}
-            return TargetPortfolio(damped_weights)
-            
+        if damping_factor < 1.0:
+            prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
+            current_weights = context.state.weights(prices)
+            if current_weights:
+                universe = context.params.get("universe") or context.available_asset_ids()
+                universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
+                damped_weights = {}
+                for asset_id in universe:
+                    w_curr = current_weights.get(asset_id, 0.0)
+                    w_targ = target.weights.get(asset_id, 0.0)
+                    damped_weights[asset_id] = (1.0 - damping_factor) * w_curr + damping_factor * w_targ
+
+                total_w = sum(damped_weights.values())
+                if total_w > 1.0 + 1e-9:
+                    damped_weights = {asset_id: w / total_w for asset_id, w in damped_weights.items()}
+                return TargetPortfolio(damped_weights)
         return target
+
 
 BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
     MonthlyEqualWeightStrategy.name: MonthlyEqualWeightStrategy,

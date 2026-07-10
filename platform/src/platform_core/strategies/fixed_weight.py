@@ -39,27 +39,29 @@ class FixedWeightThresholdStrategy(Strategy):
         context.set_cooldown(int(context.params.get("cooldown_days", 0)))
         context.set_rebalance_frequency("daily")  # 每日检测（不等于每日交易）
 
-    def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+    def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         targets = self._target_weights(context)
         if not targets:
             return None
+        return TargetPortfolio(targets)
 
+    def should_rebalance(self, context: StrategyContext, target: TargetPortfolio) -> bool:
         prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
         has_position = any(
             position.quantity > 1e-9 for position in context.state.positions.values()
         )
         if not has_position:
-            # 空仓（首日或清仓后）：建仓到目标
-            return TargetPortfolio(targets)
+            return True
 
         current = context.state.weights(prices)
         abs_band = float(context.params.get("abs_band", 0.05))
         rel_band = float(context.params.get("rel_band", 0.25))
-        for asset_id, target in targets.items():
-            deviation = abs(current.get(asset_id, 0.0) - target)
-            if deviation > abs_band or (target > 0 and deviation > rel_band * target):
-                return TargetPortfolio(targets)
-        return None
+        for asset_id, target_w in target.weights.items():
+            deviation = abs(current.get(asset_id, 0.0) - target_w)
+            if deviation > abs_band or (target_w > 0 and deviation > rel_band * target_w):
+                return True
+        return False
+
 
     @staticmethod
     def _target_weights(context: StrategyContext) -> dict[str, float] | None:

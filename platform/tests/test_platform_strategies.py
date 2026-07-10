@@ -4,8 +4,13 @@ from datetime import date
 
 import pytest
 
-from src.platform_core.models import Asset, Bar, PortfolioState, Position
-from src.platform_core.strategy import StrategyContext, get_strategy_class
+from src.platform_core.models import Asset, Bar, PortfolioState, Position, TargetPortfolio
+from src.platform_core.strategy import (
+    AdaptiveRiskDeviationVolatilityTriggeredStrategy,
+    RiskParityStrategy,
+    StrategyContext,
+    get_strategy_class,
+)
 from src.platform_core.strategies.fixed_weight import FixedWeightThresholdStrategy
 
 
@@ -97,3 +102,52 @@ def test_explicit_target_weights_are_normalized():
     assert target is not None
     assert sum(target.weights.values()) == pytest.approx(1.0)
     assert target.weights["A"] == pytest.approx(0.4)
+
+
+def test_risk_parity_uses_explicit_5_25_thresholds():
+    strategy = RiskParityStrategy()
+    target = TargetPortfolio({asset_id: 0.25 for asset_id in "ABCD"})
+
+    inside = _context(
+        {"A": (2900.0, 10.0), "B": (2100.0, 10.0), "C": (2500.0, 10.0), "D": (2500.0, 10.0)},
+        cash=0.0,
+        params={"rebalance_threshold": 0.05, "rebalance_relative_threshold": 0.25},
+    )
+    assert strategy.should_rebalance(inside, target) is False
+
+    absolute_breach = _context(
+        {"A": (3100.0, 10.0), "B": (2300.0, 10.0), "C": (2300.0, 10.0), "D": (2300.0, 10.0)},
+        cash=0.0,
+        params={"rebalance_threshold": 0.05, "rebalance_relative_threshold": 0.25},
+    )
+    assert strategy.should_rebalance(absolute_breach, target) is True
+
+    relative_target = TargetPortfolio({"A": 0.30, "B": 0.30, "C": 0.30, "D": 0.10})
+    relative_breach = _context(
+        {"A": (2900.0, 10.0), "B": (2900.0, 10.0), "C": (2900.0, 10.0), "D": (1300.0, 10.0)},
+        cash=0.0,
+        params={"rebalance_threshold": 0.05, "rebalance_relative_threshold": 0.25},
+    )
+    assert strategy.should_rebalance(relative_breach, relative_target) is True
+
+
+def test_risk_parity_without_thresholds_keeps_unconditional_default():
+    context = _context({asset_id: (2500.0, 10.0) for asset_id in "ABCD"}, cash=0.0, params={})
+    target = TargetPortfolio({asset_id: 0.25 for asset_id in "ABCD"})
+    assert RiskParityStrategy().should_rebalance(context, target) is True
+
+
+def test_relative_threshold_liquidates_zero_target_position():
+    context = _context(
+        {"A": (100.0, 10.0), "B": (9900.0, 10.0), "C": (0.0, 10.0), "D": (0.0, 10.0)},
+        cash=0.0,
+        params={"rebalance_threshold": 0.05, "rebalance_relative_threshold": 0.25},
+    )
+    target = TargetPortfolio({"B": 1.0})
+    assert RiskParityStrategy().should_rebalance(context, target) is True
+
+
+def test_adaptive_strategy_always_allows_initial_build():
+    context = _context({asset_id: (0.0, 10.0) for asset_id in "ABCD"}, cash=100000.0, params={})
+    target = TargetPortfolio({asset_id: 0.25 for asset_id in "ABCD"})
+    assert AdaptiveRiskDeviationVolatilityTriggeredStrategy().should_rebalance(context, target) is True

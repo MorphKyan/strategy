@@ -52,6 +52,7 @@ strategy:
     rolling_window: 120
     min_periods: 20
     rebalance_threshold: 0.05
+    rebalance_relative_threshold: 0.25
     init_mode: calculate
     init_calc_days: 30
     universe:

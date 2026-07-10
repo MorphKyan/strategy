@@ -50,6 +50,7 @@ strategy:
     ewma_min_periods: 20
     rebalance_frequency: monthly
     rebalance_threshold: 0.05
+    rebalance_relative_threshold: 0.25
     universe:
     - CN_ETF:510300.SH
     - CN_ETF:518880.SH

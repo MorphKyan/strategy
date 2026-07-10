@@ -52,6 +52,7 @@ strategy:
     rolling_window: 120
     min_periods: 20
     rebalance_threshold: 0.05
+    rebalance_relative_threshold: 0.25
     confidence_level: 0.95
     cvar_sensitivity: 1.0
     volatility_target: 0.08
