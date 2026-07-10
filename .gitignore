@@ -136,3 +136,6 @@ data_manifest.json
 
 # Local Claude Code tooling config (preview launch config, etc.)
 /.claude/
+
+# Personal live-portfolio attribution reports (contain real account values)
+/platform/reports/live/

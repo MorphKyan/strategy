@@ -10,7 +10,8 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 - `scripts/sync_platform_data.py`: sync platform market and fundamental data.
 - `scripts/run_sensitivity.py`: start-date sensitivity analysis.
 - `scripts/run_dashboard.py`: launch the local read-only browser dashboard (port defaults to 8501, override with the `PORT` environment variable).
-- `scripts/run_live_cycle.py`: live-mirror portfolio entry — `reconcile` overwrites state from real holdings, `plan` renders the next-day order ticket, `cycle` chains sync/reconcile/plan/daily-valuation/notify and skips non-trading days (Task Scheduler command in the docstring). Each trading day the real holdings are marked to market into `real_nav.csv`, and notifications are split into a markdown daily digest plus a separate ticket message when a rebalance triggers.
+- `scripts/run_live_cycle.py`: live-mirror portfolio entry — `reconcile` overwrites state from real holdings, `plan` renders the next-day order ticket, `cycle` chains sync/reconcile/plan/daily-valuation/notify and skips non-trading days (Task Scheduler command in the docstring). Each trading day the real holdings are marked to market into `real_nav.csv`, notifications are split into a markdown daily digest plus a separate ticket message when a rebalance triggers, and `--shadow` advances a shadow sim portfolio for attribution.
+- `scripts/report_live_attribution.py`: monthly live-vs-shadow NAV attribution (cumulative diff, annualized tracking error, cash-drag vs execution-residual split; record-only). Reports land in `reports/live/`, which is gitignored because it contains real account values.
 - `scripts/validate_hfq_data.py`: compare platform adjusted close against the research HFQ chain.
 - `src/platform_core/`: platform engine package.
   - `models.py`: assets, bars, positions, orders, trades, portfolio state.

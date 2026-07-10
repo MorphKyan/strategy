@@ -87,6 +87,26 @@ class SimPortfolio:
         return dividends
 
     @classmethod
+    def load(
+        cls,
+        portfolio_id: str,
+        config: dict[str, Any],
+        store: SQLiteStore | InMemoryStore,
+        output_root: str | Path | None = None,
+    ) -> "SimPortfolio":
+        """从 `results/sim_portfolios/<id>/portfolio_state.json` 恢复既有模拟组合。
+
+        与 create_from_checkpoint 的区别：不回到原始 checkpoint 重放，而是从上次
+        advance 持久化的状态继续增量推进——影子组合每日跟跑（蓝图 A5）用这个。
+        """
+        root = Path(output_root or config.get("output", {}).get("sim_dir", "results/sim_portfolios"))
+        state_path = root / portfolio_id / "portfolio_state.json"
+        if not state_path.exists():
+            raise FileNotFoundError(f"模拟组合状态不存在: {state_path}（先用 create_from_checkpoint 建立）")
+        state = PortfolioState.from_dict(json.loads(state_path.read_text(encoding="utf-8")))
+        return cls(portfolio_id, config, store, state, source_checkpoint=state_path, output_root=output_root)
+
+    @classmethod
     def create_from_checkpoint(
         cls,
         checkpoint_path: str | Path,

@@ -96,6 +96,7 @@ def main() -> int:
     p_cycle.add_argument("--sync", action="store_true", help="Force market data sync even if config data.fetch is false.")
     p_cycle.add_argument("--notify", action="store_true", help="Push the ticket via configured channels.")
     p_cycle.add_argument("--force", action="store_true", help="Plan from the latest bar even if asof is not a trading day.")
+    p_cycle.add_argument("--shadow", help="Shadow sim portfolio id to advance to the plan date (for monthly attribution).")
 
     args = parser.parse_args()
     portfolio, config = build_portfolio(args)
@@ -141,6 +142,21 @@ def main() -> int:
     print(f"票据: {result.plan.ticket_txt}")
     if result.plan.ticket_csv:
         print(f"明细: {result.plan.ticket_csv}")
+
+    if args.shadow:
+        # 影子模拟组合每日跟跑（月度归因的模型侧，蓝图 A5）；失败不阻断日报环路
+        from src.platform_core.sim import SimPortfolio
+        from src.platform_core.storage import InMemoryStore
+
+        store = InMemoryStore()
+        try:
+            shadow = SimPortfolio.load(args.shadow, config, store)
+            shadow_result = shadow.advance(str(result.plan.plan_date))
+            print(f"影子组合 {args.shadow} 已推进至 {result.plan.plan_date}（新增 {shadow_result.metrics.get('processed_days', 0)} 天）")
+        except Exception as exc:  # noqa: BLE001
+            print(f"影子组合推进失败（不影响主流程）: {exc}")
+        finally:
+            store.close()
     return 0
 
 
