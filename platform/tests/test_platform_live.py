@@ -139,7 +139,7 @@ def test_cycle_skips_non_trading_day(tmp_path: Path):
     assert result.plan is None and not result.reconciled and not result.notified
 
 
-def test_cycle_reconciles_plans_and_notifies(tmp_path: Path):
+def test_cycle_reconciles_plans_and_notifies_two_messages(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
     sent: list[tuple[str, str]] = []
@@ -154,10 +154,46 @@ def test_cycle_reconciles_plans_and_notifies(tmp_path: Path):
     assert result.reconciled and not result.skipped_non_trading
     assert result.plan is not None and result.plan.has_target
     assert result.notified
+    # 两条推送：日报在前，调仓票独立第二条
+    assert len(sent) == 2
+    digest_title, digest_text = sent[0]
+    assert "组合日报" in digest_title
+    assert "总值" in digest_text and "触发调仓" in digest_text
+    ticket_title, ticket_text = sent[1]
+    assert "调仓提醒" in ticket_title
+    assert "买入" in ticket_text
+
+
+def test_cycle_no_op_day_sends_single_digest(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+    sent: list[tuple[str, str]] = []
+
+    result = portfolio.cycle(asof_date="2024-01-30", notifier=lambda title, text: sent.append((title, text)) or True)
+
+    assert result.plan is not None and not result.plan.has_target
     assert len(sent) == 1
     title, text = sent[0]
-    assert "调仓提醒" in title
-    assert "买入" in text
+    assert "组合日报" in title
+    assert "无需调仓" in text
+    # 日变动基于前一估值日（reconcile 写入的 01-29 那行）
+    assert "较上一估值日" in text
+
+
+def test_mark_to_market_appends_daily_real_nav(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    assert valuation["total_value"] == pytest.approx(7100.0 + 3000.0)
+    assert valuation["previous_total"] == pytest.approx(10100.0)
+    assert valuation["weights"]["A"] == pytest.approx(3000.0 / 10100.0)
+    with portfolio.real_nav_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    assert [row["date"] for row in rows] == ["2024-01-29", "2024-01-30"]
 
 
 def test_cycle_notifier_failure_does_not_break_cycle(tmp_path: Path):
