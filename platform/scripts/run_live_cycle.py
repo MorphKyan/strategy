@@ -20,8 +20,11 @@
 RQ_SMTP_HOST/RQ_SMTP_USERNAME/RQ_SMTP_PASSWORD/RQ_SMTP_TO（邮件）即自动启用，
 详见 src/platform_core/notify.py 模块注释。任务计划注册示例：
 
-  schtasks /Create /TN "RetailQuant Live Cycle" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 16:30 ^
+  schtasks /Create /TN "RetailQuant Live Cycle" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 19:00 ^
       /TR "D:\\qcy_project\\strategy\\env\\Scripts\\python.exe D:\\qcy_project\\strategy\\platform\\scripts\\run_live_cycle.py cycle --config configs\\baseline_r1_domestic_rolling.yaml --sync --notify"
+
+推送分两条：组合日报（总值/日变动/权重，markdown）每个交易日必发；
+触发调仓时下单票作为独立第二条发送。每日估值同时追加进 real_nav.csv。
 
 reconcile/plan 单独使用时，跑之前先同步行情（sync_all_market_data.py），
 否则会被 7 天数据新鲜度闸门拦下。环路设计见 platform/docs/next_phase_blueprint.md §5。

@@ -279,13 +279,17 @@ class LivePortfolio:
         notifier: Callable[[str, str], bool] | None = None,
         force: bool = False,
     ) -> CycleResult:
-        """一条命令跑完整环路：sync →（可选）reconcile → plan →（可选）notify。
+        """一条命令跑完整环路：sync →（可选）reconcile → plan → 每日估值 →（可选）notify。
 
         - holdings_csv 缺省时跳过 reconcile，直接用上次对齐的状态 plan（推荐的
           自动化节奏：定时任务每天只 plan，用户实际下单后才手动 reconcile）。
         - asof 不在交易日历里（周末/节假日/数据未同步到位）时直接跳过，
           避免用陈旧 bar 重复出票；`force=True` 可强制按最近交易日出票。
+        - 每日估值：按 plan 日收盘对真实持仓 mark-to-market，追加进 real_nav.csv
+          （持仓只在用户实际交易并 reconcile 后变化，因此这是真实净值的日频序列）。
         - notifier 为 (title, text) -> bool 的可调用对象；推送失败不影响主流程。
+          推送分两条：日报（总值/日变动/权重，Server酱 desp 支持 markdown）总是发送；
+          触发调仓且有可执行订单时，调仓票作为**独立第二条**发送，避免被日报淹没。
         """
         asof = parse_date(asof_date)
         synced = False
@@ -305,11 +309,83 @@ class LivePortfolio:
             reconciled = True
 
         plan_result = self.plan(asof)
+        valuation = self.mark_to_market(plan_result.plan_date)
         notified = False
         if notifier is not None:
-            title = f"调仓提醒 {date_str(plan_result.plan_date)}" if plan_result.has_target else f"组合无操作 {date_str(plan_result.plan_date)}"
-            notified = bool(notifier(title, plan_result.text))
+            title, digest = self._render_daily_digest(valuation, plan_result)
+            notified = bool(notifier(title, digest))
+            if plan_result.has_target and plan_result.order_count > 0:
+                notifier(f"调仓提醒 {date_str(plan_result.plan_date)}", plan_result.text)
         return CycleResult(self.portfolio_id, asof, synced, False, reconciled, plan_result, notified)
+
+    def mark_to_market(self, asof_date: str | date) -> dict[str, Any]:
+        """按 asof 日收盘对真实持仓估值，写入 real_nav.csv 并返回摘要。
+
+        持仓与现金只会被 reconcile 改变，因此"上次对齐的持仓 × 今日收盘"就是
+        今日真实净值（用户当日有交易但尚未 reconcile 时，次日对齐后自动修正）。
+        """
+        state = self._load_state()
+        if state is None:
+            raise FileNotFoundError(f"{self.state_path} 不存在，请先 reconcile 导入真实持仓。")
+        asof = parse_date(asof_date)
+        data = self._load_data(asof)
+        bars = data.bars_on(asof)
+        prices = {asset_id: bar.close for asset_id, bar in bars.items()}
+
+        positions_value = sum(
+            position.quantity * prices.get(asset_id, 0.0) for asset_id, position in state.positions.items()
+        )
+        total_value = state.cash + positions_value
+        weights = {
+            asset_id: (position.quantity * prices.get(asset_id, 0.0) / total_value if total_value > 0 else 0.0)
+            for asset_id, position in state.positions.items()
+        }
+
+        previous_total = None
+        if self.real_nav_path.exists():
+            with self.real_nav_path.open("r", encoding="utf-8", newline="") as handle:
+                earlier = [row for row in csv.DictReader(handle) if row["date"] < date_str(asof)]
+            if earlier:
+                previous_total = float(earlier[-1]["total_value"])
+        self._append_real_nav(asof, state.cash, positions_value, total_value)
+
+        return {
+            "date": asof,
+            "cash": state.cash,
+            "positions_value": positions_value,
+            "total_value": total_value,
+            "weights": weights,
+            "previous_total": previous_total,
+        }
+
+    def _render_daily_digest(self, valuation: dict[str, Any], plan_result: PlanResult) -> tuple[str, str]:
+        """组合日报（Server酱 desp 按 markdown 渲染）。返回 (title, markdown)。"""
+        day = date_str(valuation["date"])
+        total = valuation["total_value"]
+        title = f"组合日报 {day} · {total:,.0f}元"[:32]
+
+        lines = [f"## {self.portfolio_id} 日报 · {day}", ""]
+        change_line = f"- **总值**: {total:,.2f} 元"
+        previous = valuation.get("previous_total")
+        if previous:
+            diff = total - previous
+            change_line += f"（较上一估值日 {diff:+,.2f} / {diff / previous:+.2%}）"
+        lines.append(change_line)
+        cash = valuation["cash"]
+        cash_pct = cash / total if total > 0 else 0.0
+        lines.append(f"- **现金**: {cash:,.2f} 元（{cash_pct:.1%}）")
+        lines.append("")
+        lines.append("**持仓权重**:")
+        for asset_id, weight in sorted(valuation["weights"].items(), key=lambda item: -item[1]):
+            asset = self.assets.get(asset_id)
+            label = f"{asset.code} {asset.name}" if asset else asset_id
+            lines.append(f"- {label}: {weight:.1%}")
+        lines.append("")
+        if plan_result.has_target and plan_result.order_count > 0:
+            lines.append("⚠️ **今日触发调仓**，下单票见另一条推送。")
+        else:
+            lines.append("今日无需调仓：全部偏离在阈值带内。")
+        return title, "\n".join(lines)
 
     def _sync_data(self, end: date) -> None:
         market_store = MarketDataStore(self.market_dir)
