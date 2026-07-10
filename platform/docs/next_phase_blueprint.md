@@ -175,7 +175,9 @@ weight_before, weight_target, est_fee, note
 
 ### A4. 统一入口脚本 + 调度（已完成，2026-07-05）
 
-**竣工说明**：`run_live_cycle.py` 三个子命令齐了（reconcile/plan/cycle）。`cycle` = （`--sync` 或 config `data.fetch` 时）同步行情 → （给了 `--holdings --cash` 时）reconcile → plan → （`--notify` 时）推送；asof 不在交易日历（周末/节假日/数据未更新到当日）时直接跳过不重复出票，`--force` 可强制按最近交易日出票。编排逻辑在 `LivePortfolio.cycle()`（notifier 可注入，便于测试）。任务计划注册命令见脚本 docstring（**未替用户注册**——需先设好通知环境变量再自行执行 schtasks）。原规格：
+**竣工说明**：`run_live_cycle.py` 三个子命令齐了（reconcile/plan/cycle）。`cycle` = （`--sync` 或 config `data.fetch` 时）同步行情 → （给了 `--holdings --cash` 时）reconcile → plan → **每日估值** → （`--notify` 时）推送；asof 不在交易日历（周末/节假日/数据未更新到当日）时直接跳过不重复出票，`--force` 可强制按最近交易日出票。编排逻辑在 `LivePortfolio.cycle()`（notifier 可注入，便于测试）。任务计划注册命令见脚本 docstring。
+
+**2026-07-11 增补（每日日报）**：`cycle` 每个交易日对真实持仓按收盘价 mark-to-market 并追加进 `real_nav.csv`——持仓只经 reconcile 变化，所以"上次对齐持仓 × 今日收盘"即真实日频净值（当日已交易未对齐的情形在下次 reconcile 自愈）。推送拆为两条：markdown 组合日报（总值/较上一估值日变动/现金/各资产权重/阈值带状态，Server酱 desp 按 markdown 渲染）交易日必发；触发调仓且有可执行订单时，下单票作为独立第二条，避免被日报淹没。已在真实组合上验证（Server酱 + Gmail SMTP 双通道）。原规格：
 
 ```
 run_live_cycle.py reconcile --portfolio <id> --holdings <csv> --cash <float> [--asof-date d]
@@ -195,6 +197,8 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 ```
 
 ### A5. 月度净值归因（新脚本 `platform/scripts/report_live_attribution.py`，P0 里优先级最低）
+
+> 2026-07-11 更新：`real_nav.csv` 已由 cycle 的每日估值升级为**日频序列**（不再只有 reconcile 快照），本节的输入侧已就绪，只差归因脚本本身和影子 sim 的推进接线。
 
 - 输入：`real_nav.csv`（真实） vs 同期纸面 `SimPortfolio` 的 `nav.csv`（模型）。
 - 输出：`platform/reports/live/<YYYY-MM>_attribution.md`（中文），内容：两条净值曲线对比、月度 tracking error（bp）、差异归因粗拆（手续费差/成交价差/现金拖累），**只记录，不据此改持仓或改参数**。
