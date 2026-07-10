@@ -343,7 +343,8 @@ class LivePortfolio:
 
         previous_total = None
         if self.real_nav_path.exists():
-            with self.real_nav_path.open("r", encoding="utf-8", newline="") as handle:
+            # utf-8-sig：容忍 Excel/PowerShell 手工编辑留下的 BOM
+            with self.real_nav_path.open("r", encoding="utf-8-sig", newline="") as handle:
                 earlier = [row for row in csv.DictReader(handle) if row["date"] < date_str(asof)]
             if earlier:
                 previous_total = float(earlier[-1]["total_value"])
@@ -502,7 +503,8 @@ class LivePortfolio:
     def _append_real_nav(self, asof: date, cash: float, positions_value: float, total_value: float) -> None:
         rows: list[dict[str, str]] = []
         if self.real_nav_path.exists():
-            with self.real_nav_path.open("r", encoding="utf-8", newline="") as handle:
+            # utf-8-sig：容忍 Excel/PowerShell 手工编辑留下的 BOM
+            with self.real_nav_path.open("r", encoding="utf-8-sig", newline="") as handle:
                 rows = [row for row in csv.DictReader(handle) if row["date"] != date_str(asof)]
         rows.append(
             {
