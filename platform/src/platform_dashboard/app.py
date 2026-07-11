@@ -52,7 +52,7 @@ def cached_runs(root: str) -> list[RunRecord]:
     return discover_runs(Path(root))
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=128, ttl=600)
 def cached_table(run_dir: str, name: str, modified_at: float) -> pd.DataFrame:
     del modified_at
     return read_run_table(Path(run_dir), name)
@@ -64,7 +64,7 @@ def run_table(run: RunRecord, name: str) -> pd.DataFrame:
     return cached_table(str(run.path), name, modified_at)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=128, ttl=600)
 def cached_metrics(run_dir: str, modified_at: float) -> dict[str, Any]:
     del modified_at
     return read_run_metrics(Path(run_dir))
@@ -77,7 +77,7 @@ def run_metrics(run: RunRecord) -> dict[str, Any]:
     return cached_metrics(str(run.path), modified_at)
 
 
-@st.cache_data(show_spinner=False, max_entries=64)
+@st.cache_data(show_spinner=False, max_entries=64, ttl=600)
 def cached_market_history(root: str, symbol: str, modified_at: float) -> pd.DataFrame:
     del modified_at
     return read_market_history(Path(root), symbol)
@@ -88,7 +88,7 @@ def market_history(root: Path, symbol: str) -> pd.DataFrame:
     return cached_market_history(str(root), symbol, path.stat().st_mtime if path.exists() else 0.0)
 
 
-@st.cache_data(show_spinner=False, max_entries=64)
+@st.cache_data(show_spinner=False, max_entries=64, ttl=600)
 def cached_actions(root: str, symbol: str, signature: tuple[float, float]) -> dict[str, pd.DataFrame]:
     del signature
     return read_corporate_actions(Path(root), symbol)
