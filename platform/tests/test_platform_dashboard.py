@@ -8,11 +8,20 @@ import pytest
 
 from src.platform_dashboard.artifacts import (
     align_navs,
+    build_weighted_portfolio,
     discover_configs,
+    downsample_timeseries,
     discover_runs,
     latest_positions,
+    infer_slippage_scenario,
     nav_analytics,
+    read_run_metrics,
+    read_run_table,
     read_run_tables,
+    read_corporate_actions,
+    read_market_history,
+    portfolio_risk_analysis,
+    rebalance_events,
     rebase_benchmark,
     window_start_date,
 )
@@ -73,6 +82,34 @@ def test_discover_runs_and_read_tables(tmp_path: Path) -> None:
     tables = read_run_tables(run_dir)
     assert tables["nav"]["drawdown"].tolist() == pytest.approx([0.0, -0.1])
     assert latest_positions(tables["positions"])["asset_id"].tolist() == ["B", "A"]
+
+
+def test_single_table_reader_is_lazy_and_validates_name(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    pd.DataFrame([{"date": "2025-01-01", "net_value": 1.0}]).to_csv(run_dir / "nav.csv", index=False)
+    nav = read_run_table(run_dir, "nav")
+    assert list(nav.columns) == ["date", "net_value", "drawdown"]
+    assert read_run_table(run_dir, "positions").empty
+    with pytest.raises(ValueError, match="Unsupported run table"):
+        read_run_table(run_dir, "unknown")
+
+
+def test_discovery_does_not_generate_missing_metrics(tmp_path: Path) -> None:
+    run_dir = tmp_path / "results" / "backtests" / "lazy_run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "manifest.json").write_text(
+        json.dumps({"run_id": "lazy_run", "generated_at": "2026-07-05T10:00:00"}), encoding="utf-8"
+    )
+    pd.DataFrame([
+        {"date": "2025-01-01", "net_value": 1.0},
+        {"date": "2025-01-02", "net_value": 1.1},
+    ]).to_csv(run_dir / "nav.csv", index=False)
+
+    runs = discover_runs(tmp_path)
+    assert runs[0].metrics == {}
+    assert not (run_dir / "metrics.json").exists()
+    assert read_run_metrics(run_dir)["total_return"] == pytest.approx(0.1)
 
 
 def test_discover_runs_ignores_non_backtest_manifests(tmp_path: Path) -> None:
@@ -179,3 +216,55 @@ def test_align_navs_returns_empty_when_overlap_required_but_absent() -> None:
     }
 
     assert align_navs(navs, overlap_only=True).empty
+
+
+def test_market_history_actions_and_weighted_portfolio(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    for symbol, closes in (("510300", [10, 11, 12]), ("518880", [20, 19, 21])):
+        pd.DataFrame({"trade_date": pd.date_range("2025-01-01", periods=3), "open": closes,
+                      "high": closes, "low": closes, "close": closes, "volume": [1, 2, 3]}).to_csv(data / f"{symbol}.csv", index=False)
+    pd.DataFrame([{"code": "510300", "ex_date": "2025-01-02", "dividend_per_share": 0.1}]).to_csv(data / "platform_dividends.csv", index=False)
+    pd.DataFrame([{"code": "510300", "split_date": "2025-01-03", "split_ratio": 2.0}]).to_csv(data / "platform_splits.csv", index=False)
+
+    first = read_market_history(tmp_path, "510300")
+    second = read_market_history(tmp_path, "518880")
+    actions = read_corporate_actions(tmp_path, "510300")
+    basket = build_weighted_portfolio({"510300": first, "518880": second}, {"510300": 0.6, "518880": 0.4})
+    assert actions["dividends"]["dividend_per_share"].iloc[0] == pytest.approx(0.1)
+    assert actions["splits"]["split_ratio"].iloc[0] == pytest.approx(2.0)
+    assert basket["portfolio"].iloc[0] == pytest.approx(1.0)
+    assert basket["portfolio"].iloc[-1] == pytest.approx(0.6 * 1.2 + 0.4 * 1.05)
+    assert "drawdown" in basket
+
+
+def test_rebalance_events_aggregates_filled_orders() -> None:
+    orders = pd.DataFrame([
+        {"date": "2025-01-03", "signal_date": "2025-01-02", "status": "FILLED", "trade_value": 100},
+        {"date": "2025-01-03", "signal_date": "2025-01-02", "status": "FILLED", "trade_value": -50},
+        {"date": "2025-01-04", "signal_date": "2025-01-03", "status": "REJECTED", "trade_value": 20},
+    ])
+    events = rebalance_events(orders)
+    assert len(events) == 1
+    assert events["order_count"].iloc[0] == 2
+    assert events["trade_value"].iloc[0] == pytest.approx(150)
+
+
+def test_portfolio_risk_analysis_and_downsampling() -> None:
+    histories = {
+        "A": pd.DataFrame({"trade_date": pd.date_range("2025-01-01", periods=300), "close": range(100, 400)}),
+        "B": pd.DataFrame({"trade_date": pd.date_range("2025-01-01", periods=300), "close": range(200, 500)}),
+    }
+    risk = portfolio_risk_analysis(histories, {"A": 0.6, "B": 0.4}, window=120)
+    assert risk["correlation"].shape == (2, 2)
+    assert risk["contribution"]["risk_contribution_pct"].sum() == pytest.approx(1.0)
+    sampled = downsample_timeseries(histories["A"], max_points=50)
+    assert len(sampled) <= 50
+    assert sampled.iloc[0]["trade_date"] == histories["A"].iloc[0]["trade_date"]
+    assert sampled.iloc[-1]["trade_date"] == histories["A"].iloc[-1]["trade_date"]
+
+
+def test_slippage_scenario_inference_is_explicit_and_safe() -> None:
+    assert infer_slippage_scenario("run_x", {"slippage_scenario": "stress"}) == "stress"
+    assert infer_slippage_scenario("strategy_dynamic_participation_123", {}) == "dynamic_participation"
+    assert infer_slippage_scenario("legacy_run", {}) == "unknown"

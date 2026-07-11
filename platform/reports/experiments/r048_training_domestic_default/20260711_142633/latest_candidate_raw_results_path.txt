@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\r048_training_domestic_default\20260711_142633\risk_parity_ewma_dual_band_reset\r048_domestic_ewma_dual_band_reset_default_candidate_20260711_142633_667736

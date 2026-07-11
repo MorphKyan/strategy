@@ -109,7 +109,8 @@ def discover_runs(root: Path | None = None) -> list[RunRecord]:
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                 
-                # Freshness check for cached metrics.json
+                # Discovery must stay metadata-only. Expensive metric generation is
+                # deferred until a page actually renders the selected run.
                 use_cache = False
                 if metrics_path.exists():
                     try:
@@ -126,11 +127,7 @@ def discover_runs(root: Path | None = None) -> list[RunRecord]:
                         use_cache = False
 
                 if not use_cache or metrics is None:
-                    metrics = build_platform_metrics(run_dir)
-                    try:
-                        metrics_path.write_text(json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8")
-                    except OSError:
-                        pass
+                    metrics = dict(manifest.get("metrics") or {})
 
                 records.append(
                     RunRecord(
@@ -147,6 +144,37 @@ def discover_runs(root: Path | None = None) -> list[RunRecord]:
                 continue
 
     return sorted(records, key=lambda item: (item.generated_at, item.run_id), reverse=True)
+
+
+def read_run_metrics(run_dir: Path) -> dict[str, Any]:
+    """Load or derive metrics for one run on demand."""
+    metrics_path = run_dir / "metrics.json"
+    manifest_path = run_dir / "manifest.json"
+    if metrics_path.exists():
+        try:
+            if metrics_path.stat().st_mtime >= manifest_path.stat().st_mtime:
+                return json.loads(metrics_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+    return build_platform_metrics(run_dir)
+
+
+def read_run_table(run_dir: Path, name: str) -> pd.DataFrame:
+    """Read a single artifact table so inactive dashboard sections do no I/O."""
+    if name not in {"nav", "positions", "orders", "skipped_orders", "trades"}:
+        raise ValueError(f"Unsupported run table: {name}")
+    path = run_dir / f"{name}.csv"
+    try:
+        frame = pd.read_csv(path) if path.exists() and path.stat().st_size else pd.DataFrame()
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        return pd.DataFrame()
+    if not frame.empty and "date" in frame:
+        frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+        if name == "nav":
+            frame = frame.dropna(subset=["date"]).sort_values("date")
+            if "net_value" in frame:
+                frame["drawdown"] = frame["net_value"] / frame["net_value"].cummax() - 1.0
+    return frame
 
 
 def get_runs_signature(root: Path | None = None) -> str:
@@ -206,26 +234,7 @@ def get_configs_signature(root: Path | None = None) -> str:
 
 
 def read_run_tables(run_dir: Path) -> dict[str, pd.DataFrame]:
-    tables: dict[str, pd.DataFrame] = {}
-    for name in ("nav", "positions", "orders", "skipped_orders", "trades"):
-        path = run_dir / f"{name}.csv"
-        try:
-            tables[name] = pd.read_csv(path) if path.exists() and path.stat().st_size else pd.DataFrame()
-        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
-            tables[name] = pd.DataFrame()
-    nav = tables["nav"]
-    if not nav.empty and "date" in nav:
-        nav["date"] = pd.to_datetime(nav["date"], errors="coerce")
-        nav = nav.dropna(subset=["date"]).sort_values("date")
-        if "net_value" in nav:
-            peak = nav["net_value"].cummax()
-            nav["drawdown"] = nav["net_value"] / peak - 1.0
-        tables["nav"] = nav
-    for name in ("positions", "orders", "skipped_orders", "trades"):
-        frame = tables[name]
-        if not frame.empty and "date" in frame:
-            frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
-    return tables
+    return {name: read_run_table(run_dir, name) for name in ("nav", "positions", "orders", "skipped_orders", "trades")}
 
 
 def nav_analytics(nav: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -378,3 +387,159 @@ def latest_positions(positions: pd.DataFrame) -> pd.DataFrame:
     return positions.loc[positions["date"] == latest_date, columns].sort_values(
         "weight" if "weight" in columns else columns[0], ascending=False
     )
+
+
+def discover_market_symbols(root: Path | None = None) -> list[str]:
+    """Return symbols backed by a canonical OHLCV csv, excluding factor files."""
+    data_dir = (root or platform_root()).resolve() / "data"
+    if not data_dir.exists():
+        return []
+    return sorted(
+        path.stem for path in data_dir.glob("*.csv")
+        if path.stem.isdigit() and not path.name.endswith("_hfq_factor.csv")
+    )
+
+
+def read_market_history(root: Path, symbol: str) -> pd.DataFrame:
+    """Read one local market series with only chart-relevant columns."""
+    if not symbol.isdigit():
+        raise ValueError("Invalid market symbol")
+    path = root.resolve() / "data" / f"{symbol}.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    wanted = ["trade_date", "open", "high", "low", "close", "volume", "amount", "adjust_factor"]
+    try:
+        frame = pd.read_csv(path, usecols=lambda column: column in wanted)
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        return pd.DataFrame()
+    if "trade_date" not in frame or "close" not in frame:
+        return pd.DataFrame()
+    frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce")
+    for column in set(wanted) & set(frame.columns) - {"trade_date"}:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    return frame.dropna(subset=["trade_date", "close"]).sort_values("trade_date")
+
+
+def read_corporate_actions(root: Path, symbol: str) -> dict[str, pd.DataFrame]:
+    """Read dividends and split/transfer records for a symbol."""
+    result: dict[str, pd.DataFrame] = {}
+    for key, filename, date_column in (
+        ("dividends", "platform_dividends.csv", "ex_date"),
+        ("splits", "platform_splits.csv", "split_date"),
+    ):
+        path = root.resolve() / "data" / filename
+        try:
+            frame = pd.read_csv(path, dtype={"code": str}) if path.exists() else pd.DataFrame()
+        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            frame = pd.DataFrame()
+        if not frame.empty and "code" in frame:
+            frame = frame[frame["code"].str.zfill(6) == symbol.zfill(6)].copy()
+            if date_column in frame:
+                frame[date_column] = pd.to_datetime(frame[date_column], errors="coerce")
+                frame = frame.sort_values(date_column)
+        result[key] = frame
+    return result
+
+
+def build_weighted_portfolio(histories: dict[str, pd.DataFrame], weights: dict[str, float]) -> pd.DataFrame:
+    """Build a buy-and-hold normalized basket on the common trading-date window."""
+    series = []
+    valid_weights = {key: float(value) for key, value in weights.items() if value > 0 and key in histories}
+    total = sum(valid_weights.values())
+    if total <= 0:
+        return pd.DataFrame()
+    for symbol, weight in valid_weights.items():
+        frame = histories[symbol]
+        if frame.empty:
+            continue
+        item = frame[["trade_date", "close"]].dropna().drop_duplicates("trade_date").set_index("trade_date")
+        item = item.rename(columns={"close": symbol})
+        series.append(item)
+    if not series:
+        return pd.DataFrame()
+    aligned = pd.concat(series, axis=1, join="inner").dropna()
+    if aligned.empty or (aligned.iloc[0] == 0).any():
+        return pd.DataFrame()
+    normalized = aligned / aligned.iloc[0]
+    used = [column for column in normalized if column in valid_weights]
+    denominator = sum(valid_weights[column] for column in used)
+    normalized["portfolio"] = sum(normalized[column] * valid_weights[column] / denominator for column in used)
+    normalized["drawdown"] = normalized["portfolio"] / normalized["portfolio"].cummax() - 1.0
+    return normalized.rename_axis("date").reset_index()
+
+
+def rebalance_events(orders: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate filled orders into signal/execution-date rebalance events."""
+    if orders.empty or "date" not in orders:
+        return pd.DataFrame()
+    frame = orders.copy()
+    if "status" in frame:
+        frame = frame[frame["status"].astype(str).str.upper() == "FILLED"]
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    if "signal_date" in frame:
+        frame["signal_date"] = pd.to_datetime(frame["signal_date"], errors="coerce")
+    else:
+        frame["signal_date"] = frame["date"]
+    frame["trade_value"] = pd.to_numeric(frame.get("trade_value", 0), errors="coerce").fillna(0).abs()
+    grouped = frame.dropna(subset=["date"]).groupby(["signal_date", "date"], dropna=False)
+    return grouped.agg(order_count=("date", "size"), trade_value=("trade_value", "sum")).reset_index()
+
+
+def downsample_timeseries(frame: pd.DataFrame, max_points: int = 2000) -> pd.DataFrame:
+    """Reduce rendering payload while retaining first/last and extrema candidates."""
+    if frame.empty or len(frame) <= max_points or max_points < 3:
+        return frame
+    step = max(1, math.ceil((len(frame) - 2) / (max_points - 2)))
+    indexes = [0, *range(1, len(frame) - 1, step), len(frame) - 1]
+    return frame.iloc[indexes[: max_points - 1] + [indexes[-1]]].drop_duplicates().copy()
+
+
+def portfolio_risk_analysis(
+    histories: dict[str, pd.DataFrame], weights: dict[str, float], window: int | None = None
+) -> dict[str, pd.DataFrame]:
+    """Calculate return correlation and Euler volatility contributions."""
+    closes = []
+    for symbol, frame in histories.items():
+        if frame.empty or "close" not in frame or float(weights.get(symbol, 0)) <= 0:
+            continue
+        closes.append(frame[["trade_date", "close"]].dropna().drop_duplicates("trade_date").set_index("trade_date").rename(columns={"close": symbol}))
+    if not closes:
+        return {"correlation": pd.DataFrame(), "contribution": pd.DataFrame()}
+    returns = pd.concat(closes, axis=1, join="inner").pct_change().dropna()
+    if window and window > 1:
+        returns = returns.tail(window)
+    if len(returns) < 2:
+        return {"correlation": pd.DataFrame(), "contribution": pd.DataFrame()}
+    correlation = returns.corr()
+    covariance = returns.cov() * 252
+    symbols = list(covariance.columns)
+    weight_series = pd.Series({symbol: max(0.0, float(weights.get(symbol, 0))) for symbol in symbols})
+    weight_series /= weight_series.sum()
+    marginal_variance = covariance.dot(weight_series)
+    portfolio_variance = float(weight_series.dot(marginal_variance))
+    if portfolio_variance <= 0:
+        contribution = pd.DataFrame()
+    else:
+        component = weight_series * marginal_variance / math.sqrt(portfolio_variance)
+        contribution = pd.DataFrame({
+            "symbol": symbols,
+            "weight": weight_series.values,
+            "risk_contribution": component.values,
+            "risk_contribution_pct": (component / component.sum()).values,
+        }).sort_values("risk_contribution_pct", ascending=False)
+    return {"correlation": correlation, "contribution": contribution}
+
+
+SLIPPAGE_SCENARIOS = ("default", "stress", "dynamic_participation")
+
+
+def infer_slippage_scenario(run_id: str, metrics: dict[str, Any]) -> str:
+    """Infer scenario without silently treating legacy unknown runs as default."""
+    explicit = str(metrics.get("slippage_scenario") or "").lower()
+    if explicit in SLIPPAGE_SCENARIOS:
+        return explicit
+    lowered = run_id.lower()
+    for scenario in ("dynamic_participation", "stress", "default"):
+        if scenario in lowered:
+            return scenario
+    return "unknown"

@@ -1,0 +1,1 @@
+D:\strategy\platform\results\backtests\r048_training_domestic_stress\20260711_142635\risk_parity_ewma_dual_band_reset\r048_domestic_ewma_dual_band_reset_stress_candidate_20260711_142635_554092
