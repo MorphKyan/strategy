@@ -41,6 +41,23 @@ ALL_ASSETS_DICT = [
     {"asset_id": "CN_ETF:159920.SZ", "code": "159920", "name": "恒生ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
     {"asset_id": "CN_ETF:513030.SH", "code": "513030", "name": "德国ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
     {"asset_id": "CN_ETF:510880.SH", "code": "510880", "name": "红利ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    # --- R039 行业轮动候选池（docs/r039_rotation_blueprint.md §3）---
+    {"asset_id": "CN_ETF:512880.SH", "code": "512880", "name": "证券ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:512800.SH", "code": "512800", "name": "银行ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:512010.SH", "code": "512010", "name": "医药ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:159928.SZ", "code": "159928", "name": "消费ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:512690.SH", "code": "512690", "name": "酒ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:512660.SH", "code": "512660", "name": "军工ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:512400.SH", "code": "512400", "name": "有色金属ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:512980.SH", "code": "512980", "name": "传媒ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:515000.SH", "code": "515000", "name": "科技ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:512480.SH", "code": "512480", "name": "半导体ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:515050.SH", "code": "515050", "name": "5G通信ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:512200.SH", "code": "512200", "name": "房地产ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:515220.SH", "code": "515220", "name": "煤炭ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:515700.SH", "code": "515700", "name": "新能车ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:515210.SH", "code": "515210", "name": "钢铁ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
+    {"asset_id": "CN_ETF:159996.SZ", "code": "159996", "name": "家电ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
 ]
 
 def main() -> int:

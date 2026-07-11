@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
 
 import akshare as ak
 
-# List of 12 ETFs in the universe
+# List of ETFs in the universe (core assets + R039 industry rotation candidates)
 ETFS = [
     {"code": "510300", "name": "沪深300ETF"},
     {"code": "513500", "name": "标普500ETF"},
@@ -24,6 +24,23 @@ ETFS = [
     {"code": "159920", "name": "恒生ETF"},
     {"code": "513030", "name": "德国ETF"},
     {"code": "510880", "name": "红利ETF"},
+    # R039 行业轮动候选池（docs/r039_rotation_blueprint.md §3）
+    {"code": "512880", "name": "证券ETF"},
+    {"code": "512800", "name": "银行ETF"},
+    {"code": "512010", "name": "医药ETF"},
+    {"code": "159928", "name": "消费ETF"},
+    {"code": "512690", "name": "酒ETF"},
+    {"code": "512660", "name": "军工ETF"},
+    {"code": "512400", "name": "有色金属ETF"},
+    {"code": "512980", "name": "传媒ETF"},
+    {"code": "515000", "name": "科技ETF"},
+    {"code": "512480", "name": "半导体ETF"},
+    {"code": "515050", "name": "5G通信ETF"},
+    {"code": "512200", "name": "房地产ETF"},
+    {"code": "515220", "name": "煤炭ETF"},
+    {"code": "515700", "name": "新能车ETF"},
+    {"code": "515210", "name": "钢铁ETF"},
+    {"code": "159996", "name": "家电ETF"},
 ]
 
 def parse_dividend(text):

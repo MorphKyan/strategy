@@ -1000,3 +1000,29 @@ def test_platform_experiment_runner_writes_standard_report(tmp_path: Path):
     assert payload["candidate"]["trade_count"] > 0
     assert payload["baseline"]["trade_count"] > 0
     assert "sharpe_ratio_delta" in payload["comparison"]
+
+
+def test_market_store_guards_history_shrink(tmp_path):
+    import pandas as pd
+
+    store = MarketDataStore(tmp_path)
+    path = tmp_path / "TEST.csv"
+    old = pd.DataFrame(
+        {
+            "trade_date": ["2020-01-02", "2020-01-03", "2026-01-05"],
+            "close": [1.0, 1.1, 2.0],
+        }
+    )
+    old.to_csv(path, index=False)
+
+    # 降级源只回短窗（首日晚于本地）→ 保留本地更早历史，重叠部分以新数据为准
+    short = pd.DataFrame({"trade_date": ["2026-01-05", "2026-01-06"], "close": [2.1, 2.2]})
+    merged = store._guard_history_shrink(path, short, "TEST")
+    assert merged["trade_date"].tolist() == ["2020-01-02", "2020-01-03", "2026-01-05", "2026-01-06"]
+    assert merged.loc[merged["trade_date"] == "2026-01-05", "close"].iloc[0] == 2.1
+    assert any("short-window source guard" in note for note in store.quality.notes)
+
+    # 全量数据（首日不晚于本地）→ 照常整体覆盖
+    full = pd.DataFrame({"trade_date": ["2020-01-02", "2026-01-06"], "close": [1.0, 2.2]})
+    untouched = store._guard_history_shrink(path, full, "TEST")
+    assert untouched is full

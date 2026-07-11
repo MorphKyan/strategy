@@ -1472,3 +1472,6 @@ BUILTIN_STRATEGIES[RiskParityEWMACovStrategy.name] = RiskParityEWMACovStrategy
 from src.platform_core.strategies.fixed_weight import FixedWeightThresholdStrategy  # noqa: E402
 
 BUILTIN_STRATEGIES[FixedWeightThresholdStrategy.name] = FixedWeightThresholdStrategy
+
+# strategies/rotation.py（R039 行业动量轮动）为 research-only，验收 Failed 后
+# 按 Hard Rule 3 撤销注册；复研时 import IndustryMomentumRotationStrategy 并在此注册。
