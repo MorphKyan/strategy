@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -118,11 +118,26 @@ class MarketDataStore:
             self.source = FinshareDataSource(Path.cwd())
         for asset in assets:
             path = self.path_for(asset)
-            if fetch:
-                raw = self.source.fetch_bars(self._finshare_code(asset), start=start, end=end, adjust=None)
+            is_synthetic = asset.code.endswith("_3X")
+            if fetch and not is_synthetic:
+                fetch_start = start or "1990-01-01"
+                fetch_end = end or date.today().isoformat()
+                raw = self.source.fetch_bars(self._finshare_code(asset), start=fetch_start, end=fetch_end, adjust=None)
                 normalized, notes = normalize_market_frame(raw, "finshare")
+                if normalized.empty:
+                    raise RuntimeError(
+                        f"Market data provider returned no valid rows for {asset.asset_id} "
+                        f"between {fetch_start} and {fetch_end}; existing file was preserved."
+                    )
                 normalized.to_csv(path, index=False)
                 self.quality.extend(f"{asset.asset_id}: {note}" for note in notes)
+            elif fetch and is_synthetic:
+                if not path.exists():
+                    raise FileNotFoundError(
+                        f"Synthetic market data missing for {asset.asset_id}: {path}. "
+                        "Regenerate it with the canonical synthetic-data generator."
+                    )
+                self.quality.add(f"{asset.asset_id}: synthetic asset preserved; provider fetch skipped")
             elif not path.exists():
                 raise FileNotFoundError(f"Standard market data missing for {asset.asset_id}: {path}. Run sync with --fetch or import CSV first.")
             self.quality.extend(self.validate_file(path, asset.asset_id))
@@ -130,11 +145,13 @@ class MarketDataStore:
             # Enforce 7-day data staleness check (skip under pytest)
             import sys
             if "pytest" not in sys.modules:
-                from datetime import date
                 today = date.today()
                 frame = pd.read_csv(path)
                 if "trade_date" in frame.columns:
-                    max_date = pd.to_datetime(frame["trade_date"]).max().date()
+                    valid_dates = pd.to_datetime(frame["trade_date"], errors="coerce").dropna()
+                    if valid_dates.empty:
+                        raise RuntimeError(f"No valid trade_date values for {asset.asset_id} in {path}.")
+                    max_date = valid_dates.max().date()
                     if (today - max_date).days > 7:
                         raise RuntimeError(
                             f"Stale market data detected for {asset.asset_id} in {path}. "

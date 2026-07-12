@@ -30,6 +30,43 @@ def test_target_portfolio_rejects_invalid_weights():
         TargetPortfolio({"A": 0.7, "B": 0.4})
 
 
+def test_market_sync_normalizes_open_ended_dates_and_preserves_existing_file_on_empty_fetch(tmp_path):
+    import pandas as pd
+
+    asset = Asset(asset_id="CN_ETF:515080.SH", code="515080", name="ETF", exchange="SH")
+    existing = tmp_path / "515080.csv"
+    existing.write_text("trade_date,close\n2026-06-24,1.0\n", encoding="utf-8")
+
+    class EmptySource:
+        def fetch_bars(self, code, start=None, end=None, adjust=None):
+            assert code == "515080.SH"
+            assert start == "1990-01-01"
+            assert end == date.today().isoformat()
+            return pd.DataFrame()
+
+    with pytest.raises(RuntimeError, match="existing file was preserved"):
+        MarketDataStore(tmp_path, source=EmptySource()).sync_assets([asset], start=None, end=None, fetch=True)
+    assert existing.read_text(encoding="utf-8") == "trade_date,close\n2026-06-24,1.0\n"
+
+
+def test_market_sync_skips_provider_fetch_for_synthetic_asset(tmp_path, monkeypatch):
+    import pandas as pd
+
+    monkeypatch.setattr("src.platform_core.data_store.date", type("D", (), {"today": staticmethod(lambda: date(2026, 7, 12))}))
+    asset = Asset(asset_id="CN_ETF:511260_3X.SH", code="511260_3X", name="模拟30Y", exchange="SH")
+    pd.DataFrame({
+        "trade_date": ["2026-07-10"], "open": [1], "high": [1], "low": [1], "close": [1],
+        "volume": [1], "amount": [1], "adjust_factor": [1], "source": ["simulated"], "updated_at": ["x"],
+    }).to_csv(tmp_path / "511260_3X.csv", index=False)
+
+    class NoFetch:
+        def fetch_bars(self, *args, **kwargs):
+            raise AssertionError("synthetic asset must not be fetched from provider")
+
+    report = MarketDataStore(tmp_path, source=NoFetch()).sync_assets([asset], start=None, end=None, fetch=True)
+    assert any("provider fetch skipped" in note for note in report.notes)
+
+
 def test_risk_parity_daily_rebalance_frequency_checks_every_trading_day():
     class Data:
         calendar = [

@@ -1,5 +1,5 @@
 platform:
-  run_name: r1_domestic_rolling_10y_bond_3x_vol
+  run_name: r1_domestic_ewma_bond_10y_dashboard
 data:
   data_dir: data
 assets:
@@ -29,7 +29,7 @@ assets:
   price_limit_pct: 0.1
 - asset_id: CN_ETF:511260.SH
   code: '511260'
-  name: 10年国债ETF（波动率按3倍计量）
+  name: 10年国债ETF
   asset_type: etf
   exchange: SH
   currency: CNY
@@ -51,7 +51,7 @@ execution:
 output:
   results_dir: results/backtests
 strategy:
-  strategy_name: risk_parity
+  strategy_name: risk_parity_ewma
   strategy_version_id: null
   cancel_pending_on_start: false
   params:
@@ -65,7 +65,5 @@ strategy:
     - CN_ETF:512890.SH
     - CN_ETF:518880.SH
     - CN_ETF:511260.SH
-    rolling_window: 120
-    min_periods: 20
-    vol_multipliers:
-      CN_ETF:511260.SH: 3.0
+    ewma_span: 60
+    ewma_min_periods: 20

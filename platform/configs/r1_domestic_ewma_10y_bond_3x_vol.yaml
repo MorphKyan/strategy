@@ -27,9 +27,9 @@ assets:
   currency: CNY
   lot_size: 100
   price_limit_pct: 0.1
-- asset_id: CN_ETF:511260_3X.SH
-  code: 511260_3X
-  name: 模拟30年国债期货
+- asset_id: CN_ETF:511260.SH
+  code: '511260'
+  name: 10年国债ETF（波动率按3倍计量）
   asset_type: etf
   exchange: SH
   currency: CNY
@@ -64,8 +64,8 @@ strategy:
     - CN_ETF:510300.SH
     - CN_ETF:512890.SH
     - CN_ETF:518880.SH
-    - CN_ETF:511260_3X.SH
+    - CN_ETF:511260.SH
     ewma_span: 60
     ewma_min_periods: 20
     vol_multipliers:
-      CN_ETF:511260_3X.SH: 3.0
+      CN_ETF:511260.SH: 3.0
