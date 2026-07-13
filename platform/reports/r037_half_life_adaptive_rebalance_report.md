@@ -80,7 +80,7 @@
 ## 执行命令
 
 ```powershell
-.\env\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml platform\configs\baseline_r2_global_dividend_ewma.yaml
+.\env\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml platform\configs\global_dividend_ewma.yaml
 .\env\python.exe -m compileall platform\src\platform_core\strategy.py
 .\env\python.exe platform\scripts\get_common_date_range.py --config platform\configs\research_r037_r1_halflife_train.yaml platform\configs\research_r037_r2_halflife_train.yaml
 .\env\python.exe platform\scripts\run_platform_experiment.py --config configs\research_r037_r1_halflife_train.yaml --baseline-config configs\research_r037_r1_r016_train.yaml --experiment-name r037_r1_halflife_vs_r016_train --no-charts

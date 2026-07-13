@@ -23,7 +23,7 @@
 ## 处置
 
 - `industry_momentum_rotation` 撤销注册（Hard Rule 3），`strategies/rotation.py` 留 research-only + 10 例 pytest（含"确未注册"断言）。
-- 候选配置删除（完整副本在实验报告目录）；基线 `baseline_r9_industry_equal_weight.yaml` 保留（Hard Rule 8）。
+- 候选配置删除（完整副本在实验报告目录）；基线 `domestic_industry_equal_weight.yaml` 保留（Hard Rule 8）。
 - 16 只行业 ETF 数据链（sina 全量行情 + 事件驱动 hfq 因子 + 分红/拆分事件表扩容）保留入库；`MarketDataStore` 新增历史收缩保护。
 - 冻结样本未触碰。
 

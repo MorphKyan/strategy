@@ -26,10 +26,10 @@
 | **baseline_r1_domestic_rolling**| baseline<br>candidate | 27.59%<br>27.13% | -4.49%<br>**-2.87%** | 1.4039<br>**1.6082** | 21.59%<br>22.75% | 16.0<br>19.0 |
 | **baseline_r1_domestic_ewma** | baseline<br>candidate | 29.20%<br>27.13% | -3.37%<br>**-2.87%** | 1.4750<br>**1.6082** | 41.54%<br>**22.75%** | 37.0<br>19.0 |
 | **baseline_r1_domestic_low_vol**| baseline<br>candidate | 26.53%<br>24.48% | -3.05%<br>**-2.95%** | 1.4357<br>**1.4630** | 38.58%<br>**21.80%** | 26.0<br>16.0 |
-| **baseline_r2_global_ewma** | baseline<br>candidate | 31.23%<br>29.32% | -3.08%<br>-3.27% | 1.5523<br>**1.5815** | 47.90%<br>**25.81%** | 53.0<br>26.0 |
+| **global_ewma** | baseline<br>candidate | 31.23%<br>29.32% | -3.08%<br>-3.27% | 1.5523<br>**1.5815** | 47.90%<br>**25.81%** | 53.0<br>26.0 |
 | **baseline_r2_global_dividend** | baseline<br>candidate | 29.56%<br>29.01% | -2.90%<br>-3.33% | 1.5310<br>**1.5407** | 46.99%<br>**24.64%** | 37.0<br>20.0 |
 | **baseline_r3_global_nasdaq** | baseline<br>candidate | 25.89%<br>26.41% | -3.66%<br>**-2.30%** | 1.7529<br>**2.1235** | 86.98%<br>**46.77%** | 64.0<br>36.0 |
-| **baseline_us_blend_ewma** | baseline<br>candidate | 31.75%<br>32.66% | -3.29%<br>-4.15% | 1.4855<br>**1.5581** | 56.63%<br>**27.79%** | 57.0<br>40.0 |
+| **us_blend_ewma** | baseline<br>candidate | 31.75%<br>32.66% | -3.29%<br>-4.15% | 1.4855<br>**1.5581** | 56.63%<br>**27.79%** | 57.0<br>40.0 |
 | **baseline_risk_parity_hrp** | baseline<br>candidate | 16.03%<br>26.89% | -2.00%<br>-3.21% | 2.5872<br>**2.9600** | 39.58%<br>59.18% | 3.0<br>17.0 |
 | **baseline_risk_parity_lw_cov** | baseline<br>candidate | 26.85%<br>26.89% | -4.51%<br>**-3.21%** | 2.6671<br>**2.9600** | 57.96%<br>59.18% | 10.0<br>17.0 |
 

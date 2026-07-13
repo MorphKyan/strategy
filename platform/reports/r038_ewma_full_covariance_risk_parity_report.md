@@ -39,17 +39,17 @@
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
 | **baseline_r1_domestic_rolling** | baseline | 120.49% | -14.10% | 1.304 | **19.29%** | 53 |
 | | candidate | **123.96%** | **-11.96%** | **1.464** | 28.77% | 62 |
-| **baseline_r3_global_nasdaq_all_weather_ewma** | baseline | 44.66% | -5.56% | 2.024 | 54.00% | 72 |
+| **global_nasdaq_all_weather_ewma** | baseline | 44.66% | -5.56% | 2.024 | 54.00% | 72 |
 | | candidate | **46.55%** | **-4.37%** | **2.280** | **40.86%** | 66 |
 | **baseline_r1_domestic_ewma** | baseline | **128.08%** | **-10.20%** | **1.555** | 36.44% | 79 |
 | | candidate | 123.96% | -11.96% | 1.464 | **28.77%** | 62 |
 | **baseline_r1_domestic_low_vol_ewma** | baseline | **141.74%** | **-11.98%** | **1.595** | 36.78% | 72 |
 | | candidate | 138.37% | -14.51% | 1.406 | **24.68%** | 46 |
-| **baseline_r2_global_ewma** | baseline | **125.55%** | **-12.42%** | **1.268** | 44.02% | 102 |
+| **global_ewma** | baseline | **125.55%** | **-12.42%** | **1.268** | 44.02% | 102 |
 | | candidate | 124.75% | -12.79% | 1.255 | **27.41%** | 77 |
-| **baseline_r2_global_dividend_ewma** | baseline | **138.92%** | -16.18% | **1.206** | 41.98% | 85 |
+| **global_dividend_ewma** | baseline | **138.92%** | -16.18% | **1.206** | 41.98% | 85 |
 | | candidate | 135.11% | **-16.15%** | 1.160 | **23.34%** | 56 |
-| **baseline_us_blend_ewma** | baseline | 131.68% | -26.42% | 0.794 | 46.13% | 134 |
+| **us_blend_ewma** | baseline | 131.68% | -26.42% | 0.794 | 46.13% | 134 |
 | | candidate | **133.35%** | **-26.30%** | **0.798** | **27.17%** | 89 |
 
 ### 3.2 最终测试样本外 (OOS) 对照绩效 (2025-07-01 至 2026-06-18)
@@ -58,17 +58,17 @@
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
 | **baseline_r1_domestic_rolling** | baseline | 10.39% | -4.68% | 1.638 | **79.08%** | 18 |
 | | candidate | **10.74%** | -4.68% | **1.687** | 85.35% | 16 |
-| **baseline_r3_global_nasdaq_all_weather_ewma** | baseline | **14.58%** | **-3.07%** | **2.361** | 95.22% | 30 |
+| **global_nasdaq_all_weather_ewma** | baseline | **14.58%** | **-3.07%** | **2.361** | 95.22% | 30 |
 | | candidate | 13.24% | -3.30% | 2.189 | **92.80%** | 27 |
 | **baseline_r1_domestic_ewma** | baseline | **11.20%** | -5.09% | 1.602 | 86.14% | 17 |
 | | candidate | 10.74% | **-4.68%** | **1.687** | **85.35%** | 16 |
 | **baseline_r1_domestic_low_vol_ewma** | baseline | **7.88%** | -4.98% | 1.156 | 85.20% | 13 |
 | | candidate | 7.77% | **-4.81%** | **1.157** | **83.68%** | 11 |
-| **baseline_r2_global_ewma** | baseline | **12.16%** | **-4.98%** | **1.862** | **88.52%** | 21 |
+| **global_ewma** | baseline | **12.16%** | **-4.98%** | **1.862** | **88.52%** | 21 |
 | | candidate | 11.98% | -5.31% | 1.841 | 90.13% | 19 |
-| **baseline_r2_global_dividend_ewma** | baseline | **9.98%** | **-4.91%** | **1.549** | **84.00%** | 13 |
+| **global_dividend_ewma** | baseline | **9.98%** | **-4.91%** | **1.549** | **84.00%** | 13 |
 | | candidate | 9.85% | -5.51% | 1.509 | 87.95% | 16 |
-| **baseline_us_blend_ewma** | baseline | **15.03%** | **-4.95%** | **2.115** | **89.35%** | 23 |
+| **us_blend_ewma** | baseline | **15.03%** | **-4.95%** | **2.115** | **89.35%** | 23 |
 | | candidate | 14.03% | -5.48% | 2.007 | 92.18% | 25 |
 
 ---
@@ -81,17 +81,17 @@
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **baseline_r1_domestic_rolling** | baseline | 21 | 1.497 | 0.557 | -11.48% | 4.51% | 22.31% |
 | | candidate | 21 | **1.612** | **0.482** | **-9.98%** | **3.43%** | 32.27% |
-| **baseline_r3_global_nasdaq_all_weather_ewma** | baseline | 15 | 2.034 | 0.037 | -5.55% | 0.03% | 53.76% |
+| **global_nasdaq_all_weather_ewma** | baseline | 15 | 2.034 | 0.037 | -5.55% | 0.03% | 53.76% |
 | | candidate | 15 | **2.286** | **0.021** | **-4.38%** | 0.04% | 41.12% |
 | **baseline_r1_domestic_ewma** | baseline | 11 | **1.669** | **0.390** | **-8.73%** | **2.54%** | 39.58% |
 | | candidate | 11 | 1.638 | 0.496 | -9.79% | 3.62% | 32.29% |
 | **baseline_r1_domestic_low_vol_ewma** | baseline | 11 | **1.867** | **0.598** | **-9.57%** | **4.16%** | 39.47% |
 | | candidate | 11 | 1.725 | 0.676 | -11.40% | 5.25% | 26.11% |
-| **baseline_r2_global_ewma** | baseline | 11 | 1.326 | **0.418** | **-11.53%** | **2.42%** | 45.40% |
+| **global_ewma** | baseline | 11 | 1.326 | **0.418** | **-11.53%** | **2.42%** | 45.40% |
 | | candidate | 11 | **1.342** | 0.468 | -11.65% | 2.58% | 31.25% |
-| **baseline_r2_global_dividend_ewma** | baseline | 11 | **1.284** | **0.501** | -14.93% | 3.56% | 44.07% |
+| **global_dividend_ewma** | baseline | 11 | **1.284** | **0.501** | -14.93% | 3.56% | 44.07% |
 | | candidate | 11 | 1.274 | 0.532 | **-14.81%** | **3.46%** | 26.49% |
-| **baseline_us_blend_ewma** | baseline | 11 | 0.939 | **0.598** | -23.00% | **7.67%** | 47.22% |
+| **us_blend_ewma** | baseline | 11 | 0.939 | **0.598** | -23.00% | **7.67%** | 47.22% |
 | | candidate | 11 | **0.964** | 0.640 | **-22.63%** | 7.78% | 31.45% |
 
 ---
@@ -127,4 +127,4 @@
 
 ### 6.2 配置文件绑定
 我们保留远程合并的专属测试配置：
-- 专属基准测试配置：[demo_r1_domestic_ewma_cov.yaml](file:///D:/strategy/platform/configs/demo_r1_domestic_ewma_cov.yaml) 予以保留，可作为后续生产级实盘投资组合的初始化模板。
+- 专属基准测试配置：[domestic_ewma_cov_bond_10y.yaml (原 demo_r1 演示配置，已去重合并)](file:///D:/strategy/platform/configs/domestic_ewma_cov_bond_10y.yaml (原 demo_r1 演示配置，已去重合并)) 予以保留，可作为后续生产级实盘投资组合的初始化模板。

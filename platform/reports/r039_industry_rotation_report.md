@@ -14,7 +14,7 @@
 **候选**：`industry_momentum_rotation`（`platform/src/platform_core/strategies/rotation.py`）
 参数全部先验冻结、零搜索（蓝图 §2.3）：momentum_windows=[21,63]（等权混合）、skip_days=5、top_n=3、rank_buffer=2、abs_momentum_floor=0.0、rebalance_threshold=0.05、月频。
 
-**基线**：`baseline_r9_industry_equal_weight.yaml`——同一行业池 16 只 ETF 月度等权（该配置按 Hard Rule 8 保留，供轮动线后续候选复用）。
+**基线**：`domestic_industry_equal_weight.yaml`——同一行业池 16 只 ETF 月度等权（该配置按 Hard Rule 8 保留，供轮动线后续候选复用）。
 
 **行业池**（16 只，准入标准：首日 ≤ 2020-03-31、行业互斥、股票型行业/主题 ETF）：
 512880 证券 / 512800 银行 / 512010 医药 / 159928 消费 / 512690 酒 / 512660 军工 / 512400 有色 / 512980 传媒 / 515000 科技 / 512480 半导体 / 515050 5G通信 / 512200 地产 / 515220 煤炭 / 515700 新能车 / 515210 钢铁 / 159996 家电。共同起始日 2020-03-16（159996 上市）。
@@ -26,9 +26,9 @@
 - 命令（训练样本，`cwd` 任意，脚本自切到 platform/）：
 
 ```powershell
-.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\r9_rotation_industry_momentum.yaml --baseline-config configs\baseline_r9_industry_equal_weight.yaml --experiment-name r039_industry_rotation --start-date 2020-03-16 --end-date 2025-06-30 --slippage-scenario all
+.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\r9_rotation_industry_momentum.yaml --baseline-config configs\domestic_industry_equal_weight.yaml --experiment-name r039_industry_rotation --start-date 2020-03-16 --end-date 2025-06-30 --slippage-scenario all
 .\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\r9_rotation_industry_momentum.yaml --calendar-month-step 2 --end-date 2025-06-30
-.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r9_industry_equal_weight.yaml --calendar-month-step 2 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\domestic_industry_equal_weight.yaml --calendar-month-step 2 --end-date 2025-06-30
 ```
 
 （候选配置 `r9_rotation_industry_momentum.yaml` 判 Failed 后已删除；其完整副本存于实验报告目录 `reports/experiments/r039_industry_rotation_default/20260712_031354/candidate_config.yaml`。）
@@ -82,7 +82,7 @@
 - **判定：Failed。** 未运行冻结样本（纪律：仅冻结成功候选后允许触碰）。
 - 处置（Hard Rule 3 / Acceptance Guidance）：
   - `industry_momentum_rotation` 从 `BUILTIN_STRATEGIES` 撤销注册；`strategies/rotation.py` 保留为 research-only（含判定说明），pytest（10 例）保留并新增"确未注册"回归断言。
-  - 候选配置删除；**基线配置 `baseline_r9_industry_equal_weight.yaml` 保留**（Hard Rule 8，供 D2/D3 复用）。
+  - 候选配置删除；**基线配置 `domestic_industry_equal_weight.yaml` 保留**（Hard Rule 8，供 D2/D3 复用）。
   - 16 只行业 ETF 行情/因子/事件数据保留入库（中性基础设施，任何后续行业研究可用）。
 - **对卫星仓诉求的建议**：本结果不否定"高波卫星仓"目标本身，但否定了"月频价格动量轮动"这条路。若继续，优先级重排：D2（拥挤度否决）预计只能修复 2024-10-08 型追顶（几个 pp），修不动 2021/2022 的鞭打主亏（>13pp/年），**不建议单独立项**；更值得试的方向是把"行业等权持有 + 阈值带再平衡"（即本课题基线 + R038 纪律）作为卫星仓候选——基线本身年化 6.8%、中位数起点 +2.0%，且与核心仓相关性结构不同。
 

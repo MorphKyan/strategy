@@ -6,7 +6,7 @@
 
 ## 2. 实验设置与多重对照设计
 - **样本切分约束**：
-  - 训练/研究样本区间：最早可用共同交易日至 `2025-06-30`（含）（针对最早行情不满三年的 `baseline_r7_cluster_representative_damped.yaml` 进行物理剔除，共保留 13 个有效基准配置进行测试）。
+  - 训练/研究样本区间：最早可用共同交易日至 `2025-06-30`（含）（针对最早行情不满三年的 `global_cluster_representative_damped.yaml` 进行物理剔除，共保留 13 个有效基准配置进行测试）。
   - 最终测试样本区间 (OOS)：`2025-07-01` 至 `2026-06-16`。
 - **回测频率与调仓**：统一采用按月调仓 (monthly rebalance) 以确保策略表现的完全公平对齐。
 - **基线对照策略**：原配置中对应的基线策略（例如 `risk_parity_ewma` 或 `risk_parity_lw_cov` 等）。
@@ -18,9 +18,9 @@
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
 | `baseline_r1_domestic_ewma.yaml` | Baseline (RP EWMA)<br>Shrunk EWMA | 1.575<br>1.016 | -5.60%<br>-11.05% | 40.43%<br>26.16% | 2.103<br>2.036 | -1.70%<br>-2.18% |
 | `baseline_r1_domestic_low_vol_ewma.yaml` | Baseline (RP EWMA)<br>Shrunk EWMA | 1.647<br>1.390 | -6.00%<br>-7.77% | 31.70%<br>26.35% | 1.597<br>1.491 | -1.46%<br>-1.92% |
-| `baseline_r2_global_ewma.yaml` | Baseline (LW Cov)<br>Shrunk EWMA | 1.285<br>0.891 | -7.20%<br>-10.58% | 37.51%<br>31.06% | 1.961<br>2.482 | -2.70%<br>-2.09% |
-| `baseline_r2_global_dividend_ewma.yaml` | Baseline (LW Cov)<br>Shrunk EWMA | 0.977<br>0.811 | -12.19%<br>-12.32% | 27.68%<br>36.44% | 1.592<br>2.131 | -2.60%<br>-1.95% |
-| `baseline_us_blend_ewma.yaml` | Baseline (LW Cov)<br>Shrunk EWMA | 0.753<br>0.685 | -16.40%<br>-17.32% | 38.41%<br>40.29% | 2.306<br>2.433 | -2.71%<br>-3.03% |
+| `global_ewma.yaml` | Baseline (LW Cov)<br>Shrunk EWMA | 1.285<br>0.891 | -7.20%<br>-10.58% | 37.51%<br>31.06% | 1.961<br>2.482 | -2.70%<br>-2.09% |
+| `global_dividend_ewma.yaml` | Baseline (LW Cov)<br>Shrunk EWMA | 0.977<br>0.811 | -12.19%<br>-12.32% | 27.68%<br>36.44% | 1.592<br>2.131 | -2.60%<br>-1.95% |
+| `us_blend_ewma.yaml` | Baseline (LW Cov)<br>Shrunk EWMA | 0.753<br>0.685 | -16.40%<br>-17.32% | 38.41%<br>40.29% | 2.306<br>2.433 | -2.71%<br>-3.03% |
 
 **结果分析与发现**：
 1. **训练集样本内 (IS) 表现显著退化**：在绝大多数核心的多资产配置中，新策略的 Sharpe 比例都发生了大幅退化。例如，在国内 EWMA 配置中，IS Sharpe 从 1.575 降至 1.016 (-0.559)，最大回撤从 -5.60% 大幅恶化至 -11.05%；在全球 EWMA 组合中，IS Sharpe 也从 1.285 降至 0.891 (-0.394)。这证明在历史大周期中，新策略相比基线没有提供稳定的超额表现。
@@ -31,8 +31,8 @@
 - **稳定性指标表现**：
   - `baseline_r1_domestic_ewma`：在 22 个起跑点下，新策略 Sharpe 波动标准差为 **0.6490**，最大回撤波动标准差为 **3.87%**；
   - `baseline_r1_domestic_low_vol_ewma`：新策略 Sharpe 波动标准差为 **0.6741**，最大回撤波动标准差为 **3.32%**；
-  - `baseline_r2_global_ewma`：新策略 Sharpe 波动标准差为 **0.5326**，最大回撤波动标准差为 **2.59%**；
-  - `baseline_us_blend_ewma`：新策略 Sharpe 波动标准差为 **0.5707**，最大回撤波动标准差为 **5.04%**。
+  - `global_ewma`：新策略 Sharpe 波动标准差为 **0.5326**，最大回撤波动标准差为 **2.59%**；
+  - `us_blend_ewma`：新策略 Sharpe 波动标准差为 **0.5707**，最大回撤波动标准差为 **5.04%**。
   
 - **敏感性结论**：各起跑点之间的表现标准差显著超过了合格标准（`Sharpe 波动标准差 < 0.25` 和 `最大回撤波动 < 2%`）。这说明新策略对历史回测起点的选择具有极高的敏感性，样本外稳定性很差，存在严重的过拟合风险。
 

@@ -77,8 +77,8 @@
 既有 R040 标准实验由以下入口生成，样本上限均为 `2025-06-30`：
 
 ```powershell
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r040_herc_cluster_r2_global_ewma.yaml --baseline-config configs\baseline_r2_global_ewma.yaml --experiment-name r040_herc_cluster_r2_train --start-date 2020-01-17 --end-date 2025-06-30
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r040_herc_cluster_r3_global_nasdaq_all_weather_ewma.yaml --baseline-config configs\baseline_r3_global_nasdaq_all_weather_ewma.yaml --experiment-name r040_herc_cluster_r3_train --start-date 2020-01-17 --end-date 2025-06-30
+.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r040_herc_cluster_r2_global_ewma.yaml --baseline-config configs\global_ewma.yaml --experiment-name r040_herc_cluster_r2_train --start-date 2020-01-17 --end-date 2025-06-30
+.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r040_herc_cluster_r3_global_nasdaq_all_weather_ewma.yaml --baseline-config configs\global_nasdaq_all_weather_ewma.yaml --experiment-name r040_herc_cluster_r3_train --start-date 2020-01-17 --end-date 2025-06-30
 .\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r040_herc_cluster_r7_cluster_representative_damped_3x.yaml --baseline-config configs\r040_baseline_r7_cluster_representative_damped_3x.yaml --experiment-name r040_herc_cluster_r7_train --start-date 2020-01-17 --end-date 2025-06-30
 .\env\python.exe tmp_r040_calendar_sensitivity.py
 ```

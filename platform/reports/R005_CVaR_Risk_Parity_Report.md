@@ -69,11 +69,11 @@ D:\strategy\env\python.exe C:\Users\morph\.gemini\antigravity-cli\brain\b1e3e2d1
 | **baseline_r1_domestic_ewma** | 1.4750 | 0.5499 | -3.37% | -6.46% | 415,426.06 | 754,816.49 |
 | **baseline_r1_domestic_low_vol_ewma** | 1.4357 | **1.4359** | -3.05% | **-2.46%** | 385,808.52 | **282,452.23** |
 | **baseline_r1_domestic_rolling** | 1.4039 | 0.5499 | -4.49% | -6.46% | 215,895.18 | 754,816.49 |
-| **baseline_r2_global_dividend_ewma** | 1.4589 | 1.2395 | -3.85% | -4.21% | 419,758.58 | 505,443.31 |
-| **baseline_r2_global_ewma** | 1.4675 | 0.8346 | -4.18% | -5.15% | 440,085.65 | 1,199,451.96 |
-| **baseline_r3_global_nasdaq_all_weather_ewma** | 1.7068 | 1.3695 | -3.38% | -3.21% | 863,320.32 | 1,572,434.18 |
+| **global_dividend_ewma** | 1.4589 | 1.2395 | -3.85% | -4.21% | 419,758.58 | 505,443.31 |
+| **global_ewma** | 1.4675 | 0.8346 | -4.18% | -5.15% | 440,085.65 | 1,199,451.96 |
+| **global_nasdaq_all_weather_ewma** | 1.7068 | 1.3695 | -3.38% | -3.21% | 863,320.32 | 1,572,434.18 |
 | **baseline_risk_parity_lw_cov** | 2.6671 | **2.8046** | -4.51% | **-2.72%** | 579,571.17 | 848,350.96 |
-| **baseline_us_blend_ewma** | 1.4169 | 0.9083 | -4.68% | -5.01% | 426,390.50 | 775,840.13 |
+| **us_blend_ewma** | 1.4169 | 0.9083 | -4.68% | -5.01% | 426,390.50 | 775,840.13 |
 
 ---
 
@@ -91,7 +91,7 @@ D:\strategy\env\python.exe C:\Users\morph\.gemini\antigravity-cli\brain\b1e3e2d1
 
 ### 5.2 退化归因 (劣势配置分析)
 1. **过度交易与时滞（以 EWMA / Rolling 等单一趋势配置为主）**：
-   * 在 `baseline_r1_domestic_ewma`、`baseline_r1_domestic_rolling`、`baseline_r2_global_ewma`、`baseline_us_blend_ewma` 中，夏普和回撤均出现了恶化，且换手率几乎翻倍。
+   * 在 `baseline_r1_domestic_ewma`、`baseline_r1_domestic_rolling`、`global_ewma`、`us_blend_ewma` 中，夏普和回撤均出现了恶化，且换手率几乎翻倍。
    * **原因**：历史模拟法下的 CVaR 是基于固定窗口（如 120 天）内的极端分位数样本进行边际风险估计的。在具有强单边趋势或者剧烈震荡的市场（如美股纳指或跨境权益类资产）中：
      * **样本代表性不足**：120天中 95% 置信度超限天数仅有 6 天。这意味着边际贡献 MRC 仅仅由这 6 天的历史收益决定，极易受到个别单日异动噪声（如某天个股暴跌）的严重污染，导致优化得到的权重过度敏感、频繁震荡变动。
      * **时序自相关滞后**：这导致资产池在转势时反应严重滞后或产生过拟合，换手率急剧攀升，侵蚀了策略净值。

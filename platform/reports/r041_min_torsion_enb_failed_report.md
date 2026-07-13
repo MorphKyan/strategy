@@ -4,7 +4,7 @@
 
 结论：`Failed`，不合入。
 
-候选 `risk_parity_min_torsion_enb` 在训练样本主对照中只有轻微收益改善，但日历起点敏感性未通过：`baseline_r2_global_ewma` 与 `baseline_r3_global_nasdaq_all_weather_ewma` 的有效起点平均 Sharpe 均低于基线，且 `ENB/N` 最低值在三组配置中都长期低于冻结阈值 `0.55`。最终测试样本 `2025-07-01` 之后未运行，因为候选在训练样本敏感性阶段已经失败。候选策略源码、注册和平台候选配置已物理清除。
+候选 `risk_parity_min_torsion_enb` 在训练样本主对照中只有轻微收益改善，但日历起点敏感性未通过：`global_ewma` 与 `global_nasdaq_all_weather_ewma` 的有效起点平均 Sharpe 均低于基线，且 `ENB/N` 最低值在三组配置中都长期低于冻结阈值 `0.55`。最终测试样本 `2025-07-01` 之后未运行，因为候选在训练样本敏感性阶段已经失败。候选策略源码、注册和平台候选配置已物理清除。
 
 ## 假设与来源
 
@@ -28,9 +28,9 @@
 
 | 配置 | 共同起点 | 共同终点 | 至 `2025-06-30` 训练年数 |
 | --- | --- | --- | --- |
-| `baseline_r2_global_ewma` | `2019-01-18` | `2026-06-24` | `6.448` |
-| `baseline_r3_global_nasdaq_all_weather_ewma` | `2020-01-17` | `2026-06-24` | `5.451` |
-| `baseline_us_blend_ewma` | `2019-01-18` | `2026-06-24` | `6.448` |
+| `global_ewma` | `2019-01-18` | `2026-06-24` | `6.448` |
+| `global_nasdaq_all_weather_ewma` | `2020-01-17` | `2026-06-24` | `5.451` |
+| `us_blend_ewma` | `2019-01-18` | `2026-06-24` | `6.448` |
 | `baseline_r7_cluster_representative_damped` | `2024-03-28` | `2026-06-24` | `1.257` |
 
 ## 训练样本主对照
@@ -105,9 +105,9 @@
 
 ```powershell
 .\env\python.exe -m py_compile platform\src\platform_core\strategy.py
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r041_min_torsion_enb_r2_global_ewma.yaml --baseline-config configs\baseline_r2_global_ewma.yaml --experiment-name r041_smoke_r2_train --start-date 2019-01-18 --end-date 2025-06-30 --no-charts
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r041_min_torsion_enb_r3_global_nasdaq_all_weather_ewma.yaml --baseline-config configs\baseline_r3_global_nasdaq_all_weather_ewma.yaml --experiment-name r041_r3_train --start-date 2020-01-17 --end-date 2025-06-30 --no-charts
-.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r041_min_torsion_enb_us_blend_ewma.yaml --baseline-config configs\baseline_us_blend_ewma.yaml --experiment-name r041_us_blend_train --start-date 2019-01-18 --end-date 2025-06-30 --no-charts
+.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r041_min_torsion_enb_r2_global_ewma.yaml --baseline-config configs\global_ewma.yaml --experiment-name r041_smoke_r2_train --start-date 2019-01-18 --end-date 2025-06-30 --no-charts
+.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r041_min_torsion_enb_r3_global_nasdaq_all_weather_ewma.yaml --baseline-config configs\global_nasdaq_all_weather_ewma.yaml --experiment-name r041_r3_train --start-date 2020-01-17 --end-date 2025-06-30 --no-charts
+.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r041_min_torsion_enb_us_blend_ewma.yaml --baseline-config configs\us_blend_ewma.yaml --experiment-name r041_us_blend_train --start-date 2019-01-18 --end-date 2025-06-30 --no-charts
 .\env\python.exe tmp_r041_calendar_sensitivity.py
 ```
 

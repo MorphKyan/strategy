@@ -38,16 +38,16 @@
 | **baseline_r1_domestic_ewma.yaml** | Baseline<br>Candidate | **1.151**<br>1.112 | **-9.69%**<br>-9.26% | 0.524<br>0.666 | 1.539<br>**1.853** | -3.65%<br>**-2.24%** | 0.507<br>0.809 |
 | **baseline_r1_domestic_low_vol_ewma.yaml** | Baseline<br>Candidate | **1.591**<br>1.536 | -6.01%<br>**-5.86%** | 0.453<br>0.551 | 1.063<br>**1.377** | -3.75%<br>**-1.90%** | 0.614<br>0.875 |
 | **baseline_r1_domestic_rolling.yaml** | Baseline<br>Candidate | 0.925<br>**1.577** | -10.54%<br>**-5.43%** | 0.240<br>0.511 | **1.819**<br>1.673 | **-2.56%**<br>-3.69% | 0.395<br>0.620 |
-| **baseline_r2_global_dividend_ewma.yaml** | Baseline<br>Candidate | **1.127**<br>0.958 | **-9.20%**<br>-12.18% | 0.443<br>0.600 | 1.698<br>**1.790** | -2.52%<br>**-2.45%** | 1.162<br>**0.925** |
-| **baseline_r2_global_ewma.yaml** | Baseline<br>Candidate | **1.169**<br>0.981 | **-7.09%**<br>-11.35% | 0.560<br>0.710 | 2.136<br>**2.221** | -2.74%<br>**-2.52%** | 1.053<br>**1.017** |
-| **baseline_r3_global_nasdaq_all_weather_ewma.yaml** | Baseline<br>Candidate | 1.847<br>**1.891** | **-3.69%**<br>-4.10% | 0.600<br>0.876 | 2.826<br>**2.884** | **-1.63%**<br>-1.71% | 1.265<br>**1.240** |
+| **global_dividend_ewma.yaml** | Baseline<br>Candidate | **1.127**<br>0.958 | **-9.20%**<br>-12.18% | 0.443<br>0.600 | 1.698<br>**1.790** | -2.52%<br>**-2.45%** | 1.162<br>**0.925** |
+| **global_ewma.yaml** | Baseline<br>Candidate | **1.169**<br>0.981 | **-7.09%**<br>-11.35% | 0.560<br>0.710 | 2.136<br>**2.221** | -2.74%<br>**-2.52%** | 1.053<br>**1.017** |
+| **global_nasdaq_all_weather_ewma.yaml** | Baseline<br>Candidate | 1.847<br>**1.891** | **-3.69%**<br>-4.10% | 0.600<br>0.876 | 2.826<br>**2.884** | **-1.63%**<br>-1.71% | 1.265<br>**1.240** |
 | **baseline_r5_cvar_dynamic_budget.yaml** | Baseline<br>Candidate | **1.745**<br>1.720 | **-2.78%**<br>-4.08% | 0.419<br>0.524 | **2.464**<br>2.259 | **-1.40%**<br>-2.87% | 0.345<br>0.622 |
 | **baseline_r6_adaptive_risk_deviation.yaml** | Baseline<br>Candidate | 1.561<br>**1.720** | -4.61%<br>**-4.08%** | 0.359<br>0.524 | **2.282**<br>2.259 | -2.98%<br>**-2.87%** | 0.551<br>0.622 |
-| **baseline_r7_cluster_representative_damped.yaml** | Baseline<br>Candidate | **1.894**<br>1.648 | **-4.10%**<br>-6.05% | 1.346<br>1.672 | 1.317<br>**2.106** | -4.61%<br>**-3.61%** | 0.578<br>0.962 |
+| **global_cluster_representative_damped.yaml** | Baseline<br>Candidate | **1.894**<br>1.648 | **-4.10%**<br>-6.05% | 1.346<br>1.672 | 1.317<br>**2.106** | -4.61%<br>**-3.61%** | 0.578<br>0.962 |
 | **baseline_risk_parity_gerber.yaml** | Baseline<br>Candidate | 1.581<br>**1.720** | -4.60%<br>**-4.08%** | 0.291<br>0.524 | **2.411**<br>2.241 | **-2.83%**<br>-2.87% | 0.540<br>0.649 |
 | **baseline_risk_parity_hrp.yaml** | Baseline<br>Candidate | 1.591<br>**1.720** | **-3.72%**<br>-4.08% | 0.284<br>0.524 | 1.640<br>**2.241** | **-0.83%**<br>-2.87% | 0.116<br>0.649 |
 | **baseline_risk_parity_lw_cov.yaml** | Baseline<br>Candidate | 1.581<br>**1.720** | -4.61%<br>**-4.08%** | 0.354<br>0.524 | **2.266**<br>2.241 | -2.98%<br>**-2.87%** | 0.572<br>0.649 |
-| **baseline_us_blend_ewma.yaml** | Baseline<br>Candidate | **0.743**<br>0.503 | **-16.32%**<br>-25.57% | 0.509<br>0.691 | 1.955<br>**2.333** | -2.65%<br>**-2.50%** | 1.371<br>**0.956** |
+| **us_blend_ewma.yaml** | Baseline<br>Candidate | **0.743**<br>0.503 | **-16.32%**<br>-25.57% | 0.509<br>0.691 | 1.955<br>**2.333** | -2.65%<br>**-2.50%** | 1.371<br>**0.956** |
 
 ---
 
@@ -59,16 +59,16 @@
 *   **baseline_r1_domestic_ewma**：敏感性胜出率 **11.8%**，Sharpe 均值由 2.014 -> 1.915，未见优势。
 *   **baseline_r1_domestic_low_vol_ewma**：敏感性胜出率 **8.8%**，Sharpe 均值由 2.286 -> 2.168，表现变差。
 *   **baseline_r1_domestic_rolling**：敏感性胜出率 **79.4%**，Sharpe 均值由 1.864 -> 2.041，有一定稳定性。
-*   **baseline_r2_global_dividend_ewma**：敏感性胜出率 **11.8%**，Sharpe 均值由 1.830 -> 1.726，表现衰退。
-*   **baseline_r2_global_ewma**：敏感性胜出率 **26.5%**，Sharpe 均值由 1.777 -> 1.711，表现衰退。
-*   **baseline_r3_global_nasdaq_all_weather_ewma**：敏感性胜出率 **60.0%**，Sharpe 均值由 1.827 -> 1.812，表现相当。
+*   **global_dividend_ewma**：敏感性胜出率 **11.8%**，Sharpe 均值由 1.830 -> 1.726，表现衰退。
+*   **global_ewma**：敏感性胜出率 **26.5%**，Sharpe 均值由 1.777 -> 1.711，表现衰退。
+*   **global_nasdaq_all_weather_ewma**：敏感性胜出率 **60.0%**，Sharpe 均值由 1.827 -> 1.812，表现相当。
 *   **baseline_r5_cvar_dynamic_budget**：敏感性胜出率 **14.0%**，Sharpe 均值由 2.484 -> 2.382，表现变差。
 *   **baseline_r6_adaptive_risk_deviation**：敏感性胜出率 **95.3%**，Sharpe 均值由 2.202 -> 2.382，有优势。
 *   **baseline_r7_cluster_representative_damped**：敏感性胜出率 **0.0%**，Sharpe 均值由 1.895 -> 1.454，严重衰退。
 *   **baseline_risk_parity_gerber**：敏感性胜出率 **95.3%**，Sharpe 均值由 2.227 -> 2.382，有优势。
 *   **baseline_risk_parity_hrp**：敏感性胜出率 **58.1%**，Sharpe 均值由 2.349 -> 2.382，表现相当。
 *   **baseline_risk_parity_lw_cov**：敏感性胜出率 **93.0%**，Sharpe 均值由 2.246 -> 2.382，有优势。
-*   **baseline_us_blend_ewma**：敏感性胜出率 **41.2%**，Sharpe 均值由 1.535 -> 1.484，表现衰退。
+*   **us_blend_ewma**：敏感性胜出率 **41.2%**，Sharpe 均值由 1.535 -> 1.484，表现衰退。
 
 ---
 

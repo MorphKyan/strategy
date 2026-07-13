@@ -41,12 +41,12 @@
 | | 样本外 (OOS) | 基准 (risk_parity) | 1.236 | - | -2.58% | 34.58% | 9 |
 | | 样本外 (OOS) | NLS 新策略 (risk_parity_nonlinear_shrinkage) | 0.874 | - | -3.68% | 40.94% | 9 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `baseline_r2_global_dividend_ewma.yaml` | 样本内 (IS 均值) | 基准 (risk_parity_lw_cov) | 1.286 | 0.485 | -8.52% | 41.66% | - |
+| `global_dividend_ewma.yaml` | 样本内 (IS 均值) | 基准 (risk_parity_lw_cov) | 1.286 | 0.485 | -8.52% | 41.66% | - |
 | | 样本内 (IS 均值) | NLS 新策略 (risk_parity_nonlinear_shrinkage) | 1.202 | 0.495 | -8.89% | 46.40% | - |
 | | 样本外 (OOS) | 基准 (risk_parity_lw_cov) | 0.705 | - | -2.56% | 99.99% | 13 |
 | | 样本外 (OOS) | NLS 新策略 (risk_parity_nonlinear_shrinkage) | 0.772 | - | -2.57% | 166.48% | 16 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `baseline_r2_global_ewma.yaml` | 样本内 (IS 均值) | 基准 (risk_parity_lw_cov) | 1.318 | 0.388 | -6.64% | 60.73% | - |
+| `global_ewma.yaml` | 样本内 (IS 均值) | 基准 (risk_parity_lw_cov) | 1.318 | 0.388 | -6.64% | 60.73% | - |
 | | 样本内 (IS 均值) | NLS 新策略 (risk_parity_nonlinear_shrinkage) | 1.160 | 0.465 | -7.56% | 56.10% | - |
 | | 样本外 (OOS) | 基准 (risk_parity_lw_cov) | 1.305 | - | -2.73% | 103.86% | 20 |
 | | 样本外 (OOS) | NLS 新策略 (risk_parity_nonlinear_shrinkage) | 0.917 | - | -2.65% | 163.22% | 21 |
@@ -76,7 +76,7 @@
 | | 样本外 (OOS) | 基准 (risk_parity_lw_cov) | 1.338 | - | -3.02% | 52.31% | 9 |
 | | 样本外 (OOS) | NLS 新策略 (risk_parity_nonlinear_shrinkage) | 1.270 | - | -2.88% | 44.49% | 10 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `baseline_us_blend_ewma.yaml` | 样本内 (IS 均值) | 基准 (risk_parity_lw_cov) | 0.901 | 0.601 | -14.04% | 56.62% | - |
+| `us_blend_ewma.yaml` | 样本内 (IS 均值) | 基准 (risk_parity_lw_cov) | 0.901 | 0.601 | -14.04% | 56.62% | - |
 | | 样本内 (IS 均值) | NLS 新策略 (risk_parity_nonlinear_shrinkage) | 0.829 | 0.560 | -14.78% | 70.98% | - |
 | | 样本外 (OOS) | 基准 (risk_parity_lw_cov) | 1.014 | - | -2.65% | 134.94% | 19 |
 | | 样本外 (OOS) | NLS 新策略 (risk_parity_nonlinear_shrinkage) | 1.006 | - | -2.80% | 179.30% | 24 |
@@ -145,14 +145,14 @@
 - 配置 `baseline_r1_domestic_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.4249 (门槛 < 0.20), MDD Std = 2.01% (门槛 < 1.5%)
 - 配置 `baseline_r1_domestic_low_vol_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.4606 (门槛 < 0.20), MDD Std = 2.24% (门槛 < 1.5%)
 - 配置 `baseline_r1_domestic_rolling.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.4441 (门槛 < 0.20), MDD Std = 2.32% (门槛 < 1.5%)
-- 配置 `baseline_r2_global_dividend_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.4947 (门槛 < 0.20), MDD Std = 2.50% (门槛 < 1.5%)
-- 配置 `baseline_r2_global_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.4653 (门槛 < 0.20), MDD Std = 2.26% (门槛 < 1.5%)
+- 配置 `global_dividend_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.4947 (门槛 < 0.20), MDD Std = 2.50% (门槛 < 1.5%)
+- 配置 `global_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.4653 (门槛 < 0.20), MDD Std = 2.26% (门槛 < 1.5%)
 - 配置 `baseline_r5_cvar_dynamic_budget.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.2646 (门槛 < 0.20), MDD Std = 0.62% (门槛 < 1.5%)
 - 配置 `baseline_r6_adaptive_risk_deviation.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.2355 (门槛 < 0.20), MDD Std = 0.92% (门槛 < 1.5%)
 - 配置 `baseline_risk_parity_gerber.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.2395 (门槛 < 0.20), MDD Std = 0.92% (门槛 < 1.5%)
 - 配置 `baseline_risk_parity_hrp.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.2395 (门槛 < 0.20), MDD Std = 0.92% (门槛 < 1.5%)
 - 配置 `baseline_risk_parity_lw_cov.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.2395 (门槛 < 0.20), MDD Std = 0.92% (门槛 < 1.5%)
-- 配置 `baseline_us_blend_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.5597 (门槛 < 0.20), MDD Std = 5.10% (门槛 < 1.5%)
+- 配置 `us_blend_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.5597 (门槛 < 0.20), MDD Std = 5.10% (门槛 < 1.5%)
 - 配置 `r0_domestic_equal_weight_risk_parity_ewma.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.2199 (门槛 < 0.20), MDD Std = 0.98% (门槛 < 1.5%)
 - 配置 `r1_domestic_ewma_10y_bond_3x_vol.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.4249 (门槛 < 0.20), MDD Std = 2.01% (门槛 < 1.5%)
 - 配置 `r1_domestic_ewma_risk_parity_cvar_dynamic_budget.yaml` 的起点敏感性指标未达标: Sharpe Std = 0.3685 (门槛 < 0.20), MDD Std = 1.10% (门槛 < 1.5%)

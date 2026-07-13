@@ -32,18 +32,18 @@
 | baseline_r1_user_holdings | floor | 36.27% | 2.73% | -4.04% | 0.9315 | 14.99% | 42 | Pass |
 | baseline_r1_user_holdings | ceil | 37.60% | 2.81% | -4.05% | 0.9574 | 18.90% | 76 | Pass |
 | baseline_r1_user_holdings | round | 37.42% | 2.80% | -4.20% | 0.9526 | 15.38% | 44 | Pass |
-| baseline_r2_global_dividend_ewma | floor | 150.12% | 8.30% | -14.05% | 0.9662 | 49.79% | 298 | Pass |
-| baseline_r2_global_dividend_ewma | ceil | 147.40% | 8.20% | -14.02% | 0.9481 | 59.83% | 409 | Pass |
-| baseline_r2_global_dividend_ewma | round | 145.43% | 8.12% | -13.32% | 0.9680 | 51.35% | 303 | Pass |
-| baseline_r2_global_ewma | floor | 134.70% | 6.99% | -12.00% | 0.8994 | 48.77% | 382 | Pass |
-| baseline_r2_global_ewma | ceil | 131.44% | 6.87% | -11.66% | 0.8983 | 52.23% | 413 | Pass |
-| baseline_r2_global_ewma | round | 131.32% | 6.87% | -11.66% | 0.8985 | 48.76% | 371 | Pass |
-| baseline_r2_user_holdings | floor | 36.62% | 2.75% | -4.31% | 0.9542 | 15.42% | 52 | Pass |
-| baseline_r2_user_holdings | ceil | 37.18% | 2.79% | -4.33% | 0.9593 | 18.98% | 89 | Pass |
-| baseline_r2_user_holdings | round | 37.09% | 2.78% | -4.39% | 0.9611 | 16.28% | 60 | Pass |
-| baseline_r3_global_nasdaq_all_weather_ewma | floor | 107.30% | 5.95% | -27.02% | 0.4249 | 40.88% | 282 | Pass |
-| baseline_r3_global_nasdaq_all_weather_ewma | ceil | 106.06% | 5.89% | -26.93% | 0.4230 | 46.99% | 345 | Pass |
-| baseline_r3_global_nasdaq_all_weather_ewma | round | 108.40% | 5.99% | -26.68% | 0.4284 | 38.79% | 243 | Pass |
+| global_dividend_ewma | floor | 150.12% | 8.30% | -14.05% | 0.9662 | 49.79% | 298 | Pass |
+| global_dividend_ewma | ceil | 147.40% | 8.20% | -14.02% | 0.9481 | 59.83% | 409 | Pass |
+| global_dividend_ewma | round | 145.43% | 8.12% | -13.32% | 0.9680 | 51.35% | 303 | Pass |
+| global_ewma | floor | 134.70% | 6.99% | -12.00% | 0.8994 | 48.77% | 382 | Pass |
+| global_ewma | ceil | 131.44% | 6.87% | -11.66% | 0.8983 | 52.23% | 413 | Pass |
+| global_ewma | round | 131.32% | 6.87% | -11.66% | 0.8985 | 48.76% | 371 | Pass |
+| global_user_holdings | floor | 36.62% | 2.75% | -4.31% | 0.9542 | 15.42% | 52 | Pass |
+| global_user_holdings | ceil | 37.18% | 2.79% | -4.33% | 0.9593 | 18.98% | 89 | Pass |
+| global_user_holdings | round | 37.09% | 2.78% | -4.39% | 0.9611 | 16.28% | 60 | Pass |
+| global_nasdaq_all_weather_ewma | floor | 107.30% | 5.95% | -27.02% | 0.4249 | 40.88% | 282 | Pass |
+| global_nasdaq_all_weather_ewma | ceil | 106.06% | 5.89% | -26.93% | 0.4230 | 46.99% | 345 | Pass |
+| global_nasdaq_all_weather_ewma | round | 108.40% | 5.99% | -26.68% | 0.4284 | 38.79% | 243 | Pass |
 | baseline_r3_user_holdings | floor | 22.29% | 1.77% | -7.92% | 0.6460 | 15.05% | 67 | Pass |
 | baseline_r3_user_holdings | ceil | 22.23% | 1.76% | -7.92% | 0.6448 | 16.21% | 79 | Pass |
 | baseline_r3_user_holdings | round | 22.64% | 1.79% | -7.93% | 0.6546 | 15.47% | 66 | Pass |
@@ -65,9 +65,9 @@
 | baseline_risk_parity_lw_cov | floor | 140.30% | 7.19% | -7.59% | 1.3808 | 22.95% | 92 | Pass |
 | baseline_risk_parity_lw_cov | ceil | 139.27% | 7.16% | -7.63% | 1.3706 | 24.42% | 107 | Pass |
 | baseline_risk_parity_lw_cov | round | 138.96% | 7.14% | -7.60% | 1.3701 | 22.29% | 96 | Pass |
-| baseline_us_blend_ewma | floor | 146.51% | 7.41% | -26.14% | 0.5652 | 42.08% | 245 | Pass |
-| baseline_us_blend_ewma | ceil | 143.71% | 7.31% | -26.04% | 0.5596 | 46.59% | 277 | Pass |
-| baseline_us_blend_ewma | round | 145.17% | 7.36% | -26.12% | 0.5617 | 41.32% | 227 | Pass |
+| us_blend_ewma | floor | 146.51% | 7.41% | -26.14% | 0.5652 | 42.08% | 245 | Pass |
+| us_blend_ewma | ceil | 143.71% | 7.31% | -26.04% | 0.5596 | 46.59% | 277 | Pass |
+| us_blend_ewma | round | 145.17% | 7.36% | -26.12% | 0.5617 | 41.32% | 227 | Pass |
 
 ## 3. 启动日敏感性测试结果 (每2月一个启动日 ~ 2025-06-30)
 
@@ -81,12 +81,12 @@
 | baseline_r1_domestic_ewma | floor | 79 | 1.7082 (0.6706) | 13.60% (5.60%) | -8.20% (3.18%) | 64.36% | 104.8 |
 | baseline_r1_domestic_ewma | ceil | 79 | 1.7066 (0.6749) | 13.59% (5.65%) | -8.26% (3.19%) | 73.58% | 145.8 |
 | baseline_r1_domestic_ewma | round | 79 | 1.7194 (0.6773) | 13.70% (5.65%) | -8.21% (3.16%) | 66.68% | 111.5 |
-| baseline_r2_global_ewma | floor | 79 | 1.4910 (0.7125) | 12.65% (4.44%) | -9.88% (3.41%) | 83.32% | 288.4 |
-| baseline_r2_global_ewma | ceil | 79 | 1.4737 (0.6937) | 12.45% (4.31%) | -9.73% (3.29%) | 92.03% | 318.1 |
-| baseline_r2_global_ewma | round | 79 | 1.4785 (0.6990) | 12.51% (4.41%) | -9.78% (3.33%) | 84.42% | 280.9 |
-| baseline_us_blend_ewma | floor | 79 | 1.2076 (0.9330) | 13.64% (4.96%) | -20.70% (9.44%) | 71.23% | 181.8 |
-| baseline_us_blend_ewma | ceil | 79 | 1.1929 (0.9240) | 13.45% (4.93%) | -20.64% (9.39%) | 81.97% | 215.1 |
-| baseline_us_blend_ewma | round | 79 | 1.1930 (0.9266) | 13.53% (4.92%) | -20.86% (9.55%) | 70.90% | 170.1 |
+| global_ewma | floor | 79 | 1.4910 (0.7125) | 12.65% (4.44%) | -9.88% (3.41%) | 83.32% | 288.4 |
+| global_ewma | ceil | 79 | 1.4737 (0.6937) | 12.45% (4.31%) | -9.73% (3.29%) | 92.03% | 318.1 |
+| global_ewma | round | 79 | 1.4785 (0.6990) | 12.51% (4.41%) | -9.78% (3.33%) | 84.42% | 280.9 |
+| us_blend_ewma | floor | 79 | 1.2076 (0.9330) | 13.64% (4.96%) | -20.70% (9.44%) | 71.23% | 181.8 |
+| us_blend_ewma | ceil | 79 | 1.1929 (0.9240) | 13.45% (4.93%) | -20.64% (9.39%) | 81.97% | 215.1 |
+| us_blend_ewma | round | 79 | 1.1930 (0.9266) | 13.53% (4.92%) | -20.86% (9.55%) | 70.90% | 170.1 |
 | baseline_r5_cvar_dynamic_budget | floor | 79 | 2.2151 (0.6945) | 14.13% (6.03%) | -5.53% (1.98%) | 59.06% | 94.3 |
 | baseline_r5_cvar_dynamic_budget | ceil | 79 | 2.1999 (0.6931) | 14.07% (6.05%) | -5.53% (1.99%) | 70.68% | 164.5 |
 | baseline_r5_cvar_dynamic_budget | round | 79 | 2.2075 (0.6972) | 14.11% (6.06%) | -5.54% (1.98%) | 61.87% | 98.7 |
@@ -115,18 +115,18 @@
 | baseline_r1_user_holdings | floor | 2.98% | 3.15% | -5.11% | 0.4632 | 96.43% | 32 |
 | baseline_r1_user_holdings | ceil | 2.75% | 2.92% | -5.11% | 0.4356 | 86.04% | 26 |
 | baseline_r1_user_holdings | round | 2.83% | 3.00% | -5.11% | 0.4478 | 83.25% | 21 |
-| baseline_r2_global_dividend_ewma | floor | 8.20% | 8.70% | -4.40% | 1.3847 | 100.29% | 45 |
-| baseline_r2_global_dividend_ewma | ceil | 8.00% | 8.49% | -4.53% | 1.3467 | 116.95% | 58 |
-| baseline_r2_global_dividend_ewma | round | 8.33% | 8.84% | -4.35% | 1.4042 | 102.85% | 42 |
-| baseline_r2_global_ewma | floor | 10.67% | 11.33% | -4.54% | 1.7124 | 110.39% | 56 |
-| baseline_r2_global_ewma | ceil | 10.90% | 11.57% | -4.82% | 1.7455 | 117.37% | 59 |
-| baseline_r2_global_ewma | round | 10.87% | 11.54% | -4.73% | 1.7445 | 108.21% | 50 |
-| baseline_r2_user_holdings | floor | 4.93% | 5.23% | -4.50% | 0.7679 | 104.42% | 37 |
-| baseline_r2_user_holdings | ceil | 4.92% | 5.22% | -4.48% | 0.7665 | 130.60% | 55 |
-| baseline_r2_user_holdings | round | 4.98% | 5.28% | -4.48% | 0.7749 | 103.85% | 37 |
-| baseline_r3_global_nasdaq_all_weather_ewma | floor | 12.06% | 12.81% | -3.31% | 2.0193 | 110.90% | 47 |
-| baseline_r3_global_nasdaq_all_weather_ewma | ceil | 11.90% | 12.65% | -3.34% | 2.0035 | 131.09% | 63 |
-| baseline_r3_global_nasdaq_all_weather_ewma | round | 11.94% | 12.68% | -3.33% | 2.0142 | 116.95% | 48 |
+| global_dividend_ewma | floor | 8.20% | 8.70% | -4.40% | 1.3847 | 100.29% | 45 |
+| global_dividend_ewma | ceil | 8.00% | 8.49% | -4.53% | 1.3467 | 116.95% | 58 |
+| global_dividend_ewma | round | 8.33% | 8.84% | -4.35% | 1.4042 | 102.85% | 42 |
+| global_ewma | floor | 10.67% | 11.33% | -4.54% | 1.7124 | 110.39% | 56 |
+| global_ewma | ceil | 10.90% | 11.57% | -4.82% | 1.7455 | 117.37% | 59 |
+| global_ewma | round | 10.87% | 11.54% | -4.73% | 1.7445 | 108.21% | 50 |
+| global_user_holdings | floor | 4.93% | 5.23% | -4.50% | 0.7679 | 104.42% | 37 |
+| global_user_holdings | ceil | 4.92% | 5.22% | -4.48% | 0.7665 | 130.60% | 55 |
+| global_user_holdings | round | 4.98% | 5.28% | -4.48% | 0.7749 | 103.85% | 37 |
+| global_nasdaq_all_weather_ewma | floor | 12.06% | 12.81% | -3.31% | 2.0193 | 110.90% | 47 |
+| global_nasdaq_all_weather_ewma | ceil | 11.90% | 12.65% | -3.34% | 2.0035 | 131.09% | 63 |
+| global_nasdaq_all_weather_ewma | round | 11.94% | 12.68% | -3.33% | 2.0142 | 116.95% | 48 |
 | baseline_r3_user_holdings | floor | 3.56% | 3.77% | -6.91% | 0.5343 | 103.21% | 35 |
 | baseline_r3_user_holdings | ceil | 3.57% | 3.78% | -6.93% | 0.5347 | 119.10% | 49 |
 | baseline_r3_user_holdings | round | 3.07% | 3.26% | -6.62% | 0.4766 | 88.86% | 30 |
@@ -148,9 +148,9 @@
 | baseline_risk_parity_lw_cov | floor | 15.34% | 16.31% | -4.94% | 2.1785 | 84.76% | 21 |
 | baseline_risk_parity_lw_cov | ceil | 15.25% | 16.22% | -4.95% | 2.1661 | 89.58% | 24 |
 | baseline_risk_parity_lw_cov | round | 15.17% | 16.13% | -4.90% | 2.1143 | 83.57% | 14 |
-| baseline_us_blend_ewma | floor | 13.10% | 13.92% | -4.72% | 1.9026 | 112.03% | 35 |
-| baseline_us_blend_ewma | ceil | 13.45% | 14.30% | -4.80% | 1.9683 | 137.33% | 60 |
-| baseline_us_blend_ewma | round | 13.23% | 14.07% | -4.80% | 1.9144 | 120.85% | 41 |
+| us_blend_ewma | floor | 13.10% | 13.92% | -4.72% | 1.9026 | 112.03% | 35 |
+| us_blend_ewma | ceil | 13.45% | 14.30% | -4.80% | 1.9683 | 137.33% | 60 |
+| us_blend_ewma | round | 13.23% | 14.07% | -4.80% | 1.9144 | 120.85% | 41 |
 
 ## 5. 各方案分析与实盘建议
 

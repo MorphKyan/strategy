@@ -286,7 +286,7 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 - 与核心仓在**组合层**隔离（独立 `sim_r9_*`/`live_r9_*` 命名空间），不动摇 §4 五条架构契约。
 - 信号选型依据 2026-07-12 文献调研：A 股个股月频动量失效（Liu-Stambaugh-Yuan 2019）但行业动量存活；舆情/热点不做买入信号（日频动量一周内反转），其可交易本质由拥挤度代理（D2 迭代）。
 
-**竣工说明（as-built，2026-07-12）**：D1 当日完成实现+全套验收，训练样本相对行业等权基线年化落后 10.5pp、32 个起点仅 1 个为正，判 **Failed / research-only**（详见 r039 蓝图头部判定与 `reports/r039_industry_rotation_report.md`）。策略已撤销注册（代码与 pytest 保留）；沉淀资产：16 只行业 ETF 全量数据链（sina 行情 + 事件驱动 hfq 因子 + 分红/拆分事件表扩容）、可复用基线 `baseline_r9_industry_equal_weight.yaml`、`MarketDataStore` 历史收缩保护。卫星仓诉求仍在，下一个候选建议"行业池等权 + Swedroe 阈值带"（新编号立项）。
+**竣工说明（as-built，2026-07-12）**：D1 当日完成实现+全套验收，训练样本相对行业等权基线年化落后 10.5pp、32 个起点仅 1 个为正，判 **Failed / research-only**（详见 r039 蓝图头部判定与 `reports/r039_industry_rotation_report.md`）。策略已撤销注册（代码与 pytest 保留）；沉淀资产：16 只行业 ETF 全量数据链（sina 行情 + 事件驱动 hfq 因子 + 分红/拆分事件表扩容）、可复用基线 `domestic_industry_equal_weight.yaml`、`MarketDataStore` 历史收缩保护。卫星仓诉求仍在，下一个候选建议"行业池等权 + Swedroe 阈值带"（新编号立项）。
 
 ---
 

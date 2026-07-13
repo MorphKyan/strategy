@@ -25,10 +25,10 @@ Marcos López de Prado 于 2016 年提出的层次风险平价 (Hierarchical Ris
 | `baseline_m3m4_fundamental` | `fundamental_value_equal_weight` $\rightarrow$ `hrp` | 0.000 $\rightarrow$ 2.611 (+2.611) | 0.00% $\rightarrow$ -2.00% | 0.0 $\rightarrow$ 390235.3 | N/A | 0 $\rightarrow$ 3 |
 | `baseline_r1_domestic_rolling` | `risk_parity` $\rightarrow$ `hrp` | 1.404 $\rightarrow$ 1.580 (+0.176) | -4.49% $\rightarrow$ -1.97% | 215895.2 $\rightarrow$ 179788.1 | -16.72% | 16 $\rightarrow$ 15 |
 | `baseline_r1_domestic_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.475 $\rightarrow$ 1.580 (+0.105) | -3.37% $\rightarrow$ -1.97% | 415426.1 $\rightarrow$ 179788.1 | -56.72% | 37 $\rightarrow$ 15 |
-| `baseline_r2_global_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.552 $\rightarrow$ 1.706 (+0.154) | -3.08% $\rightarrow$ -2.05% | 479040.1 $\rightarrow$ 189460.2 | -60.45% | 53 $\rightarrow$ 19 |
-| `baseline_r2_global_dividend_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.531 $\rightarrow$ 1.604 (+0.073) | -2.90% $\rightarrow$ -2.09% | 469963.6 $\rightarrow$ 188120.5 | -59.97% | 37 $\rightarrow$ 15 |
-| `baseline_r3_global_nasdaq_all_weather_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.753 $\rightarrow$ 2.254 (+0.501) | -3.66% $\rightarrow$ -2.01% | 869815.6 $\rightarrow$ 362366.7 | -58.34% | 64 $\rightarrow$ 28 |
-| `baseline_us_blend_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.486 $\rightarrow$ 1.605 (+0.119) | -3.29% $\rightarrow$ -2.14% | 566258.3 $\rightarrow$ 142448.2 | -74.84% | 57 $\rightarrow$ 6 |
+| `global_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.552 $\rightarrow$ 1.706 (+0.154) | -3.08% $\rightarrow$ -2.05% | 479040.1 $\rightarrow$ 189460.2 | -60.45% | 53 $\rightarrow$ 19 |
+| `global_dividend_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.531 $\rightarrow$ 1.604 (+0.073) | -2.90% $\rightarrow$ -2.09% | 469963.6 $\rightarrow$ 188120.5 | -59.97% | 37 $\rightarrow$ 15 |
+| `global_nasdaq_all_weather_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.753 $\rightarrow$ 2.254 (+0.501) | -3.66% $\rightarrow$ -2.01% | 869815.6 $\rightarrow$ 362366.7 | -58.34% | 64 $\rightarrow$ 28 |
+| `us_blend_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.486 $\rightarrow$ 1.605 (+0.119) | -3.29% $\rightarrow$ -2.14% | 566258.3 $\rightarrow$ 142448.2 | -74.84% | 57 $\rightarrow$ 6 |
 | `baseline_r1_domestic_low_vol_ewma` | `risk_parity_ewma` $\rightarrow$ `hrp` | 1.436 $\rightarrow$ 1.513 (+0.077) | -3.05% $\rightarrow$ -1.98% | 385808.5 $\rightarrow$ 142529.7 | -63.06% | 26 $\rightarrow$ 3 |
 
 *注：为了数据对齐的科学性，表格中的换手率在 pipeline 原生输出的基础上进行了 1/100 的换算，以还原常规单位。*

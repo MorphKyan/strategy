@@ -58,9 +58,9 @@
 
 | 配置文件 | 债券资产配置版本 | 累计收益率 | 年化收益率 | 年化波动率 | 最大回撤 | 夏普比率 | 年化双边周转率 | 交易次数 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `compare_r1_domestic_ewma_bond_10y_bond_10y.yaml` | **10y国债 (511260)** | 24.66% | 10.57% | **4.56%** | **-1.92%** | **2.23** | **65.62%** | 65 |
-| `compare_r1_domestic_ewma_bond_10y_bond_30y_511090.yaml` | **30y国债 (511090)** | **32.36%** | **13.63%** | 8.05% | -4.99% | 1.63 | 87.07% | 68 |
-| `compare_r1_domestic_ewma_bond_10y_bond_30y_511130.yaml` | **30y国债 (511130)** | 32.12% | 13.54% | 7.63% | -4.92% | 1.71 | **78.10%** | **63** |
+| `domestic_ewma_bond_10y.yaml (原 compare_r1 对比配置，已去重合并)` | **10y国债 (511260)** | 24.66% | 10.57% | **4.56%** | **-1.92%** | **2.23** | **65.62%** | 65 |
+| `domestic_ewma_bond_30y_511090.yaml (原 compare_r1 对比配置，已去重合并)` | **30y国债 (511090)** | **32.36%** | **13.63%** | 8.05% | -4.99% | 1.63 | 87.07% | 68 |
+| `domestic_ewma_bond_30y_511130.yaml (原 compare_r1 对比配置，已去重合并)` | **30y国债 (511130)** | 32.12% | 13.54% | 7.63% | -4.92% | 1.71 | **78.10%** | **63** |
 
 ---
 
@@ -68,8 +68,8 @@
 
 以下展示代表性对比策略在 10y (绿线)、30y_511090 (蓝线)、30y_511130 (紫线) 三路对比下的净值曲线图。
 
-### 4.1 策略：`r1_domestic_ewma_bond_10y_dashboard` (EWMA 策略三路配置对比)
-![r1_domestic_ewma_bond_10y_dashboard 三路对比](file:///C:/Users/morph/.gemini/antigravity/brain/49e6496a-2a43-4d7e-9594-08e0e92f93e0/r1_domestic_ewma_bond_10y_dashboard_nav_compare.png)
+### 4.1 策略：`domestic_ewma_bond_10y (原 r1..._dashboard 对比名，已去重合并)` (EWMA 策略三路配置对比)
+![domestic_ewma_bond_10y (原 r1..._dashboard 对比名，已去重合并) 三路对比](file:///C:/Users/morph/.gemini/antigravity/brain/49e6496a-2a43-4d7e-9594-08e0e92f93e0/domestic_ewma_bond_10y (原 r1..._dashboard 对比名，已去重合并)_nav_compare.png)
 
 ### 4.2 策略：`baseline_r1_domestic_rolling` (滚动风险平价策略对比)
 ![baseline_r1_domestic_rolling 三路对比](file:///C:/Users/morph/.gemini/antigravity/brain/49e6496a-2a43-4d7e-9594-08e0e92f93e0/baseline_r1_domestic_rolling_nav_compare.png)

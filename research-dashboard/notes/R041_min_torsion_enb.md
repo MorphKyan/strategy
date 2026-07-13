@@ -20,7 +20,7 @@
 
 - 所需本地行情最新日期均为 `2026-06-24`，满足 7 日新鲜度要求。
 - `baseline_r7_cluster_representative_damped` 共同训练历史仅 `1.257` 年，剔除。
-- 有效研究配置：`baseline_r2_global_ewma`、`baseline_r3_global_nasdaq_all_weather_ewma`、`baseline_us_blend_ewma`。
+- 有效研究配置：`global_ewma`、`global_nasdaq_all_weather_ewma`、`us_blend_ewma`。
 
 ## 指标摘要
 

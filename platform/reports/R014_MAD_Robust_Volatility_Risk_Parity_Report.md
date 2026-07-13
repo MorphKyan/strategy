@@ -162,13 +162,13 @@ class RiskParityMADStrategy(RiskParityStrategy):
 | **baseline_r1_domestic_rolling** | Baseline | 27.59% | 3.56% | 2.53% | -4.49% | 1.4039 | 2.1590 | 16 |
 | | MAD (No-Cov) | 28.65% | 3.68% | 2.53% | -3.72% | 1.4554 | 2.7107 | 26 |
 | | MAD (Cov) | 24.91% | 3.24% | 2.15% | -3.14% | 1.5098 | 2.1248 | 22 |
-| **baseline_r2_global_dividend_ewma** | Baseline | 29.56% | 3.78% | 2.47% | -2.90% | 1.5310 | 4.6996 | 37 |
+| **global_dividend_ewma** | Baseline | 29.56% | 3.78% | 2.47% | -2.90% | 1.5310 | 4.6996 | 37 |
 | | MAD (No-Cov) | 30.19% | 3.85% | 2.47% | -2.62% | 1.5588 | 4.0121 | 40 |
 | | MAD (Cov) | 28.92% | 3.71% | 2.47% | -2.56% | 1.5029 | 4.8730 | 38 |
-| **baseline_r2_global_ewma** | Baseline | 31.23% | 3.97% | 2.56% | -3.08% | 1.5523 | 4.7904 | 53 |
+| **global_ewma** | Baseline | 31.23% | 3.97% | 2.56% | -3.08% | 1.5523 | 4.7904 | 53 |
 | | MAD (No-Cov) | 31.98% | 4.06% | 2.75% | -2.96% | 1.4779 | 4.2053 | 48 |
 | | MAD (Cov) | 27.28% | 3.52% | 2.39% | -3.40% | 1.4708 | 4.9282 | 41 |
-| **baseline_r3_global_nasdaq_all_weather_ewma**| Baseline | 25.89% | 6.17% | 3.52% | -3.66% | 1.7529 | 8.6982 | 64 |
+| **global_nasdaq_all_weather_ewma**| Baseline | 25.89% | 6.17% | 3.52% | -3.66% | 1.7529 | 8.6982 | 64 |
 | | MAD (No-Cov) | 28.68% | 6.78% | 3.75% | -3.11% | 1.8076 | 8.0239 | 77 |
 | | MAD (Cov) | 26.12% | 6.22% | 3.18% | -3.31% | 1.9568 | 10.3886| 85 |
 | **baseline_r5_cvar_dynamic_budget** | Baseline | 21.76% | 8.09% | 2.46% | -1.63% | **3.2943** | 5.8446 | 20 |
@@ -180,7 +180,7 @@ class RiskParityMADStrategy(RiskParityStrategy):
 | **baseline_risk_parity_lw_cov** | Baseline | 26.85% | 10.00% | 3.75% | -4.51% | 2.6671 | 5.7957 | 10 |
 | | MAD (No-Cov) | 28.01% | 10.40% | 3.66% | -3.91% | 2.8418 | 7.1461 | 20 |
 | | MAD (Cov) | 26.65% | 9.93% | 3.25% | -2.95% | 3.0575 | 6.9220 | 25 |
-| **baseline_us_blend_ewma** | Baseline | 31.75% | 4.03% | 2.71% | -3.29% | 1.4855 | 5.6626 | 57 |
+| **us_blend_ewma** | Baseline | 31.75% | 4.03% | 2.71% | -3.29% | 1.4855 | 5.6626 | 57 |
 | | MAD (No-Cov) | 35.13% | 4.41% | 3.07% | -4.19% | 1.4372 | 4.2997 | 58 |
 | | MAD (Cov) | 28.93% | 3.71% | 2.54% | -3.90% | 1.4612 | 5.3621 | 50 |
 
@@ -193,13 +193,13 @@ class RiskParityMADStrategy(RiskParityStrategy):
 | baseline_r1_domestic_ewma | +0.0362 | +1.23% | +0.1076 | +2.59% | 是 |
 | baseline_r1_domestic_low_vol_ewma| -0.0371 | +0.95% | +0.1639 | +4.25% | **否 (夏普退化)** |
 | baseline_r1_domestic_rolling | +0.1059 | +1.34% | -0.0342 | -1.58% | 是 |
-| baseline_r2_global_dividend_ewma | -0.0281 | +0.33% | +0.1734 | +3.69% | **否 (夏普退化)** |
-| baseline_r2_global_ewma | -0.0815 | -0.32% | +0.1378 | +2.88% | **否 (夏普与回撤双退化)** |
+| global_dividend_ewma | -0.0281 | +0.33% | +0.1734 | +3.69% | **否 (夏普退化)** |
+| global_ewma | -0.0815 | -0.32% | +0.1378 | +2.88% | **否 (夏普与回撤双退化)** |
 | baseline_r3_global_nasdaq_all_weather| +0.2039 | +0.36% | +1.6904 | +19.43% | 是 |
 | baseline_r5_cvar_dynamic_budget | -0.2369 | -1.32% | +0.9799 | +16.77% | **否 (夏普与回撤双退化)** |
 | baseline_risk_parity_hrp | +0.4703 | -0.95% | +2.9639 | +74.88% | **否 (换手率增幅达74.88% > 30%)** |
 | baseline_risk_parity_lw_cov | +0.3904 | +1.55% | +1.1263 | +19.43% | 是 |
-| baseline_us_blend_ewma | -0.0244 | -0.61% | -0.3005 | -5.31% | **否 (夏普与回撤双退化)** |
+| us_blend_ewma | -0.0244 | -0.61% | -0.3005 | -5.31% | **否 (夏普与回撤双退化)** |
 
 ---
 
@@ -208,11 +208,11 @@ class RiskParityMADStrategy(RiskParityStrategy):
 依据回测绩效，MAD 稳健波动率策略表现出如下统计特征：
 
 ### 5.1 局部适用性
-1. **对于中高波资产包 (如 Nasdaq 全球全天候、国内 Rolling 组合)**：MAD 可以有效剔除短期极端冲高/大跌的虚假高波动噪声，提供更为平稳的配比，这使得夏普比率在 `baseline_r3_global_nasdaq_all_weather_ewma` (+0.20) 和 `baseline_risk_parity_lw_cov` (+0.39) 中有不错提升。
+1. **对于中高波资产包 (如 Nasdaq 全球全天候、国内 Rolling 组合)**：MAD 可以有效剔除短期极端冲高/大跌的虚假高波动噪声，提供更为平稳的配比，这使得夏普比率在 `global_nasdaq_all_weather_ewma` (+0.20) 和 `baseline_risk_parity_lw_cov` (+0.39) 中有不错提升。
 2. **最大回撤的收窄**：在多个滚动组合中，最大回撤展现出小幅收窄趋势，基本符合抗震防守的设想。
 
 ### 5.2 核心痛点与过拟合风险 (退化表现)
-1. **多重资产退化**：在 `baseline_r2_global_ewma` (夏普 -0.08)、`baseline_r5_cvar_dynamic_budget` (夏普 -0.23) 以及 `baseline_us_blend_ewma` (夏普 -0.02) 等广泛的大类资产配置方案下，MAD 策略的绩效全面退化，不仅夏普下行，最大回撤也有所扩大。这说明 MAD 作为无偏估计在某些温和波动的平稳市况下，会因样本量较小造成估计效率下降（相比样本方差），导致过度保守或配置失当。
+1. **多重资产退化**：在 `global_ewma` (夏普 -0.08)、`baseline_r5_cvar_dynamic_budget` (夏普 -0.23) 以及 `us_blend_ewma` (夏普 -0.02) 等广泛的大类资产配置方案下，MAD 策略的绩效全面退化，不仅夏普下行，最大回撤也有所扩大。这说明 MAD 作为无偏估计在某些温和波动的平稳市况下，会因样本量较小造成估计效率下降（相比样本方差），导致过度保守或配置失当。
 2. **换手率剧增（交易磨损红线超限）**：
    - 在 HRP 层次风险平价配置中（`baseline_risk_parity_hrp`），Candidate 的年化双边换手率增幅高达 **74.88%**（由 3.95 飙升至 6.92），这在实际交易中会触发致命的印花税和交易摩擦磨损，严重偏离了换手率变化幅度不超过 30% 的红线规定。
 

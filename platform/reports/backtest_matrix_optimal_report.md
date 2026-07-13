@@ -8,14 +8,14 @@
 | `baseline_r1_domestic_ewma.yaml` | **hrp** | 2.427 | -0.41% | 259.06% | 3 | 沪深300ETF,红利低波ETF,黄金ETF,十年国债ETF |
 | `baseline_r1_domestic_low_vol_ewma.yaml` | **hrp** | 2.411 | -0.38% | 260.72% | 2 | 红利低波ETF,黄金ETF,十年国债ETF |
 | `baseline_r1_domestic_rolling.yaml` | **hrp** | 2.427 | -0.41% | 259.06% | 3 | 沪深300ETF,红利低波ETF,黄金ETF,十年国债ETF |
-| `baseline_r2_global_dividend_ewma.yaml` | **hrp** | 2.480 | -0.42% | 258.60% | 3 | 红利低波ETF,标普500ETF,黄金ETF,十年国债ETF |
-| `baseline_r2_global_ewma.yaml` | **risk_parity_cvar_dynamic_budget** | 2.478 | -0.54% | 261.85% | 4 | 沪深300ETF,红利低波ETF,标谱500ETF,黄金ETF... |
-| `baseline_r3_global_nasdaq_all_weather_ewma.yaml` | **risk_parity_lw_cov** | 3.184 | -1.63% | 291.44% | 14 | 沪深300ETF,红利低波ETF,纳指ETF,黄金ETF... |
+| `global_dividend_ewma.yaml` | **hrp** | 2.480 | -0.42% | 258.60% | 3 | 红利低波ETF,标普500ETF,黄金ETF,十年国债ETF |
+| `global_ewma.yaml` | **risk_parity_cvar_dynamic_budget** | 2.478 | -0.54% | 261.85% | 4 | 沪深300ETF,红利低波ETF,标谱500ETF,黄金ETF... |
+| `global_nasdaq_all_weather_ewma.yaml` | **risk_parity_lw_cov** | 3.184 | -1.63% | 291.44% | 14 | 沪深300ETF,红利低波ETF,纳指ETF,黄金ETF... |
 | `baseline_r5_cvar_dynamic_budget.yaml` | **hrp** | 2.464 | -0.41% | 260.53% | 2 | 沪深300ETF,黄金ETF,十年国债ETF |
 | `baseline_r6_adaptive_risk_deviation.yaml` | **hrp** | 2.464 | -0.41% | 260.53% | 2 | 沪深300ETF,黄金ETF,十年国债ETF |
 | `baseline_risk_parity_hrp.yaml` | **hrp** | 2.464 | -0.41% | 260.53% | 2 | 沪深300ETF,黄金ETF,十年国债ETF |
 | `baseline_risk_parity_lw_cov.yaml` | **hrp** | 2.464 | -0.41% | 260.53% | 2 | 沪深300ETF,黄金ETF,十年国债ETF |
-| `baseline_us_blend_ewma.yaml` | **risk_parity_cvar_dynamic_budget** | 2.848 | -0.57% | 258.95% | 5 | 沪深300ETF,红利低波ETF,标普500ETF,纳指ETF... |
+| `us_blend_ewma.yaml` | **risk_parity_cvar_dynamic_budget** | 2.848 | -0.57% | 258.95% | 5 | 沪深300ETF,红利低波ETF,标普500ETF,纳指ETF... |
 
 ## 2. 策略在不同组合中的适用性与局限性分析
 ### 2.1 层次风险平价 (HRP) 与 CVaR 动态预算的普适性验证

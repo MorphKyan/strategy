@@ -49,7 +49,7 @@
 | - Baseline (RP-LW) | IS (训练期) | 1.588 | -5.00% | 52.3% | 0.502 |
 | - Candidate (ICA-CVaR) | IS (训练期) | **1.010** | **-19.40%** | 430.3% | **0.701** |
 
-*(注：由于行情长度不足三年，`baseline_r7_cluster_representative_damped.yaml` 在回测中已被自动拒绝审计，不予展示。)*
+*(注：由于行情长度不足三年，`global_cluster_representative_damped.yaml` 在回测中已被自动拒绝审计，不予展示。)*
 
 ---
 

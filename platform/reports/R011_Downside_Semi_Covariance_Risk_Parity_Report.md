@@ -26,10 +26,10 @@
 | `baseline_r1_domestic_rolling` | `risk_parity` $\rightarrow$ `candidate` | 1.404 $\rightarrow$ 1.294 (-0.110) | -4.49% $\rightarrow$ -3.73% | 215.90% $\rightarrow$ 311.78% | +44.41% | 16 $\rightarrow$ 33 |
 | `baseline_r1_domestic_ewma` | `risk_parity_ewma` $\rightarrow$ `candidate` | 1.475 $\rightarrow$ 1.294 (-0.181) | -3.37% $\rightarrow$ -3.73% | 415.43% $\rightarrow$ 311.78% | -24.95% | 37 $\rightarrow$ 33 |
 | `baseline_r1_domestic_low_vol` | `risk_parity_ewma` $\rightarrow$ `candidate` | 1.436 $\rightarrow$ 1.385 (-0.051) | -3.05% $\rightarrow$ -3.54% | 385.81% $\rightarrow$ 238.56% | -38.17% | 26 $\rightarrow$ 21 |
-| `baseline_r2_global_ewma` | `risk_parity_ewma` $\rightarrow$ `candidate` | 1.552 $\rightarrow$ 1.369 (-0.183) | -3.08% $\rightarrow$ -4.27% | 479.04% $\rightarrow$ 328.42% | -31.44% | 53 $\rightarrow$ 33 |
+| `global_ewma` | `risk_parity_ewma` $\rightarrow$ `candidate` | 1.552 $\rightarrow$ 1.369 (-0.183) | -3.08% $\rightarrow$ -4.27% | 479.04% $\rightarrow$ 328.42% | -31.44% | 53 $\rightarrow$ 33 |
 | `baseline_r2_global_dividend` | `risk_parity_ewma` $\rightarrow$ `candidate` | 1.531 $\rightarrow$ 1.365 (-0.166) | -2.90% $\rightarrow$ -4.03% | 469.96% $\rightarrow$ 302.74% | -35.58% | 37 $\rightarrow$ 28 |
 | `baseline_r3_global_nasdaq_aw` | `risk_parity_ewma` $\rightarrow$ `candidate` | 1.753 $\rightarrow$ 1.783 (+0.030) | -3.66% $\rightarrow$ -2.22% | 869.82% $\rightarrow$ 645.13% | -25.83% | 64 $\rightarrow$ 61 |
-| `baseline_us_blend_ewma` | `risk_parity_ewma` $\rightarrow$ `candidate` | 1.486 $\rightarrow$ 1.355 (-0.131) | -3.29% $\rightarrow$ -4.10% | 566.26% $\rightarrow$ 372.20% | -34.27% | 57 $\rightarrow$ 63 |
+| `us_blend_ewma` | `risk_parity_ewma` $\rightarrow$ `candidate` | 1.486 $\rightarrow$ 1.355 (-0.131) | -3.29% $\rightarrow$ -4.10% | 566.26% $\rightarrow$ 372.20% | -34.27% | 57 $\rightarrow$ 63 |
 | `baseline_risk_parity_hrp` | `hrp` $\rightarrow$ `candidate` | 2.587 $\rightarrow$ 2.487 (-0.100) | -2.00% $\rightarrow$ -3.59% | 395.81% $\rightarrow$ 864.43% | +118.39% | 3 $\rightarrow$ 26 |
 | `baseline_risk_parity_lw_cov` | `risk_parity_lw_cov` $\rightarrow$ `candidate` | 2.667 $\rightarrow$ 2.487 (-0.180) | -4.51% $\rightarrow$ -3.59% | 579.57% $\rightarrow$ 864.43% | +49.15% | 10 $\rightarrow$ 26 |
 

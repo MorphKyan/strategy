@@ -89,4 +89,4 @@
 * **研究成果判定**：有显著优化 (Passed)
 * **推荐动作**：
   1. **将 `ClusterRepresentativeDampedRiskParityStrategy` 策略物理合入主干**并保留注册（目前已在 `platform/src/platform_core/strategy.py` 完成物理编写与注册）。
-  2. **批准固化并合入专属 YAML 配置文件 `platform/configs/baseline_r7_cluster_representative_damped.yaml`**（参数设定为 $\lambda=1.0$ 切换阻尼版本，对应 Sharpe 1.736 的最优解），用于未来的高分散、低磨损核心资产配置。
+  2. **批准固化并合入专属 YAML 配置文件 `platform/configs/global_cluster_representative_damped.yaml`**（参数设定为 $\lambda=1.0$ 切换阻尼版本，对应 Sharpe 1.736 的最优解），用于未来的高分散、低磨损核心资产配置。

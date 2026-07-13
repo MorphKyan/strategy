@@ -7,7 +7,7 @@
 - 候选原始结果路径：`D:\qcy_project\strategy\platform\results\backtests\r039_industry_rotation_default\20260712_031354\industry_momentum_rotation\r9_rotation_industry_momentum_default_candidate_20260712_031355_039517`
 - 候选配置：`D:\qcy_project\strategy\platform\configs\r9_rotation_industry_momentum.yaml`
 - Baseline 原始结果路径：`D:\qcy_project\strategy\platform\results\backtests\r039_industry_rotation_default\20260712_031354\monthly_equal_weight\baseline_r9_industry_equal_weight_default_baseline_20260712_031357_230488`
-- Baseline 配置：`D:\qcy_project\strategy\platform\configs\baseline_r9_industry_equal_weight.yaml`
+- Baseline 配置：`D:\qcy_project\strategy\platform\configs\domestic_industry_equal_weight.yaml`
 
 ## 样本切分
 - 训练样本截至：`2025-06-30`
