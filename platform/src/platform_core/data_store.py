@@ -129,6 +129,7 @@ class MarketDataStore:
                         f"Market data provider returned no valid rows for {asset.asset_id} "
                         f"between {fetch_start} and {fetch_end}; existing file was preserved."
                     )
+                normalized = self._guard_history_shrink(path, normalized, asset.asset_id)
                 normalized.to_csv(path, index=False)
                 self.quality.extend(f"{asset.asset_id}: {note}" for note in notes)
             elif fetch and is_synthetic:
@@ -159,6 +160,36 @@ class MarketDataStore:
                         )
         self._write_manifest()
         return self.quality
+
+    def _guard_history_shrink(self, path: Path, normalized: pd.DataFrame, asset_id: str) -> pd.DataFrame:
+        """防止降级数据源覆盖掉已有的长历史。
+
+        主源（eastmoney）被限流时，finshare 会降级到只有短窗数据的备源
+        （如 baostock 的 ETF 数据仅从 2026-01 起）。若直接整文件覆盖，
+        一次全量同步就会把多年历史压缩成几个月。规则：新数据首日晚于
+        本地已有首日时，保留本地更早的历史行，只用新数据更新重叠及之后
+        的部分（本地行情快照随 git 版本管理，误覆盖仍可恢复，但不该发生）。
+        """
+        if normalized.empty or not path.exists():
+            return normalized
+        try:
+            existing = pd.read_csv(path)
+        except Exception:
+            return normalized
+        if "trade_date" not in existing.columns or existing.empty:
+            return normalized
+        new_first = normalized["trade_date"].min()
+        old_first = existing["trade_date"].min()
+        if new_first <= old_first:
+            return normalized
+        preserved = existing[existing["trade_date"] < new_first]
+        merged = pd.concat([preserved, normalized], ignore_index=True)
+        merged = merged.drop_duplicates(subset=["trade_date"], keep="last").sort_values("trade_date")
+        self.quality.add(
+            f"{asset_id}: fetched history starts {new_first} but local starts {old_first}; "
+            f"kept {len(preserved)} earlier local rows (short-window source guard)"
+        )
+        return merged
 
     def import_raw_csv(self, asset: Asset, raw_path: str | Path, source: str = "csv") -> Path:
         raw = pd.read_csv(raw_path)
