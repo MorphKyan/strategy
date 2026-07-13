@@ -181,6 +181,30 @@ def test_cycle_no_op_day_sends_single_digest(tmp_path: Path):
     assert "较上一估值日" in text
 
 
+def test_mark_to_market_freezes_history_once_newer_row_exists(tmp_path: Path):
+    """已有更新日期的估值后，旧日期不允许被重估值改写（数据中间状态防护）。"""
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+    portfolio.mark_to_market("2024-01-30")
+    portfolio.mark_to_market("2024-01-31")
+
+    with portfolio.real_nav_path.open(newline="", encoding="utf-8") as handle:
+        before = {row["date"]: row["total_value"] for row in csv.DictReader(handle)}
+
+    # 回头重估 01-30（模拟数据处于异常中间状态时的 --force 重跑）→ 必须拒绝回写
+    result = portfolio.mark_to_market("2024-01-30")
+    assert result["written"] is False
+
+    with portfolio.real_nav_path.open(newline="", encoding="utf-8") as handle:
+        after = {row["date"]: row["total_value"] for row in csv.DictReader(handle)}
+    assert after == before
+
+    # 最新日期的同日重跑仍允许（当晚数据修正的正常场景）
+    result = portfolio.mark_to_market("2024-01-31")
+    assert result["written"] is True
+
+
 def test_mark_to_market_appends_daily_real_nav(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])

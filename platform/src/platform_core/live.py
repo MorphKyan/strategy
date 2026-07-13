@@ -22,10 +22,13 @@ from __future__ import annotations
 import copy
 import csv
 import json
+import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import MarketDataStore
@@ -342,13 +345,33 @@ class LivePortfolio:
         }
 
         previous_total = None
+        has_newer = False
+        same_day_total = None
         if self.real_nav_path.exists():
             # utf-8-sig：容忍 Excel/PowerShell 手工编辑留下的 BOM
             with self.real_nav_path.open("r", encoding="utf-8-sig", newline="") as handle:
-                earlier = [row for row in csv.DictReader(handle) if row["date"] < date_str(asof)]
+                rows = list(csv.DictReader(handle))
+            earlier = [row for row in rows if row["date"] < date_str(asof)]
             if earlier:
                 previous_total = float(earlier[-1]["total_value"])
-        self._append_real_nav(asof, state.cash, positions_value, total_value)
+            has_newer = any(row["date"] > date_str(asof) for row in rows)
+            same = [row for row in rows if row["date"] == date_str(asof)]
+            if same:
+                same_day_total = float(same[-1]["total_value"])
+
+        # 历史行冻结：real_nav 是真实净值台账，一旦出现更新日期的估值，旧日期
+        # 不允许被重估值改写（曾发生：数据处于研究中间状态时 --force 重跑，把
+        # 已记录的历史行改成了错误值）。需要修正历史请用 reconcile（用户真值）。
+        written = not has_newer
+        if written:
+            if same_day_total is not None and same_day_total > 0 and abs(total_value / same_day_total - 1.0) > 0.001:
+                logger.warning(
+                    f"real_nav {date_str(asof)} 同日重估值差异 {(total_value / same_day_total - 1.0):+.2%}"
+                    f"（{same_day_total:,.2f} → {total_value:,.2f}），已替换；若非当日数据修正请检查数据状态"
+                )
+            self._append_real_nav(asof, state.cash, positions_value, total_value)
+        else:
+            logger.warning("real_nav 已存在晚于 %s 的估值行，跳过历史回写（修正历史请用 reconcile）", date_str(asof))
 
         return {
             "date": asof,
@@ -357,6 +380,7 @@ class LivePortfolio:
             "total_value": total_value,
             "weights": weights,
             "previous_total": previous_total,
+            "written": written,
         }
 
     def _render_daily_digest(self, valuation: dict[str, Any], plan_result: PlanResult) -> tuple[str, str]:
