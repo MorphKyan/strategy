@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from io import StringIO
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -13,6 +15,92 @@ from src.platform_core.models import Asset, parse_date
 
 
 MARKET_COLUMNS = ["trade_date", "open", "high", "low", "close", "volume", "amount", "adjust_factor", "source", "updated_at"]
+
+# 主备数据源之间 volume/amount 常有小数级噪音（如 10171325.0 vs 10171324.85，
+# 手/份换算差异），价格列一致时按容差视为同一行，避免换源日反复 churn。
+JITTER_COLUMNS = {"volume", "amount"}
+JITTER_RELATIVE_TOLERANCE = 0.01
+
+
+def _stringify_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """按 to_csv 的实际序列化结果把 frame 转成字符串表，保证比较与落盘同构。"""
+    buffer = StringIO()
+    frame.to_csv(buffer, index=False, lineterminator="\n")
+    buffer.seek(0)
+    return pd.read_csv(buffer, dtype=str, keep_default_na=False)
+
+
+def _rows_equivalent(new_row: dict, old_row: dict, columns: list[str]) -> bool:
+    for column in columns:
+        new_value = new_row.get(column, "")
+        old_value = old_row.get(column, "")
+        if new_value == old_value:
+            continue
+        if column in JITTER_COLUMNS:
+            try:
+                new_num, old_num = float(new_value), float(old_value)
+            except (TypeError, ValueError):
+                return False
+            base = max(abs(old_num), 1e-12)
+            if abs(new_num - old_num) / base <= JITTER_RELATIVE_TOLERANCE:
+                continue
+        return False
+    return True
+
+
+def write_csv_stable(path: Path, frame: pd.DataFrame, key_column: str | None = None) -> bool:
+    """内容感知 CSV 写盘：diff 只反映真实数据变化。返回是否写盘。
+
+    - key_column 给定且新旧行等价（价格列严格相等、volume/amount 在容差内）时，
+      **保留旧行原样**（含 updated_at 时间戳与噪音前的数值）；
+    - 全文件内容与磁盘一致时完全不写（mtime 都不动）；
+    - 写盘时保留文件原有行尾（仓库快照历史上是 CRLF——pandas 在 Windows 直写
+      文件的默认行为——改行尾会制造一次性全文件假 diff）。
+
+    行情快照随 git 版本管理后，每日同步给所有行重打 updated_at 曾制造数万行
+    假 diff、天天弄脏工作区；本函数是该问题的根治点，事件表与合成数据生成器
+    也复用它。
+    """
+    candidate = _stringify_frame(frame)
+    existing: pd.DataFrame | None = None
+    if path.exists():
+        try:
+            existing = pd.read_csv(path, dtype=str, keep_default_na=False)
+        except Exception:
+            existing = None
+    if (
+        key_column
+        and existing is not None
+        and key_column in existing.columns
+        and key_column in candidate.columns
+    ):
+        compare_columns = [c for c in candidate.columns if c != "updated_at" and c in existing.columns]
+        old_by_key = {row[key_column]: row for row in existing.to_dict("records")}
+        restored = []
+        for row in candidate.to_dict("records"):
+            old = old_by_key.get(row[key_column])
+            if old is not None and _rows_equivalent(row, old, compare_columns):
+                row = {column: old.get(column, row.get(column, "")) for column in candidate.columns}
+            restored.append(row)
+        candidate = pd.DataFrame(restored, columns=list(candidate.columns))
+
+    buffer = StringIO()
+    candidate.to_csv(buffer, index=False, lineterminator="\n")
+    text = buffer.getvalue()  # 统一 LF 的规范形
+
+    newline_style = os.linesep
+    if path.exists():
+        try:
+            raw = path.read_bytes()
+            if raw:
+                newline_style = "\r\n" if b"\r\n" in raw else "\n"
+            if raw.decode("utf-8").replace("\r\n", "\n") == text:
+                return False
+        except (OSError, UnicodeDecodeError):
+            pass
+    output = text if newline_style == "\n" else text.replace("\n", "\r\n")
+    path.write_text(output, encoding="utf-8", newline="")
+    return True
 
 
 
@@ -130,7 +218,7 @@ class MarketDataStore:
                         f"between {fetch_start} and {fetch_end}; existing file was preserved."
                     )
                 normalized = self._guard_history_shrink(path, normalized, asset.asset_id)
-                normalized.to_csv(path, index=False)
+                self._write_preserving_unchanged(path, normalized, asset.asset_id)
                 self.quality.extend(f"{asset.asset_id}: {note}" for note in notes)
             elif fetch and is_synthetic:
                 if not path.exists():
@@ -190,6 +278,12 @@ class MarketDataStore:
             f"kept {len(preserved)} earlier local rows (short-window source guard)"
         )
         return merged
+
+    def _write_preserving_unchanged(self, path: Path, frame: pd.DataFrame, asset_id: str) -> bool:
+        changed = write_csv_stable(path, frame, key_column="trade_date")
+        if not changed:
+            self.quality.add(f"{asset_id}: data unchanged; file untouched")
+        return changed
 
     def import_raw_csv(self, asset: Asset, raw_path: str | Path, source: str = "csv") -> Path:
         raw = pd.read_csv(raw_path)

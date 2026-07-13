@@ -102,14 +102,18 @@ def generate_3x_etf():
     df["updated_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
     
     output_cols = ["trade_date", "open", "high", "low", "close", "volume", "amount", "adjust_factor", "source", "updated_at"]
-    df[output_cols].to_csv(output_price_path, index=False)
-    
+    # 稳定写盘：派生数据未变的行保留原 updated_at，内容一致时不动文件，
+    # 避免每次同步都全文件重写（数千行假 diff）
+    from src.platform_core.data_store import write_csv_stable
+
+    write_csv_stable(output_price_path, df[output_cols], key_column="trade_date")
+
     # Save adjust factor file (always 1.0 since prices are pre-adjusted)
     factors_out = pd.DataFrame({
         "trade_date": df["trade_date"],
         "hfq_factor": 1.0
     })
-    factors_out.to_csv(output_factor_path, index=False)
+    write_csv_stable(output_factor_path, factors_out, key_column="trade_date")
     
     print(f"Successfully generated synthetic 3x ETF:")
     print(f"- Prices saved to: {output_price_path}")
