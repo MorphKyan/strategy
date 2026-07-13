@@ -242,7 +242,7 @@ def run_platform_experiment(
     db_path: str | Path,
     baseline_config_path: str | Path | None = None,
     experiment_name: str | None = None,
-    raw_root: str | Path = "results/backtests",
+    raw_root: str | Path = "results/temporary_backtests/experiments",
     report_root: str | Path = "reports/experiments",
     skip_baseline: bool = False,
     render_charts: bool = True,

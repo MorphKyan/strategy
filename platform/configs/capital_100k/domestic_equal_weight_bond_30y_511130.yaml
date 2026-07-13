@@ -1,0 +1,56 @@
+﻿platform:
+  run_name: domestic_equal_weight_bond_30y_511130_capital_100k
+data:
+  data_dir: data
+assets:
+- asset_id: CN_ETF:510300.SH
+  code: '510300'
+  name: 沪深300ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:518880.SH
+  code: '518880'
+  name: 黄金ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511130.SH
+  code: '511130'
+  name: 30年国债ETF 511130
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+portfolio:
+  initial_cash: 100000.0
+  initial_equity: 100000.0
+  initial_positions: []
+backtest:
+  enable_checkpoints: false
+execution:
+  round_mode: round
+  price_field: close
+  weight_tolerance: 0.0005
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+output:
+  results_dir: results/backtests
+strategy:
+  strategy_name: monthly_equal_weight
+  strategy_version_id: null
+  cancel_pending_on_start: false
+  params:
+    rebalance_on_start: true
+    cooldown_days: 20
+    universe:
+    - CN_ETF:510300.SH
+    - CN_ETF:518880.SH
+    - CN_ETF:511130.SH

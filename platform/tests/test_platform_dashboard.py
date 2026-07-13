@@ -7,12 +7,16 @@ import pandas as pd
 import pytest
 
 from src.platform_dashboard.artifacts import (
+    RunRecord,
     align_navs,
     build_weighted_portfolio,
     discover_configs,
     downsample_timeseries,
     discover_runs,
+    effective_nav_start_date,
+    filter_runs,
     latest_positions,
+    market_history_for_window,
     infer_slippage_scenario,
     nav_analytics,
     read_run_metrics,
@@ -84,6 +88,19 @@ def test_discover_runs_and_read_tables(tmp_path: Path) -> None:
     assert latest_positions(tables["positions"])["asset_id"].tolist() == ["B", "A"]
 
 
+def test_filter_runs_matches_multiple_metadata_terms(tmp_path: Path) -> None:
+    runs = [
+        RunRecord("risk_parity_training_default", tmp_path / "default", "", "2020-01-01", "2025-06-30", {},
+                  {"strategy": {"strategy_name": "risk_parity"}, "slippage_scenario": "default"}),
+        RunRecord("fixed_weight_stress", tmp_path / "stress", "", "2021-01-01", "2025-06-30", {},
+                  {"strategy": {"strategy_name": "fixed_weight"}, "slippage_scenario": "stress"}),
+    ]
+
+    assert filter_runs(runs, "RISK default") == [runs[0]]
+    assert filter_runs(runs, "2021 stress") == [runs[1]]
+    assert filter_runs(runs, "missing") == []
+
+
 def test_single_table_reader_is_lazy_and_validates_name(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -93,6 +110,48 @@ def test_single_table_reader_is_lazy_and_validates_name(tmp_path: Path) -> None:
     assert read_run_table(run_dir, "positions").empty
     with pytest.raises(ValueError, match="Unsupported run table"):
         read_run_table(run_dir, "unknown")
+
+
+def test_nav_reader_trims_cash_only_prefix_and_keeps_pretrade_baseline(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    pd.DataFrame(
+        [
+            {"date": "2020-01-01", "net_value": 1.0, "cash": 100.0},
+            {"date": "2020-01-02", "net_value": 1.0, "cash": 100.0},
+            {"date": "2020-01-03", "net_value": 1.0, "cash": 100.0},
+            {"date": "2020-01-06", "net_value": 1.02, "cash": 2.0},
+            {"date": "2020-01-07", "net_value": 1.01, "cash": 2.0},
+        ]
+    ).to_csv(run_dir / "nav.csv", index=False)
+    pd.DataFrame([{"date": "2020-01-06", "trade_id": "T1"}]).to_csv(run_dir / "trades.csv", index=False)
+
+    assert effective_nav_start_date(run_dir) == pd.Timestamp("2020-01-03")
+    nav = read_run_table(run_dir, "nav")
+    assert nav["date"].tolist() == list(pd.to_datetime(["2020-01-03", "2020-01-06", "2020-01-07"]))
+    assert nav["drawdown"].tolist() == pytest.approx([0.0, 0.0, 1.01 / 1.02 - 1])
+
+
+def test_dashboard_metrics_use_effective_nav_window(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "manifest.json").write_text(json.dumps({"execution_model": {}}), encoding="utf-8")
+    pd.DataFrame(
+        [
+            {"date": "2020-01-01", "net_value": 1.0, "total_value": 100.0, "cash": 100.0},
+            {"date": "2020-01-02", "net_value": 1.0, "total_value": 100.0, "cash": 100.0},
+            {"date": "2020-01-03", "net_value": 1.0, "total_value": 100.0, "cash": 100.0},
+            {"date": "2020-01-06", "net_value": 1.1, "total_value": 110.0, "cash": 1.0},
+        ]
+    ).to_csv(run_dir / "nav.csv", index=False)
+    pd.DataFrame([{"date": "2020-01-06", "trade_id": "T1", "trade_value": 99.0}]).to_csv(
+        run_dir / "trades.csv", index=False
+    )
+
+    metrics = read_run_metrics(run_dir)
+    assert metrics["start_date"] == "2020-01-03"
+    assert metrics["observations"] == 2
+    assert metrics["total_return"] == pytest.approx(0.1)
 
 
 def test_discovery_does_not_generate_missing_metrics(tmp_path: Path) -> None:
@@ -128,6 +187,31 @@ def test_discover_runs_skips_sensitivity_raw_and_cache(tmp_path: Path) -> None:
         (run_dir / "manifest.json").write_text(json.dumps({"run_id": f"{excluded}_run"}), encoding="utf-8")
         pd.DataFrame([{"date": "2025-01-01", "net_value": 1.0}]).to_csv(run_dir / "nav.csv", index=False)
     assert discover_runs(tmp_path) == []
+
+
+def test_discover_runs_loads_temporary_root_only_when_enabled(tmp_path: Path) -> None:
+    fixed_dir = tmp_path / "results" / "backtests" / "fixed_run"
+    temporary_dir = tmp_path / "results" / "temporary_backtests" / "direct" / "temporary_run"
+    sensitivity_dir = tmp_path / "results" / "temporary_backtests" / "sensitivity" / "sensitivity_run"
+    unrelated_dir = tmp_path / "results" / "other" / "unrelated_run"
+    for run_dir, run_id in (
+        (fixed_dir, "fixed_run"),
+        (temporary_dir, "temporary_run"),
+        (sensitivity_dir, "sensitivity_run"),
+        (unrelated_dir, "unrelated_run"),
+    ):
+        run_dir.mkdir(parents=True)
+        (run_dir / "manifest.json").write_text(
+            json.dumps({"run_id": run_id, "generated_at": "2026-07-05T10:00:00"}),
+            encoding="utf-8",
+        )
+        pd.DataFrame([{"date": "2025-01-01", "net_value": 1.0}]).to_csv(run_dir / "nav.csv", index=False)
+
+    assert [run.run_id for run in discover_runs(tmp_path)] == ["fixed_run"]
+    assert {run.run_id for run in discover_runs(tmp_path, include_temporary=True)} == {
+        "fixed_run",
+        "temporary_run",
+    }
 
 
 def _make_nav(start: str, periods: int, daily_ret: float, base: float = 1.0) -> pd.DataFrame:
@@ -236,6 +320,18 @@ def test_market_history_actions_and_weighted_portfolio(tmp_path: Path) -> None:
     assert basket["portfolio"].iloc[0] == pytest.approx(1.0)
     assert basket["portfolio"].iloc[-1] == pytest.approx(0.6 * 1.2 + 0.4 * 1.05)
     assert "drawdown" in basket
+
+
+def test_market_history_for_window_uses_inclusive_backtest_dates() -> None:
+    history = pd.DataFrame({
+        "trade_date": pd.date_range("2025-01-01", periods=6),
+        "close": range(10, 16),
+    })
+
+    sliced = market_history_for_window(history, "2025-01-02", "2025-01-04")
+
+    assert sliced["trade_date"].tolist() == list(pd.date_range("2025-01-02", "2025-01-04"))
+    assert sliced["close"].tolist() == [11, 12, 13]
 
 
 def test_rebalance_events_aggregates_filled_orders() -> None:

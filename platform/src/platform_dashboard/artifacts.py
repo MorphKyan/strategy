@@ -35,6 +35,30 @@ class RunRecord:
     manifest: dict[str, Any]
 
 
+def filter_runs(runs: list[RunRecord], query: str) -> list[RunRecord]:
+    """Filter runs with case-insensitive AND matching across useful metadata."""
+    terms = query.casefold().split()
+    if not terms:
+        return runs
+    matched: list[RunRecord] = []
+    for run in runs:
+        strategy = run.manifest.get("strategy") or {}
+        haystack = " ".join(
+            str(value)
+            for value in (
+                run.run_id,
+                run.start_date,
+                run.end_date,
+                run.path,
+                run.manifest.get("slippage_scenario", ""),
+                strategy.get("strategy_name", "") if isinstance(strategy, dict) else strategy,
+            )
+        ).casefold()
+        if all(term in haystack for term in terms):
+            matched.append(run)
+    return matched
+
+
 def platform_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -71,35 +95,32 @@ def discover_configs(root: Path | None = None) -> list[ConfigRecord]:
 #   sim 用 total_value 而非 net_value），属于将来的组合页（蓝图 B3/B4），混进
 #   回测列表会出现无数据的空行。
 EXCLUDED_RESULT_DIRS = {"sensitivity_raw", "backtest_cache", "sim_portfolios", "live_portfolios"}
+TEMPORARY_EXCLUDED_DIRS = EXCLUDED_RESULT_DIRS | {"sensitivity"}
 
 
-def discover_runs(root: Path | None = None) -> list[RunRecord]:
+def discover_runs(root: Path | None = None, include_temporary: bool = False) -> list[RunRecord]:
     root = (root or platform_root()).resolve()
-    results_dir = root / "results"
     records: list[RunRecord] = []
-    if not results_dir.exists():
-        return records
+    result_roots = [root / "results" / "backtests"]
+    if include_temporary:
+        result_roots.append(root / "results" / "temporary_backtests")
 
+    for results_dir in result_roots:
+        if not results_dir.exists():
+            continue
+        excluded_dirs = TEMPORARY_EXCLUDED_DIRS if results_dir.name == "temporary_backtests" else EXCLUDED_RESULT_DIRS
+        for record in _discover_runs_in_root(results_dir, excluded_dirs=excluded_dirs):
+            records.append(record)
+
+    return sorted(records, key=lambda item: (item.generated_at, item.run_id), reverse=True)
+
+
+def _discover_runs_in_root(results_dir: Path, excluded_dirs: set[str]) -> list[RunRecord]:
+    records: list[RunRecord] = []
     for dirpath, dirnames, filenames in os.walk(results_dir):
-        # Prune internal research, sweeps, raw folders to avoid scanning thousands of files
-        pruned_dirs = []
-        for d in dirnames:
-            d_lower = d.lower()
-            if (
-                d in EXCLUDED_RESULT_DIRS or
-                "sensitivity_raw" in d_lower or
-                "backtest_cache" in d_lower or
-                "sim_portfolios" in d_lower or
-                "live_portfolios" in d_lower or
-                "backtests_sweep" in d_lower or
-                "research" in d_lower or
-                "_sweep" in d_lower or
-                "_raw" in d_lower or
-                "compare" in d_lower
-            ):
-                continue
-            pruned_dirs.append(d)
-        dirnames[:] = pruned_dirs
+        # The two explicit roots already separate dashboard-visible artifacts.
+        # Only known non-backtest stores are pruned if they are nested manually.
+        dirnames[:] = [d for d in dirnames if d not in excluded_dirs]
 
         if "manifest.json" in filenames and "nav.csv" in filenames:
             run_dir = Path(dirpath)
@@ -143,11 +164,15 @@ def discover_runs(root: Path | None = None) -> list[RunRecord]:
             except (OSError, ValueError, json.JSONDecodeError):
                 continue
 
-    return sorted(records, key=lambda item: (item.generated_at, item.run_id), reverse=True)
+    return records
 
 
 def read_run_metrics(run_dir: Path) -> dict[str, Any]:
-    """Load or derive metrics for one run on demand."""
+    """Derive dashboard metrics from the economically active NAV window."""
+    effective_start = effective_nav_start_date(run_dir)
+    if effective_start is not None:
+        return build_platform_metrics(run_dir, start_date=effective_start)
+
     metrics_path = run_dir / "metrics.json"
     manifest_path = run_dir / "manifest.json"
     if metrics_path.exists():
@@ -157,6 +182,49 @@ def read_run_metrics(run_dir: Path) -> dict[str, Any]:
         except (OSError, ValueError, json.JSONDecodeError):
             pass
     return build_platform_metrics(run_dir)
+
+
+def effective_nav_start_date(run_dir: Path) -> pd.Timestamp | None:
+    """Return the baseline NAV date immediately before the first invested day.
+
+    Modern artifacts use the first trade date.  Legacy runs without trades.csv
+    fall back to the first NAV change.  Keeping the preceding NAV observation
+    preserves the first invested day's return while removing long cash-only
+    prefixes from charts and annualized dashboard metrics.
+    """
+    nav_path = run_dir / "nav.csv"
+    try:
+        nav = pd.read_csv(nav_path, usecols=lambda column: column in {"date", "net_value"})
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError, ValueError):
+        return None
+    if nav.empty or not {"date", "net_value"}.issubset(nav.columns):
+        return None
+    nav["date"] = pd.to_datetime(nav["date"], errors="coerce")
+    nav["net_value"] = pd.to_numeric(nav["net_value"], errors="coerce")
+    nav = nav.dropna(subset=["date", "net_value"]).sort_values("date")
+    if len(nav) < 2:
+        return None
+
+    active_date: pd.Timestamp | None = None
+    trades_path = run_dir / "trades.csv"
+    try:
+        if trades_path.exists() and trades_path.stat().st_size:
+            trades = pd.read_csv(trades_path, usecols=lambda column: column == "date")
+            trade_dates = pd.to_datetime(trades.get("date"), errors="coerce").dropna()
+            if not trade_dates.empty:
+                active_date = pd.Timestamp(trade_dates.min())
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError, ValueError):
+        active_date = None
+
+    if active_date is None:
+        initial_value = float(nav["net_value"].iloc[0])
+        changed = nav.loc[~nav["net_value"].sub(initial_value).abs().le(1e-12), "date"]
+        if changed.empty:
+            return None
+        active_date = pd.Timestamp(changed.iloc[0])
+
+    prior = nav.loc[nav["date"] < active_date, "date"]
+    return pd.Timestamp(prior.iloc[-1] if not prior.empty else active_date)
 
 
 def read_run_table(run_dir: Path, name: str) -> pd.DataFrame:
@@ -172,6 +240,9 @@ def read_run_table(run_dir: Path, name: str) -> pd.DataFrame:
         frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
         if name == "nav":
             frame = frame.dropna(subset=["date"]).sort_values("date")
+            effective_start = effective_nav_start_date(run_dir)
+            if effective_start is not None:
+                frame = frame[frame["date"] >= effective_start].copy()
             if "net_value" in frame:
                 frame["drawdown"] = frame["net_value"] / frame["net_value"].cummax() - 1.0
     return frame
@@ -418,6 +489,25 @@ def read_market_history(root: Path, symbol: str) -> pd.DataFrame:
     for column in set(wanted) & set(frame.columns) - {"trade_date"}:
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
     return frame.dropna(subset=["trade_date", "close"]).sort_values("trade_date")
+
+
+def market_history_for_window(
+    history: pd.DataFrame,
+    start_date: str | None,
+    end_date: str | None,
+) -> pd.DataFrame:
+    """Return market rows inside the inclusive backtest window."""
+    if history.empty or "trade_date" not in history:
+        return history.copy()
+    dates = pd.to_datetime(history["trade_date"], errors="coerce")
+    mask = dates.notna()
+    start = pd.to_datetime(start_date, errors="coerce")
+    end = pd.to_datetime(end_date, errors="coerce")
+    if not pd.isna(start):
+        mask &= dates >= start
+    if not pd.isna(end):
+        mask &= dates <= end
+    return history.loc[mask].copy()
 
 
 def read_corporate_actions(root: Path, symbol: str) -> dict[str, pd.DataFrame]:

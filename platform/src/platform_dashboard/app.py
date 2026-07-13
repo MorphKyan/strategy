@@ -18,8 +18,10 @@ from src.platform_dashboard.artifacts import (
     discover_market_symbols,
     discover_runs,
     downsample_timeseries,
+    filter_runs,
     infer_slippage_scenario,
     latest_positions,
+    market_history_for_window,
     nav_analytics,
     platform_root,
     read_run_metrics,
@@ -48,8 +50,8 @@ def cached_configs(root: str) -> list[ConfigRecord]:
 
 
 @st.cache_data(show_spinner=False, ttl=30)
-def cached_runs(root: str) -> list[RunRecord]:
-    return discover_runs(Path(root))
+def cached_runs(root: str, include_temporary: bool = False) -> list[RunRecord]:
+    return discover_runs(Path(root), include_temporary=include_temporary)
 
 
 @st.cache_data(show_spinner=False, max_entries=128, ttl=600)
@@ -61,6 +63,9 @@ def cached_table(run_dir: str, name: str, modified_at: float) -> pd.DataFrame:
 def run_table(run: RunRecord, name: str) -> pd.DataFrame:
     path = run.path / f"{name}.csv"
     modified_at = path.stat().st_mtime if path.exists() else 0.0
+    if name == "nav":
+        trades = run.path / "trades.csv"
+        modified_at = max(modified_at, trades.stat().st_mtime if trades.exists() else 0.0)
     return cached_table(str(run.path), name, modified_at)
 
 
@@ -73,7 +78,12 @@ def cached_metrics(run_dir: str, modified_at: float) -> dict[str, Any]:
 def run_metrics(run: RunRecord) -> dict[str, Any]:
     manifest = run.path / "manifest.json"
     metrics = run.path / "metrics.json"
-    modified_at = max(manifest.stat().st_mtime, metrics.stat().st_mtime if metrics.exists() else 0.0)
+    artifact_paths = [run.path / f"{name}.csv" for name in ("nav", "trades", "orders", "skipped_orders", "positions")]
+    modified_at = max(
+        manifest.stat().st_mtime,
+        metrics.stat().st_mtime if metrics.exists() else 0.0,
+        *(path.stat().st_mtime if path.exists() else 0.0 for path in artifact_paths),
+    )
     return cached_metrics(str(run.path), modified_at)
 
 
@@ -139,16 +149,17 @@ def render_overview(configs: list[ConfigRecord], runs: list[RunRecord]) -> None:
         return
     rows = []
     for run in runs[:10]:
+        metrics = run_metrics(run)
         rows.append(
             {
                 "run_id": run.run_id,
-                "区间": f"{run.start_date} → {run.end_date}",
-                "累计收益": metric_text(run.metrics.get("total_return"), "percent"),
-                "年化收益": metric_text(run.metrics.get("annualized_return"), "percent"),
-                "年化波动": metric_text(run.metrics.get("annualized_volatility"), "percent"),
-                "最大回撤": metric_text(run.metrics.get("max_drawdown"), "percent"),
-                "Sharpe": metric_text(run.metrics.get("sharpe_ratio")),
-                "滑点场景": metric_text(run.metrics.get("slippage_scenario"), "text"),
+                "区间": f"{metrics.get('start_date', '—')} → {metrics.get('end_date', '—')}",
+                "累计收益": metric_text(metrics.get("total_return"), "percent"),
+                "年化收益": metric_text(metrics.get("annualized_return"), "percent"),
+                "年化波动": metric_text(metrics.get("annualized_volatility"), "percent"),
+                "最大回撤": metric_text(metrics.get("max_drawdown"), "percent"),
+                "Sharpe": metric_text(metrics.get("sharpe_ratio")),
+                "滑点场景": metric_text(metrics.get("slippage_scenario"), "text"),
             }
         )
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
@@ -199,6 +210,13 @@ def render_performance(nav: pd.DataFrame, run: RunRecord, runs: list[RunRecord])
     if nav.empty or "net_value" not in nav:
         st.info("该运行没有可展示的净值数据。")
         return
+
+    effective_start = nav["date"].min()
+    if run.start_date and pd.Timestamp(run.start_date) < effective_start:
+        st.caption(
+            f"已隐藏首次投资前的纯现金区间：原始日历起点 {run.start_date}，"
+            f"有效净值基准日 {effective_start.date()}。"
+        )
 
     controls = st.columns([1.1, 3.2, 1.6, 0.7])
     others = [item for item in runs if item.run_id != run.run_id]
@@ -288,8 +306,7 @@ def render_performance(nav: pd.DataFrame, run: RunRecord, runs: list[RunRecord])
     drawdown.update_traces(line_color="#d9534f", fillcolor="rgba(217,83,79,0.25)")
     drawdown.update_layout(height=260, margin={"l": 10, "r": 10, "t": 20, "b": 10}, yaxis_tickformat=".1%")
     st.plotly_chart(drawdown, width="stretch")
-    if start is not None:
-        st.caption(f"区间：{window['date'].iloc[0].date()} → {window['date'].iloc[-1].date()}，回撤按区间内高点计算。")
+    st.caption(f"区间：{window['date'].iloc[0].date()} → {window['date'].iloc[-1].date()}，回撤按区间内高点计算。")
 
 
 def render_return_decomposition(nav: pd.DataFrame) -> None:
@@ -432,8 +449,10 @@ def render_rebalance_overlay(run: RunRecord, root: Path) -> None:
         return
     asset_orders = orders[orders["asset_id"].astype(str) == selected].copy()
     asset_orders["date"] = pd.to_datetime(asset_orders["date"], errors="coerce")
-    start = min(history["trade_date"].max(), pd.Timestamp(run.start_date or history["trade_date"].min()))
-    price = history[history["trade_date"] >= start]
+    price = market_history_for_window(history, run.start_date, run.end_date)
+    if price.empty:
+        st.warning("当前回测区间内没有可展示行情。")
+        return
     fig = go.Figure(go.Scatter(x=price["trade_date"], y=price["close"], name="收盘价", line={"width": 1.4}))
     for side, color, symbol_shape in (("BUY", UP_COLOR, "triangle-up"), ("SELL", DOWN_COLOR, "triangle-down")):
         points = asset_orders[asset_orders.get("side", "").astype(str).str.upper() == side]
@@ -455,14 +474,52 @@ def render_runs(runs: list[RunRecord]) -> None:
     if not runs:
         st.warning("未发现可读取的回测结果。")
         return
+    if "backtest_run_query" not in st.session_state:
+        st.session_state["backtest_run_query"] = ""
+    if "backtest_run_query_draft" not in st.session_state:
+        st.session_state["backtest_run_query_draft"] = st.session_state["backtest_run_query"]
+    with st.form("backtest_run_search_form", border=False):
+        search_col, button_col, clear_col = st.columns([6, 1, 1])
+        with search_col:
+            st.text_input(
+                "搜索回测",
+                placeholder="输入运行名、策略、日期或滑点场景；可用空格分隔多个关键词",
+                key="backtest_run_query_draft",
+            )
+        with button_col:
+            st.write("")
+            st.form_submit_button(
+                "搜索",
+                width="stretch",
+                on_click=lambda: st.session_state.update(
+                    backtest_run_query=st.session_state.get("backtest_run_query_draft", "").strip()
+                ),
+            )
+        with clear_col:
+            st.write("")
+            st.form_submit_button(
+                "清除",
+                width="stretch",
+                on_click=lambda: st.session_state.update(
+                    backtest_run_query="", backtest_run_query_draft=""
+                ),
+            )
+
+    choices = filter_runs(runs, st.session_state["backtest_run_query"])
+    if not choices:
+        st.info("没有匹配的回测，请调整关键词或清除搜索条件。")
+        return
+    if st.session_state["backtest_run_query"]:
+        st.caption(f"找到 {len(choices)} 个回测（共 {len(runs)} 个）")
+    choice_by_id = {item.run_id: item for item in choices}
     selected_id = st.selectbox(
         "选择回测",
-        [item.run_id for item in runs],
-        format_func=lambda run_id: next(
-            f"{item.run_id} · {item.start_date} → {item.end_date}" for item in runs if item.run_id == run_id
+        list(choice_by_id),
+        format_func=lambda run_id: (
+            f"{run_id} · {choice_by_id[run_id].start_date} → {choice_by_id[run_id].end_date}"
         ),
     )
-    run = next(item for item in runs if item.run_id == selected_id)
+    run = choice_by_id[selected_id]
     st.caption(str(run.path))
     render_run_metrics(run)
     sections = ["净值与回撤", "收益分解", "持仓", "调仓与行情", "订单与交易", "运行信息"]
@@ -772,18 +829,23 @@ def main() -> None:
     render_header()
     with st.sidebar:
         page = st.radio("导航", ["概览", "市场数据", "回测分析", "回测对比", "策略配置"])
+        include_temporary = st.checkbox(
+            "加载临时回测",
+            value=False,
+            help="同时加载研究、训练集、测试集、敏感性和其他临时回测。",
+        )
         if st.button("刷新数据", width="stretch"):
             st.cache_data.clear()
             st.rerun()
         st.caption(f"Platform: {root}")
     if page == "概览":
-        render_overview(cached_configs(root), cached_runs(root))
+        render_overview(cached_configs(root), cached_runs(root, include_temporary))
     elif page == "市场数据":
         render_market_data(root_path)
     elif page == "回测分析":
-        render_runs(cached_runs(root))
+        render_runs(cached_runs(root, include_temporary))
     elif page == "回测对比":
-        render_comparison(cached_runs(root))
+        render_comparison(cached_runs(root, include_temporary))
     else:
         render_configs(cached_configs(root))
 
