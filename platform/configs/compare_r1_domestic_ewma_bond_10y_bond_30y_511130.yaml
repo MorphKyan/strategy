@@ -1,0 +1,69 @@
+platform:
+  run_name: r1_domestic_ewma_bond_10y_dashboard_bond_30y_511130
+data:
+  data_dir: data
+assets:
+- asset_id: CN_ETF:510300.SH
+  code: '510300'
+  name: 沪深300ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512890.SH
+  code: '512890'
+  name: 红利低波ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:518880.SH
+  code: '518880'
+  name: 黄金ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511130.SH
+  code: '511130'
+  name: 30年国债ETF 511130
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+backtest: {}
+execution:
+  round_mode: round
+  price_field: close
+  weight_tolerance: 0.0005
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+output:
+  results_dir: results/backtests
+strategy:
+  strategy_name: risk_parity_ewma
+  strategy_version_id: null
+  cancel_pending_on_start: false
+  params:
+    rebalance_frequency: monthly
+    rebalance_threshold: 0.05
+    rebalance_relative_threshold: 0.25
+    init_mode: calculate
+    init_calc_days: 30
+    universe:
+    - CN_ETF:510300.SH
+    - CN_ETF:512890.SH
+    - CN_ETF:518880.SH
+    - CN_ETF:511130.SH
+    ewma_span: 60
+    ewma_min_periods: 20

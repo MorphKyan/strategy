@@ -5,7 +5,7 @@
 - 研究 ID：R049
 - Owner：`/root`
 - 创建时间：2026-07-11 Asia/Shanghai
-- 状态：`In Progress`（阶段 A）
+- 状态：`Failed`
 - 关联看板项：`research-dashboard/research_backlog.md`
 
 ## 假设、来源与反证风险
@@ -32,3 +32,11 @@
 - 数值等价冒烟测试：在二维正定协方差样例中，`CLARABEL` 返回 `optimal`，SOCP 目标 `1.0078865027`、解 `[0.999808038, 0]`、成本约束残差小于 `1e-9`，且 Theorem 5 的充分条件成立。
 - 禁止在最终测试后修改公式、adaptive 版本、专家集合、频率、lag、成本映射、求解器/容差、资产或验收阈值。
 - 阶段 A 未通过将停止，不读取最终测试样本。
+
+## 训练验证与结论
+
+- 阶段 A 的二维 SOCP/no-trade/JSON checkpoint 序列化测试通过；首次训练运行发现 `date` 不能序列化，改为 ISO 日期后重跑，未改变任何冻结参数。
+- 训练命令：`.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r049_robust_ellipsoidal_online_portfolio_adaptive.yaml --baseline-config configs\r8_permanent_real_fixed_weight_threshold.yaml --experiment-name r049_training_vs_fixed_weight --start-date 2019-01-18 --end-date 2025-06-30 --no-charts --slippage-scenario all`。
+- 三个场景的候选 Sharpe 为 `0.0868`、`-0.2299`、`-0.2379`，主基线为 `1.1715`、`1.1682`、`1.1643`；候选年化换手为 `19.7465`、`19.7750`、`19.5461`，主基线为 `0.1024`、`0.1025`、`0.0997`。候选交易数为 `410/420/418`，主基线均为 `24`。
+- 三滑点下 Sharpe、收益和最大回撤同时显著退化，且换手与订单数违反预冻结硬门槛。因此停止研究；不运行机制基线、起点敏感性或最终测试，且不读取 `2025-07-01` 之后结果。
+- 候选策略源码、注册、配置和测试已清理；原始 artifacts 与标准化报告保留。详见 `platform/reports/r049_relp_adap_failed_report.md`。
