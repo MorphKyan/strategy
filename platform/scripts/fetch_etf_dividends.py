@@ -141,23 +141,49 @@ def main():
         except Exception as e:
             print(f"  - Error fetching splits: {e}")
             
-    # Output dividends
+    # 事件表写入原则（只增不删 + 新拆分先过价格验证 + 稳定写盘）：
+    # 上游数据异常时整表覆盖曾静默删掉已验证的历史事件（510500 两条拆分被
+    # 替换成错误的 1:0.01）。本地表是"账本"，抓取结果只能追加候选。
+    from src.platform_core.corporate_actions import merge_event_table, validate_split_against_prices
+    from src.platform_core.data_store import write_csv_stable
+
+    data_dir = ROOT / "data"
+
+    def read_existing(path):
+        return pd.read_csv(path, dtype=str).fillna("") if path.exists() else None
+
+    # Output dividends（键：code + ex_date；纯追加）
     df_out_div = pd.DataFrame(dividend_records)
     if not df_out_div.empty:
-        # Sort by ex_date descending
-        df_out_div = df_out_div.sort_values(by=["code", "ex_date"], ascending=[True, False])
-        output_div_path = ROOT / "data" / "platform_dividends.csv"
-        df_out_div.to_csv(output_div_path, index=False, encoding="utf-8")
-        print(f"\nSaved {len(df_out_div)} dividend events to {output_div_path}")
-        
-    # Output splits
+        output_div_path = data_dir / "platform_dividends.csv"
+        merged, notes, additions = merge_event_table(read_existing(output_div_path), df_out_div, ["code", "ex_date"])
+        for note in notes:
+            print(f"  [dividends] {note}")
+        if additions:
+            merged = pd.concat([merged, pd.DataFrame(additions)], ignore_index=True)
+        merged = merged.sort_values(by=["code", "ex_date"], ascending=[True, False])
+        changed = write_csv_stable(output_div_path, merged)
+        print(f"\nDividends: +{len(additions)} new events; file {'updated' if changed else 'unchanged'} ({output_div_path})")
+
+    # Output splits（键：code + split_date；新增必须过价格交叉验证）
     df_out_split = pd.DataFrame(split_records)
     if not df_out_split.empty:
-        df_out_split = df_out_split.sort_values(by=["code", "split_date"], ascending=[True, False])
-        output_split_path = ROOT / "data" / "platform_splits.csv"
-        df_out_split.to_csv(output_split_path, index=False, encoding="utf-8")
-        print(f"Saved {len(df_out_split)} split events to {output_split_path}")
-        
+        output_split_path = data_dir / "platform_splits.csv"
+        merged, notes, additions = merge_event_table(read_existing(output_split_path), df_out_split, ["code", "split_date"])
+        for note in notes:
+            print(f"  [splits] {note}")
+        accepted = []
+        for row in additions:
+            ok, verdict = validate_split_against_prices(row["code"], row["split_date"], float(row["split_ratio"]), data_dir)
+            print(f"  [splits] {'接受' if ok else '拒绝'}: {verdict}")
+            if ok:
+                accepted.append(row)
+        if accepted:
+            merged = pd.concat([merged, pd.DataFrame(accepted)], ignore_index=True)
+        merged = merged.sort_values(by=["code", "split_date"], ascending=[True, False])
+        changed = write_csv_stable(output_split_path, merged)
+        print(f"Splits: +{len(accepted)} accepted / {len(additions) - len(accepted)} rejected; file {'updated' if changed else 'unchanged'} ({output_split_path})")
+
     return 0
 
 if __name__ == "__main__":
