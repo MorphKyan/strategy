@@ -63,7 +63,11 @@ def main() -> int:
         type=int,
         help="按自然月生成锚点，并取锚点当日或其后首个交易日；设置后优先于 --step。",
     )
-    parser.add_argument("--raw-root", default="results/sensitivity_raw", help="Root for raw sensitivity run artifacts.")
+    parser.add_argument(
+        "--raw-root",
+        default="results/sensitivity",
+        help="Root for raw sensitivity run artifacts.",
+    )
     parser.add_argument("--report-root", default="reports/sensitivity", help="Root for sensitivity summary reports.")
     parser.add_argument("--charts", action="store_true", help="Render per-run charts. Off by default because sensitivity can produce many runs.")
     parser.add_argument("--end-date", help="Runtime sensitivity end date, YYYY-MM-DD. Use 2025-06-30 for training-sample research.")

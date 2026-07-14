@@ -25,6 +25,8 @@ When documents conflict, apply this priority order: user instruction for the cur
 - Platform docs: `platform/docs/`
 - Platform tests: `platform/tests/`
 - Platform raw artifacts: `platform/results/`
+- Platform fixed-config backtests: `platform/results/backtests/`
+- Platform temporary backtests: `platform/results/temporary_backtests/`
 - Platform reports: `platform/reports/`
 - Platform metadata/data: `platform/data/`
 - Platform backtest entry: `.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml` (or `.\env\python.exe` when the local env uses that layout)
@@ -59,6 +61,12 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 8. Reusable platform configs under `platform/configs/`, including retained generated configs, may be kept when they encode one strategy and one portfolio useful for baseline/candidate comparison. These configs must not include fixed backtest `start_date` or `end_date`; runtime commands must provide sample windows when a bounded sample is required. Platform configs must use a single `strategy` mapping and must not use multi-segment strategy schedules.
 9. Only reusable, parameterized tools may be added under `platform/scripts/`. Do not add task-specific backtest scripts, hardcoded config matrices, hardcoded strategy sweeps, or one-off report generators there. A retained script must have a stable CLI, avoid hardcoded research config lists, document its usage, and have a clear maintenance owner.
 10. All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when exactness matters.
+11. Backtest artifacts must be separated by configuration status and sample window:
+    - YAML files directly under `platform/configs/` or any of its subdirectories other than `generated/` are fixed configs. Only their full-common-history runs may be written under `platform/results/backtests/`.
+    - A full-common-history run starts at the earliest trading date shared by every configured asset and ends at their latest shared trading date. That latest date must be no more than 7 calendar days before the run date.
+    - Runs using `platform/configs/generated/`, any non-fixed config, a training window, a final-test window, a sensitivity window, an experiment comparison, an explicitly bounded partial window, or any temporary/ad hoc setup must be written under `platform/results/temporary_backtests/`.
+    - Use `platform/results/temporary_backtests/direct/` for temporary direct backtests and `platform/results/temporary_backtests/experiments/` for standardized experiments. Sensitivity runs remain isolated under `platform/results/sensitivity/` and must never be loaded by Streamlit, even when temporary backtests are enabled. Results whose provenance cannot prove both a fixed config and the full common-history window are temporary.
+    - Streamlit must load only `platform/results/backtests/` by default. It may include `platform/results/temporary_backtests/` only through one global option whose default is off.
 
 ## Data Freshness And Sample Isolation
 

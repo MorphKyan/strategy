@@ -1,0 +1,70 @@
+﻿assets:
+- asset_id: CN_ETF:510300.SH
+  asset_type: etf
+  code: '510300'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 沪深300ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:518880.SH
+  asset_type: etf
+  code: '518880'
+  currency: CNY
+  exchange: SH
+  lot_size: 100
+  name: 黄金ETF
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511260.SH
+  code: '511260'
+  name: 10年国债ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+backtest:
+  enable_checkpoints: false
+data:
+  data_dir: data
+  fetch: false
+  fundamental_fields:
+  - pe
+  - pb
+  - roe
+  - debt_to_asset
+  - dividend_yield
+  fundamentals_dir: data/platform_fundamentals
+  market_store_dir: null
+  source: finshare
+execution:
+  round_mode: round
+  fee:
+    min_fee: 5.0
+    rate: 0.0002
+  price_field: close
+  unfilled_policy: retry_next_day
+  weight_tolerance: 0.0005
+output:
+  results_dir: results/backtests
+  sim_dir: results/sim_portfolios
+platform:
+  run_name: domestic_risk_parity_gerber_risk_parity_lw_cov_bond_10y_capital_100k
+portfolio:
+  initial_cash: 100000.0
+  initial_equity: 100000.0
+  initial_positions: []
+strategy:
+  cancel_pending_on_start: false
+  params:
+    min_periods: 20
+    rebalance_frequency: monthly
+    rebalance_threshold: 0.05
+    rebalance_relative_threshold: 0.25
+    rolling_window: 120
+    universe:
+    - CN_ETF:510300.SH
+    - CN_ETF:518880.SH
+    - CN_ETF:511260.SH
+  strategy_name: risk_parity_lw_cov
+  strategy_version_id: null

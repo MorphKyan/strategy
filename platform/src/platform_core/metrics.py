@@ -228,13 +228,19 @@ def _compute_period_metrics(
     }
 
 
-def build_platform_metrics(result_dir: str | Path) -> dict[str, Any]:
+def build_platform_metrics(result_dir: str | Path, start_date: Any = None) -> dict[str, Any]:
     result_dir = Path(result_dir)
     nav = read_csv_or_empty(result_dir / "nav.csv")
     trades = read_csv_or_empty(result_dir / "trades.csv")
     orders = read_csv_or_empty(result_dir / "orders.csv")
     skipped_orders = read_csv_or_empty(result_dir / "skipped_orders.csv")
     positions = read_csv_or_empty(result_dir / "positions.csv")
+    if start_date is not None:
+        nav = _filter_by_date(nav, start_date=start_date)
+        trades = _filter_by_date(trades, start_date=start_date)
+        orders = _filter_by_date(orders, start_date=start_date)
+        skipped_orders = _filter_by_date(skipped_orders, start_date=start_date)
+        positions = _filter_by_date(positions, start_date=start_date)
     manifest_path = result_dir / "manifest.json"
     execution_model: dict[str, Any] = {}
     if manifest_path.exists():

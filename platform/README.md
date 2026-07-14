@@ -90,14 +90,16 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 
 ## Archive Structure
 
-- Raw direct backtests: `results/backtests/<run_id>/`
-- Raw standardized experiments: `results/backtests/<experiment>/<timestamp>/<strategy>/<run_id>/`
+- Fixed-config full-common-history backtests: `results/backtests/<run_id>/`
+- Temporary direct backtests: `results/temporary_backtests/direct/<run_id>/`
+- Raw standardized experiments: `results/temporary_backtests/experiments/<experiment>/<timestamp>/<strategy>/<run_id>/`
 - Standardized experiment reports: `reports/experiments/<experiment>/<timestamp>/`
-- Sensitivity raw runs: `results/sensitivity_raw/<strategy>/<timestamp>/`
+- Sensitivity raw runs: `results/sensitivity/<strategy>/<timestamp>/` (never loaded by Streamlit)
 - Sensitivity reports: `reports/sensitivity/<strategy>/<timestamp>/`
 - Data validation reports: `reports/data_validation/<timestamp>/`
 
 Raw run directories contain execution-level artifacts. Report directories contain decision-level summaries, metrics, config copies, and pointers back to raw paths.
+The Streamlit dashboard loads only fixed-config backtests by default. Its global sidebar option can additionally load temporary backtests. Training, final-test, experiment, sensitivity, generated-config, partial-window, and ad hoc runs must never be written to the fixed-config directory.
 
 ## Platform Docs
 
