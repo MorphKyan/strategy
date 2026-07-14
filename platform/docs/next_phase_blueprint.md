@@ -227,13 +227,17 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 已落地：`st.multiselect` 选 2–5 个 run，`align_navs()` 裁剪到共同重叠区间（可选）并在所选区间首日各自归一（净值模式从 1.0、收益率模式从 0% 出发），净值/回撤叠加 + 全样本指标对照表。区间与显示控件与 B1 完全一致。
 
-### B3. 模拟/实盘组合页（新页面，依赖主线 A 落地）
+### B3. 模拟/实盘组合页（已完成，2026-07-15）
+
+**竣工说明（as-built，与下方原规格的差异）**：发现器合并为一个 `discover_portfolios()`（live 在前）；sim 全史 = 拼接 `runs/*/nav.csv` 增量段、同日保留最新段，统一归一为 `net_value` 列（`read_portfolio_nav`）。目标权重优先取 `pending_intents`，否则取最近一张下单票的 `weight_target`（票只含需交易资产，图注已说明）；非行情代码（演示组合）跳过取价，权重留空。real_nav vs 影子 sim 用 `align_navs` 在共同区间首日归一（收益率口径）。组合目录无元数据（A1 有意未接 SQLite），策略名列暂缺。原规格：
 
 - 发现器：`artifacts.py` 加 `discover_sim_portfolios()` 与 `discover_live_portfolios()`，分别扫 `results/sim_portfolios/` 与 `results/live_portfolios/`。注意 sim 的 `nav.csv` 列是 `total_value` 而非回测的 `net_value`，读取层要归一。
 - 展示：当前权重 vs 目标权重（双色条形图）、pending intents 表、最近一张下单票原文、real_nav vs 影子 sim nav 对比曲线。
 - 保持**只读**。reconcile 录入仍走命令行，看板不做写操作（避免把看板变成需要认真测试的应用）。
 
-### B4. 组合总览列表页（多组合横向视图，依赖主线 A 产出组合）
+### B4. 组合总览列表页（已完成，2026-07-15）
+
+**竣工说明**：`trailing_returns`（复用 `window_start_date`，新增"近1周"标签；历史短于区间显示 —，另附"成立以来"）+ `business_days_behind`（工作日近似交易日，未剔除节假日，>=3 整行标黄）。上线当天即抓到真实故障：影子组合净值滞后 3 个工作日（任务计划 `--shadow` 参数被 schtasks 261 字符上限截断）。原规格：
 
 投资者日常最高频的问题是"我所有在跑的组合最近表现如何"，一页列表回答它：
 
@@ -321,7 +325,7 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 1. ~~A1+A2：`live.py` 的 reconcile + plan + 下单票~~ **已完成（2026-07-05）**：`live.py` + `run_live_cycle.py`（reconcile/plan），端到端验证通过（真实配置 + 全真数据出票）。SQLite 集成与 notify/cycle 留给下一步。
 2. ~~A3+A4：notify + cycle + 任务计划~~ **已完成（2026-07-05）**：`notify.py`（Server酱/SMTP，环境变量零配置自动发现）+ `cycle` 子命令（非交易日自动跳过）。任务计划命令已写进脚本 docstring，由用户设好推送密钥后自行注册。
 3. ~~B1：收益多尺度视图~~ **已完成（2026-07-05）**：净值/收益率双模式（收益率按区间首日归零）、区间选择、对数坐标、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、月度序列、滚动波动与滚动 Sharpe，持仓面积图含现金层。派生计算在 `artifacts.py`（`nav_analytics`/`rebase_benchmark`/`window_start_date`），测试在 `test_platform_dashboard.py`。
-4. B3+B4：sim/实盘组合页 + 组合总览列表（近 1 周/1 月/3 月/半年收益，配合 A 使用）
+4. ~~B3+B4：sim/实盘组合页 + 组合总览列表~~ **已完成（2026-07-15）**：`discover_portfolios`/`read_portfolio_nav`/`trailing_returns`/`business_days_behind` 等读取层 + "组合总览"/"组合详情"两页，测试在 `test_platform_dashboard.py`。**主线 B（看板升级）全部竣工。**
 5. ~~A5：月度归因报告~~ **已完成（2026-07-11）**：attribution.py + report_live_attribution.py + cycle --shadow 影子跟跑；reports/live/ 因含真实账户金额已 gitignore。**主线 A（实战环路）全部竣工。**
 6. ~~B2：多回测对比页~~ **已完成（2026-07-05）**：`align_navs` 对齐重叠区间、在所选区间首日归一叠加（净值/收益率双模式）+ 回撤叠加 + 指标对照表，控件与回测分析页统一。
 7. C1 流程文档化 + C2（真要做个股时再启动）

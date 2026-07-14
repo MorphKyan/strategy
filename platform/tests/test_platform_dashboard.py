@@ -8,13 +8,20 @@ import pytest
 
 from src.platform_dashboard.artifacts import (
     align_navs,
+    asset_code,
     build_weighted_portfolio,
+    business_days_behind,
     discover_configs,
+    discover_portfolios,
     downsample_timeseries,
     discover_runs,
     latest_positions,
+    latest_ticket,
     infer_slippage_scenario,
+    max_drawdown,
     nav_analytics,
+    position_weights,
+    read_portfolio_nav,
     read_run_metrics,
     read_run_table,
     read_run_tables,
@@ -23,6 +30,7 @@ from src.platform_dashboard.artifacts import (
     portfolio_risk_analysis,
     rebalance_events,
     rebase_benchmark,
+    trailing_returns,
     window_start_date,
 )
 
@@ -268,3 +276,120 @@ def test_slippage_scenario_inference_is_explicit_and_safe() -> None:
     assert infer_slippage_scenario("run_x", {"slippage_scenario": "stress"}) == "stress"
     assert infer_slippage_scenario("strategy_dynamic_participation_123", {}) == "dynamic_participation"
     assert infer_slippage_scenario("legacy_run", {}) == "unknown"
+
+
+# ---------------------------------------------------------------- 组合页（蓝图 B3/B4）
+
+
+def _write_state(portfolio_dir: Path, cash: float = 1000.0, pending: dict | None = None) -> None:
+    portfolio_dir.mkdir(parents=True, exist_ok=True)
+    (portfolio_dir / "portfolio_state.json").write_text(
+        json.dumps(
+            {
+                "cash": cash,
+                "positions": {
+                    "CN_ETF:510300.SH": {"asset_id": "CN_ETF:510300.SH", "quantity": 1000.0, "cost_basis": 4.0},
+                    "CN_ETF:518880.SH": {"asset_id": "CN_ETF:518880.SH", "quantity": 500.0, "cost_basis": 8.0},
+                },
+                "pending_intents": pending or {},
+                "cooldown_pool": {},
+                "strategy_state": {},
+                "last_date": "2026-07-10",
+                "dividend_receivables": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_discover_portfolios_and_nav_readers(tmp_path: Path) -> None:
+    live_dir = tmp_path / "results" / "live_portfolios" / "live_x"
+    _write_state(live_dir)
+    pd.DataFrame(
+        [
+            {"date": "2026-07-09", "cash": 100.0, "positions_value": 900.0, "total_value": 1000.0},
+            {"date": "2026-07-10", "cash": 100.0, "positions_value": 950.0, "total_value": 1050.0},
+        ]
+    ).to_csv(live_dir / "real_nav.csv", index=False)
+
+    # sim 全史 = runs 增量段拼接；同日重复保留更新一段（advance 重跑场景）
+    sim_dir = tmp_path / "results" / "sim_portfolios" / "sim_y"
+    _write_state(sim_dir)
+    for run_name, rows in (
+        ("2026-07-09_100000", [{"date": "2026-07-08", "total_value": 2.0}, {"date": "2026-07-09", "total_value": 2.1}]),
+        ("2026-07-10_100000", [{"date": "2026-07-09", "total_value": 2.15}, {"date": "2026-07-10", "total_value": 2.2}]),
+    ):
+        run_dir = sim_dir / "runs" / run_name
+        run_dir.mkdir(parents=True)
+        pd.DataFrame(rows).to_csv(run_dir / "nav.csv", index=False)
+
+    records = discover_portfolios(tmp_path)
+    assert [(item.kind, item.portfolio_id) for item in records] == [("live", "live_x"), ("sim", "sim_y")]
+    assert records[0].state["cash"] == pytest.approx(1000.0)
+
+    live_nav = read_portfolio_nav(live_dir, "live")
+    assert list(live_nav["net_value"]) == pytest.approx([1000.0, 1050.0])
+    sim_nav = read_portfolio_nav(sim_dir, "sim")
+    assert list(sim_nav["net_value"]) == pytest.approx([2.0, 2.15, 2.2])
+    assert read_portfolio_nav(tmp_path / "missing", "live").empty
+
+
+def test_latest_ticket_prefers_newest_and_tolerates_missing_csv(tmp_path: Path) -> None:
+    tickets = tmp_path / "tickets"
+    tickets.mkdir()
+    (tickets / "ticket_2026-07-09.txt").write_text("老票", encoding="utf-8")
+    pd.DataFrame([{"asset_id": "CN_ETF:510300.SH", "code": "510300", "weight_target": 0.5}]).to_csv(
+        tickets / "ticket_2026-07-09.csv", index=False
+    )
+    (tickets / "ticket_2026-07-10.txt").write_text("【无操作】2026-07-10", encoding="utf-8")
+
+    ticket = latest_ticket(tmp_path)
+    assert ticket is not None
+    assert ticket["date"] == "2026-07-10"
+    assert "无操作" in ticket["text"]
+    assert ticket["orders"].empty  # 无操作日只有 txt
+    assert latest_ticket(tmp_path / "nowhere") is None
+
+
+def test_position_weights_includes_cash_and_missing_price(tmp_path: Path) -> None:
+    _write_state(tmp_path, cash=500.0)
+    state = json.loads((tmp_path / "portfolio_state.json").read_text(encoding="utf-8"))
+    weights = position_weights(state, {"CN_ETF:510300.SH": 5.0})  # 518880 缺价
+
+    assert asset_code("CN_ETF:510300.SH") == "510300"
+    frame = weights.set_index("code")
+    # 已知市值 = 1000*5 + 现金 500；缺价资产保留行但权重为空
+    assert frame.loc["510300", "weight"] == pytest.approx(5000.0 / 5500.0)
+    assert frame.loc["现金", "weight"] == pytest.approx(500.0 / 5500.0)
+    assert pd.isna(frame.loc["518880", "weight"])
+
+
+def test_trailing_returns_uses_window_start_and_guards_short_history() -> None:
+    nav = _make_nav("2025-01-01", 300, 0.001)
+    returns = trailing_returns(nav)
+    last = nav["date"].iloc[-1]
+    start = window_start_date(last, "近1月")
+    window = nav[nav["date"] >= start]
+    assert returns["近1月"] == pytest.approx(window["net_value"].iloc[-1] / window["net_value"].iloc[0] - 1)
+    assert returns["成立以来"] == pytest.approx(nav["net_value"].iloc[-1] / nav["net_value"].iloc[0] - 1)
+    assert window_start_date(last, "近1周") == last - pd.DateOffset(weeks=1)
+
+    young = _make_nav("2026-07-08", 3, 0.001)  # 3 天历史撑不起任何"近N期"
+    young_returns = trailing_returns(young)
+    assert young_returns["近1周"] is None
+    assert young_returns["近1月"] is None
+    assert young_returns["成立以来"] == pytest.approx(young["net_value"].iloc[-1] / young["net_value"].iloc[0] - 1)
+
+    assert trailing_returns(pd.DataFrame())["成立以来"] is None
+
+
+def test_max_drawdown_and_staleness() -> None:
+    nav = pd.DataFrame({"date": pd.bdate_range("2025-01-01", periods=3), "net_value": [1.0, 0.8, 0.9]})
+    assert max_drawdown(nav) == pytest.approx(-0.2)
+    assert max_drawdown(pd.DataFrame()) is None
+
+    # 周五 → 下周三 = 滞后 3 个工作日；同日/未来不为负
+    assert business_days_behind("2026-07-10", "2026-07-15") == 3
+    assert business_days_behind("2026-07-14", "2026-07-15") == 1
+    assert business_days_behind("2026-07-15", "2026-07-15") == 0
+    assert business_days_behind("2026-07-10", "2026-07-11") == 0  # 周六视角，无新交易日
