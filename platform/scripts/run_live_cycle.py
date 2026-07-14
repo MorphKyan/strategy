@@ -18,10 +18,19 @@
 
 推送渠道零配置：设环境变量 RQ_SERVERCHAN_KEY（Server酱/微信）或
 RQ_SMTP_HOST/RQ_SMTP_USERNAME/RQ_SMTP_PASSWORD/RQ_SMTP_TO（邮件）即自动启用，
-详见 src/platform_core/notify.py 模块注释。任务计划注册示例：
+详见 src/platform_core/notify.py 模块注释。
 
-  schtasks /Create /TN "RetailQuant Live Cycle" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 19:00 ^
-      /TR "D:\\qcy_project\\strategy\\env\\Scripts\\python.exe D:\\qcy_project\\strategy\\platform\\scripts\\run_live_cycle.py cycle --config configs\\baseline_r1_domestic_rolling.yaml --sync --notify"
+任务计划注册【必须用 PowerShell，勿用 schtasks】——schtasks /TR 有 261 字符
+上限且超长时**静默截断**（2026-07-15 实测：--shadow sim_r8_permanent_shadow
+被截成 sim_r8_permanent_s，影子组合连续数晚推进失败无人察觉）：
+
+  $action = New-ScheduledTaskAction -Execute "D:\\qcy_project\\strategy\\env\\Scripts\\python.exe" `
+      -Argument "D:\\qcy_project\\strategy\\platform\\scripts\\run_live_cycle.py cycle --config configs\\r8_permanent_real_fixed_weight_threshold.yaml --portfolio live_r8_permanent_100k --sync --notify --shadow sim_r8_permanent_shadow"
+  $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At 19:00
+  Register-ScheduledTask -TaskName "RetailQuant Live Cycle" -Action $action -Trigger $trigger
+
+注册后务必回读校验参数完整（截断不报错）：
+  (Get-ScheduledTask "RetailQuant Live Cycle").Actions.Arguments
 
 推送分两条：组合日报（总值/日变动/权重，markdown）每个交易日必发；
 触发调仓时下单票作为独立第二条发送。每日估值同时追加进 real_nav.csv。
