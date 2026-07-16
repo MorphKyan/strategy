@@ -7,16 +7,21 @@ from pathlib import Path
 import pytest
 
 from src.platform_core import notify as notify_module
-from src.platform_core.live import LivePortfolio
+from src.platform_core.live import LivePortfolio, PlanResult
+from src.platform_core.models import parse_date
 from src.platform_core.notify import resolve_channels, send_notification
 
 
-def _write_market_data(data_dir: Path) -> None:
+def _write_market_data(data_dir: Path, closes: dict[str, dict[str, float]] | None = None) -> None:
+    """closes: code -> {date: close}，缺省恒为 10（OHLC 同价）。"""
     data_dir.mkdir(parents=True, exist_ok=True)
     header = "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor"
     dates = ["2024-01-29", "2024-01-30", "2024-01-31"]
     for code in ("AAA", "BBB"):
-        rows = [header] + [f"{code},{d},10,10,10,10,1000,10000,1" for d in dates]
+        rows = [header]
+        for d in dates:
+            price = (closes or {}).get(code, {}).get(d, 10)
+            rows.append(f"{code},{d},{price},{price},{price},{price},1000,10000,1")
         (data_dir / f"{code}.csv").write_text("\n".join(rows), encoding="utf-8")
 
 
@@ -162,6 +167,34 @@ def test_cycle_reconciles_plans_and_notifies_two_messages(tmp_path: Path):
     ticket_title, ticket_text = sent[1]
     assert "调仓提醒" in ticket_title
     assert "买入" in ticket_text
+
+
+def test_cycle_digest_reports_asset_daily_change_and_inception_pnl(tmp_path: Path):
+    """日报含各持仓当日涨跌幅/盈亏额与组合成立以来盈亏（2026-07-16 用户需求）。"""
+    data_dir = tmp_path / "data"
+    # AAA 收盘: 01-29 10 → 01-30 11（+10%）→ 01-31 12.1（+10%）
+    _write_market_data(data_dir, closes={"AAA": {"2024-01-30": 11, "2024-01-31": 12.1}})
+    portfolio = LivePortfolio("live_test", _live_config(data_dir), output_root=tmp_path / "live")
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")  # 起点总值 10100
+    portfolio.mark_to_market("2024-01-30")
+    sent: list[tuple[str, str]] = []
+
+    portfolio.cycle(asof_date="2024-01-31", notifier=lambda title, text: sent.append((title, text)) or True)
+
+    _, text = sent[0]
+    # 当日涨跌：AAA +10%，盈亏 300 股 ×（12.1 − 11）= +330 元
+    assert "+10.00%" in text and "+330.00 元" in text
+    # 成立以来：总值 7100 + 300×12.1 = 10730，对起点 10100 为 +630 / +6.24%
+    assert "成立以来" in text
+    assert "+630.00 元 / +6.24%" in text and "起点 2024-01-29" in text
+
+    # 成立首日（尚无早于当日的基准）不显示"成立以来"行
+    valuation = portfolio.mark_to_market("2024-01-29")
+    _, first_day_text = portfolio._render_daily_digest(
+        valuation, PlanResult(portfolio.portfolio_id, parse_date("2024-01-29"), False, 0, None, Path("x"), "")
+    )
+    assert "成立以来" not in first_day_text
 
 
 def test_cycle_no_op_day_sends_single_digest(tmp_path: Path):
