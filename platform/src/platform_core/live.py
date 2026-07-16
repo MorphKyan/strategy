@@ -344,9 +344,25 @@ class LivePortfolio:
             for asset_id, position in state.positions.items()
         }
 
+        # 各持仓当日涨跌幅与盈亏额（对比前一交易日收盘；持仓以上次 reconcile 为准，
+        # 当日已交易未对齐时与真实盈亏有偏差，次日 reconcile 后自愈——与 nav 同一口径）
+        earlier_days = [day for day in data.calendar if day < asof]
+        prev_bars = data.bars_on(max(earlier_days)) if earlier_days else {}
+        asset_changes: dict[str, dict[str, float]] = {}
+        for asset_id, position in state.positions.items():
+            bar, prev_bar = bars.get(asset_id), prev_bars.get(asset_id)
+            if bar is None or prev_bar is None or prev_bar.close <= 0:
+                continue
+            asset_changes[asset_id] = {
+                "pct": bar.close / prev_bar.close - 1.0,
+                "pnl": position.quantity * (bar.close - prev_bar.close),
+            }
+
         previous_total = None
         has_newer = False
         same_day_total = None
+        inception_date: str | None = None
+        inception_total = None
         if self.real_nav_path.exists():
             # utf-8-sig：容忍 Excel/PowerShell 手工编辑留下的 BOM
             with self.real_nav_path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -358,6 +374,9 @@ class LivePortfolio:
             same = [row for row in rows if row["date"] == date_str(asof)]
             if same:
                 same_day_total = float(same[-1]["total_value"])
+            if rows:  # 文件按日期排序落盘，首行即组合起点（首次 reconcile）
+                inception_date = rows[0]["date"]
+                inception_total = float(rows[0]["total_value"])
 
         # 历史行冻结：real_nav 是真实净值台账，一旦出现更新日期的估值，旧日期
         # 不允许被重估值改写（曾发生：数据处于研究中间状态时 --force 重跑，把
@@ -379,7 +398,10 @@ class LivePortfolio:
             "positions_value": positions_value,
             "total_value": total_value,
             "weights": weights,
+            "asset_changes": asset_changes,
             "previous_total": previous_total,
+            "inception_date": inception_date,
+            "inception_total": inception_total,
             "written": written,
         }
 
@@ -396,15 +418,27 @@ class LivePortfolio:
             diff = total - previous
             change_line += f"（较上一估值日 {diff:+,.2f} / {diff / previous:+.2%}）"
         lines.append(change_line)
+        inception_total = valuation.get("inception_total")
+        inception_date = valuation.get("inception_date")
+        if inception_total and inception_date and inception_date < day:
+            diff = total - inception_total
+            lines.append(
+                f"- **成立以来**: {diff:+,.2f} 元 / {diff / inception_total:+.2%}（起点 {inception_date}）"
+            )
         cash = valuation["cash"]
         cash_pct = cash / total if total > 0 else 0.0
         lines.append(f"- **现金**: {cash:,.2f} 元（{cash_pct:.1%}）")
         lines.append("")
-        lines.append("**持仓权重**:")
+        lines.append("**持仓权重与当日涨跌**:")
+        asset_changes = valuation.get("asset_changes") or {}
         for asset_id, weight in sorted(valuation["weights"].items(), key=lambda item: -item[1]):
             asset = self.assets.get(asset_id)
             label = f"{asset.code} {asset.name}" if asset else asset_id
-            lines.append(f"- {label}: {weight:.1%}")
+            entry = f"- {label}: {weight:.1%}"
+            change = asset_changes.get(asset_id)
+            if change is not None:
+                entry += f"，{change['pct']:+.2%} / {change['pnl']:+,.2f} 元"
+            lines.append(entry)
         lines.append("")
         if plan_result.has_target and plan_result.order_count > 0:
             lines.append("⚠️ **今日触发调仓**，下单票见另一条推送。")
