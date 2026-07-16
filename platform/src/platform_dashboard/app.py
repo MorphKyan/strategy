@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
 import plotly.express as px
@@ -26,13 +26,17 @@ from src.platform_dashboard.artifacts import (
     infer_slippage_scenario,
     latest_positions,
     latest_ticket,
+    list_tickets,
     market_history_for_window,
     max_drawdown,
     nav_analytics,
+    nav_summary_metrics,
     platform_root,
     position_weights,
     read_portfolio_nav,
     read_run_metrics,
+    read_sim_run_table,
+    read_ticket_orders,
     read_run_table,
     read_corporate_actions,
     read_market_history,
@@ -236,26 +240,21 @@ def render_run_metrics(run: RunRecord) -> None:
 PERFORMANCE_PERIODS = ["近1月", "近3月", "近6月", "今年", "近1年", "近2年", "近3年", "全部"]
 
 
-def render_performance(nav: pd.DataFrame, run: RunRecord, runs: list[RunRecord]) -> None:
+def render_performance(nav: pd.DataFrame, benchmarks: dict[str, Callable[[], pd.DataFrame]] | None = None) -> None:
+    """净值与回撤视图。benchmarks 为 {标签: 惰性净值加载器}，回测/组合详情页共用
+    （基准净值经 rebase_benchmark 缩放到候选坐标系，规模不同的组合可直接对比）。"""
     if nav.empty or "net_value" not in nav:
-        st.info("该运行没有可展示的净值数据。")
+        st.info("没有可展示的净值数据。")
         return
-
-    effective_start = nav["date"].min()
-    if run.start_date and pd.Timestamp(run.start_date) < effective_start:
-        st.caption(
-            f"已隐藏首次投资前的纯现金区间：原始日历起点 {run.start_date}，"
-            f"有效净值基准日 {effective_start.date()}。"
-        )
+    benchmarks = benchmarks or {}
 
     controls = st.columns([1.1, 3.2, 1.6, 0.7])
-    others = [item for item in runs if item.run_id != run.run_id]
     with controls[0]:
         mode = st.radio("显示", ["净值", "收益率"], horizontal=True)
     with controls[1]:
         period = st.radio("区间", PERFORMANCE_PERIODS, index=len(PERFORMANCE_PERIODS) - 1, horizontal=True)
     with controls[2]:
-        benchmark_id = st.selectbox("基准对比", ["无", *[item.run_id for item in others]])
+        benchmark_id = st.selectbox("基准对比", ["无", *benchmarks])
     with controls[3]:
         log_scale = st.toggle("对数", value=False, disabled=mode == "收益率", help="长区间复利曲线建议开启")
 
@@ -272,8 +271,7 @@ def render_performance(nav: pd.DataFrame, run: RunRecord, runs: list[RunRecord])
 
     benchmark_window = pd.DataFrame()
     if benchmark_id != "无":
-        benchmark_run = next(item for item in others if item.run_id == benchmark_id)
-        benchmark_window = rebase_benchmark(window, run_table(benchmark_run, "nav"))
+        benchmark_window = rebase_benchmark(window, benchmarks[benchmark_id]())
         if benchmark_window.empty:
             st.warning("与所选基准在该区间内无重叠，无法对比。")
 
@@ -555,7 +553,18 @@ def render_runs(runs: list[RunRecord]) -> None:
     sections = ["净值与回撤", "收益分解", "持仓", "调仓与行情", "订单与交易", "运行信息"]
     section = st.segmented_control("分析视图", sections, default=sections[0], label_visibility="collapsed")
     if section == "净值与回撤":
-        render_performance(run_table(run, "nav"), run, runs)
+        nav = run_table(run, "nav")
+        if not nav.empty and run.start_date and pd.Timestamp(run.start_date) < nav["date"].min():
+            st.caption(
+                f"已隐藏首次投资前的纯现金区间：原始日历起点 {run.start_date}，"
+                f"有效净值基准日 {nav['date'].min().date()}。"
+            )
+        benchmarks = {
+            item.run_id: (lambda item=item: run_table(item, "nav"))
+            for item in runs
+            if item.run_id != run.run_id
+        }
+        render_performance(nav, benchmarks)
     elif section == "收益分解":
         render_return_decomposition(run_table(run, "nav"))
     elif section == "持仓":
@@ -764,7 +773,7 @@ def render_portfolio_overview(portfolios: list[PortfolioRecord]) -> None:
     )
 
 
-def render_portfolio_detail(portfolios: list[PortfolioRecord], root: Path) -> None:
+def render_portfolio_detail(portfolios: list[PortfolioRecord], runs: list[RunRecord], root: Path) -> None:
     st.subheader("组合详情")
     if not portfolios:
         st.info("尚未发现模拟/实盘组合（results/sim_portfolios、results/live_portfolios）。")
@@ -793,7 +802,40 @@ def render_portfolio_detail(portfolios: list[PortfolioRecord], root: Path) -> No
     cols[3].metric("待执行意图", len(pending))
     cols[4].metric("成立以来", metric_text(returns.get("成立以来"), "percent"))
 
-    # ---- 当前权重 vs 目标权重
+    # nav 派生指标行（复用回测口径；样本太短时年化类显示 —，见 nav_summary_metrics）
+    summary = nav_summary_metrics(nav)
+    second = st.columns(5)
+    second[0].metric("年化收益", metric_text(summary.get("annualized_return"), "percent"))
+    second[1].metric("年化波动", metric_text(summary.get("annualized_volatility"), "percent"))
+    second[2].metric("Sharpe", metric_text(summary.get("sharpe_ratio")))
+    second[3].metric("最大回撤", metric_text(summary.get("max_drawdown"), "percent"))
+    second[4].metric("当前回撤", metric_text(summary.get("current_drawdown"), "percent"))
+    if 0 < summary["observations"] < 20:
+        st.caption(f"净值观测仅 {summary['observations']} 天，年化类指标暂不计算（样本不足，随净值累积自动出现）。")
+
+    sections = ["概览", "净值与回撤", "收益分解", "票据与交易"]
+    section = st.segmented_control("组合视图", sections, default=sections[0], label_visibility="collapsed")
+
+    if section == "概览":
+        _render_portfolio_snapshot(record, state, pending, root)
+    elif section == "净值与回撤":
+        # 基准可选其他组合（影子 sim 等）或任意回测 run —— 实盘 vs 回测预期一图看清
+        benchmarks: dict[str, Callable[[], pd.DataFrame]] = {
+            f"{item.kind} · {item.portfolio_id}": (lambda item=item: portfolio_nav(item))
+            for item in portfolios
+            if item.portfolio_id != record.portfolio_id
+        }
+        for run in runs:
+            benchmarks[f"回测 · {run.run_id}"] = lambda run=run: run_table(run, "nav")
+        render_performance(nav, benchmarks)
+    elif section == "收益分解":
+        render_return_decomposition(nav)
+    else:
+        _render_portfolio_activity(record)
+
+
+def _render_portfolio_snapshot(record: PortfolioRecord, state: dict[str, Any], pending: dict[str, Any], root: Path) -> None:
+    """概览节：当前权重 vs 目标权重、待执行意图、最新下单票。"""
     st.markdown("#### 当前权重 vs 目标权重")
     prices: dict[str, float] = {}
     for asset_id in (state.get("positions") or {}):
@@ -840,49 +882,37 @@ def render_portfolio_detail(portfolios: list[PortfolioRecord], root: Path) -> No
         st.markdown("#### 待执行意图")
         st.dataframe(pd.DataFrame(list(pending.values())), width="stretch", hide_index=True)
 
-    # ---- 最近一张下单票
     if ticket is not None:
         st.markdown(f"#### 最新下单票（{ticket['date']}）")
         st.code(ticket["text"], language=None)
         if not ticket["orders"].empty:
             st.dataframe(ticket["orders"], width="stretch", hide_index=True)
 
-    # ---- 净值曲线
-    if nav.empty or len(nav) < 2:
-        st.info("净值序列不足两天，暂无曲线。")
-        return
-    st.markdown("#### 净值")
+
+def _render_portfolio_activity(record: PortfolioRecord) -> None:
+    """票据与交易节：live 组合列历史下单票，sim 组合列建议订单与模拟成交。"""
     if record.kind == "live":
-        shadows = [item for item in portfolios if item.kind == "sim"]
-        shadow_id = st.selectbox("影子模拟组合对比", ["无", *[item.portfolio_id for item in shadows]])
-        nav_map: dict[str, pd.DataFrame] = {"真实账户": nav}
-        if shadow_id != "无":
-            shadow = next(item for item in shadows if item.portfolio_id == shadow_id)
-            nav_map[f"影子 · {shadow_id}"] = portfolio_nav(shadow)
-        aligned = align_navs(nav_map, overlap_only=len(nav_map) > 1)
-        if aligned.empty:
-            st.warning("与所选影子组合没有重叠区间。")
+        st.markdown("#### 下单票历史")
+        tickets_frame = list_tickets(record.path)
+        if tickets_frame.empty:
+            st.caption("暂无下单票。")
         else:
-            fig = go.Figure()
-            for name, group in aligned.groupby("run_id"):
-                fig.add_trace(go.Scatter(x=group["date"], y=group["net_value"] - 1.0, name=name, line={"width": 1.8}))
-            fig.add_hline(y=0, line_dash="dot", line_color="#999999")
-            fig.update_layout(height=380, yaxis_tickformat=".2%", yaxis_title="区间收益",
-                              margin={"l": 10, "r": 10, "t": 30, "b": 10},
-                              legend={"orientation": "h", "yanchor": "bottom", "y": 1.02})
-            st.plotly_chart(fig, width="stretch")
-            if len(nav_map) > 1:
-                st.caption("真实与影子净值规模不同，已在共同区间首日各自归一（收益率口径），差异即 tracking error。")
+            shown = tickets_frame.rename(
+                columns={"date": "日期", "kind": "类型", "summary": "摘要", "has_detail": "有明细"}
+            )
+            st.dataframe(shown, width="stretch", hide_index=True)
+        orders = read_ticket_orders(record.path)
+        if not orders.empty:
+            st.markdown("#### 调仓明细（全部票据）")
+            st.dataframe(orders, width="stretch", hide_index=True)
     else:
-        fig = go.Figure(go.Scatter(x=nav["date"], y=nav["net_value"], name="总值", line={"width": 1.8}))
-        fig.update_layout(height=380, yaxis_title="总值", margin={"l": 10, "r": 10, "t": 30, "b": 10})
-        st.plotly_chart(fig, width="stretch")
-        drawdown = nav["net_value"] / nav["net_value"].cummax() - 1.0
-        dd = px.area(pd.DataFrame({"date": nav["date"], "drawdown": drawdown}), x="date", y="drawdown",
-                     labels={"date": "日期", "drawdown": "回撤"})
-        dd.update_traces(line_color="#d9534f", fillcolor="rgba(217,83,79,0.25)")
-        dd.update_layout(height=240, yaxis_tickformat=".1%", margin={"l": 10, "r": 10, "t": 15, "b": 10})
-        st.plotly_chart(dd, width="stretch")
+        for title, name in (("建议订单", "suggested_orders"), ("模拟成交", "trades")):
+            st.markdown(f"#### {title}")
+            frame = read_sim_run_table(record.path, name)
+            if frame.empty:
+                st.caption("无记录")
+            else:
+                st.dataframe(frame, width="stretch", hide_index=True)
 
 
 # ---------------------------------------------------------------- 策略配置
@@ -1042,7 +1072,7 @@ def main() -> None:
     elif page == "组合总览":
         render_portfolio_overview(cached_portfolios(root))
     elif page == "组合详情":
-        render_portfolio_detail(cached_portfolios(root), root_path)
+        render_portfolio_detail(cached_portfolios(root), cached_runs(root, include_temporary), root_path)
     elif page == "市场数据":
         render_market_data(root_path)
     elif page == "回测分析":

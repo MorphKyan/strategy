@@ -795,6 +795,103 @@ def trailing_returns(nav: pd.DataFrame, periods: list[str] | None = None) -> dic
     return out
 
 
+def nav_summary_metrics(nav: pd.DataFrame, min_annualize_obs: int = 20) -> dict[str, Any]:
+    """组合详情页指标行：从 nav 现算年化收益/波动/Sharpe/最大及当前回撤。
+
+    观测少于 min_annualize_obs 天时年化类指标返回 None（几天样本年化出来
+    是噪声，宁可显示 —），回撤类不受限。与 A5 归因"观测<5 判样本不足"同思路。
+    """
+    out: dict[str, Any] = {
+        "observations": 0,
+        "annualized_return": None,
+        "annualized_volatility": None,
+        "sharpe_ratio": None,
+        "max_drawdown": None,
+        "current_drawdown": None,
+    }
+    if nav.empty or "net_value" not in nav or "date" not in nav:
+        return out
+    frame = nav[["date", "net_value"]].dropna().sort_values("date")
+    series = pd.to_numeric(frame["net_value"], errors="coerce").dropna()
+    if len(series) < 2 or (series <= 0).any():
+        return out
+    out["observations"] = int(len(series))
+    drawdown = series / series.cummax() - 1.0
+    out["max_drawdown"] = float(drawdown.min())
+    out["current_drawdown"] = float(drawdown.iloc[-1])
+    if len(series) >= min_annualize_obs:
+        daily = series.pct_change().dropna()
+        years = len(daily) / 252
+        if years > 0:
+            out["annualized_return"] = float((series.iloc[-1] / series.iloc[0]) ** (1 / years) - 1)
+        volatility = float(daily.std() * math.sqrt(252))
+        out["annualized_volatility"] = volatility
+        if volatility > 0:
+            out["sharpe_ratio"] = float(daily.mean() * 252 / volatility)
+    return out
+
+
+def list_tickets(portfolio_dir: Path) -> pd.DataFrame:
+    """全部下单票列表（新在前）：date, kind（调仓/无操作）, summary（正文首行）。"""
+    tickets_dir = portfolio_dir / "tickets"
+    if not tickets_dir.exists():
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for txt_path in sorted(tickets_dir.glob("ticket_*.txt"), reverse=True):
+        try:
+            first_line = txt_path.read_text(encoding="utf-8").strip().splitlines()[0]
+        except (OSError, IndexError):
+            continue
+        rows.append(
+            {
+                "date": txt_path.stem.removeprefix("ticket_"),
+                "kind": "无操作" if "无操作" in first_line else "调仓",
+                "summary": first_line,
+                "has_detail": txt_path.with_suffix(".csv").exists(),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def read_ticket_orders(portfolio_dir: Path) -> pd.DataFrame:
+    """拼接全部 ticket_*.csv 调仓明细，按日期倒序（live 组合的"订单历史"）。"""
+    parts: list[pd.DataFrame] = []
+    for path in sorted((portfolio_dir / "tickets").glob("ticket_*.csv")) if (portfolio_dir / "tickets").exists() else []:
+        try:
+            if path.stat().st_size:
+                parts.append(pd.read_csv(path, dtype={"code": str}))
+        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            continue
+    if not parts:
+        return pd.DataFrame()
+    frame = pd.concat(parts, ignore_index=True)
+    if "date" in frame:
+        frame = frame.sort_values("date", ascending=False)
+    return frame.reset_index(drop=True)
+
+
+def read_sim_run_table(portfolio_dir: Path, name: str) -> pd.DataFrame:
+    """拼接 sim 组合 runs/*/{name}.csv 增量段（同 read_portfolio_nav 的口径）。
+
+    同日重跑 advance 会产生重复行，按整行去重。
+    """
+    if name not in {"trades", "suggested_orders"}:
+        raise ValueError(f"Unsupported sim run table: {name}")
+    parts: list[pd.DataFrame] = []
+    for path in sorted(portfolio_dir.glob(f"runs/*/{name}.csv")):
+        try:
+            if path.exists() and path.stat().st_size:
+                parts.append(pd.read_csv(path))
+        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            continue
+    if not parts:
+        return pd.DataFrame()
+    frame = pd.concat(parts, ignore_index=True).drop_duplicates()
+    if "date" in frame:
+        frame = frame.sort_values("date", ascending=False)
+    return frame.reset_index(drop=True)
+
+
 def max_drawdown(nav: pd.DataFrame) -> float | None:
     if nav.empty or "net_value" not in nav or len(nav) < 2:
         return None
