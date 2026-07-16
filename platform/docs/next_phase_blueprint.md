@@ -229,7 +229,9 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 ### B3. 模拟/实盘组合页（已完成，2026-07-15）
 
-**竣工说明（as-built，与下方原规格的差异）**：发现器合并为一个 `discover_portfolios()`（live 在前）；sim 全史 = 拼接 `runs/*/nav.csv` 增量段、同日保留最新段，统一归一为 `net_value` 列（`read_portfolio_nav`）。目标权重优先取 `pending_intents`，否则取最近一张下单票的 `weight_target`（票只含需交易资产，图注已说明）；非行情代码（演示组合）跳过取价，权重留空。real_nav vs 影子 sim 用 `align_navs` 在共同区间首日归一（收益率口径）。组合目录无元数据（A1 有意未接 SQLite），策略名列暂缺。原规格：
+**竣工说明（as-built，与下方原规格的差异）**：发现器合并为一个 `discover_portfolios()`（live 在前）；sim 全史 = 拼接 `runs/*/nav.csv` 增量段、同日保留最新段，统一归一为 `net_value` 列（`read_portfolio_nav`）。目标权重优先取 `pending_intents`，否则取最近一张下单票的 `weight_target`（票只含需交易资产，图注已说明）；非行情代码（演示组合）跳过取价，权重留空。real_nav vs 影子 sim 用 `align_navs` 在共同区间首日归一（收益率口径）。组合目录无元数据（A1 有意未接 SQLite），策略名列暂缺。
+
+**2026-07-16 增补（复用回测分析充实详情页）**：详情页改为四分节（概览/净值与回撤/收益分解/票据与交易）。`render_performance` 泛化为接受 `{标签: 惰性净值加载器}` 的基准字典，回测分析与组合详情共用——实盘组合的基准可选影子 sim 或**任意回测 run**（实盘 vs 回测预期一图对比，取代原影子专用对比图）；收益分解（月度热力图/滚动指标）零成本挂接；新增 nav 派生指标行（`nav_summary_metrics`，观测 <20 天时年化类显示 — 防小样本噪声）与票据/交易历史（`list_tickets`/`read_ticket_orders`/`read_sim_run_table`）。持仓面积图需每日权重快照落盘（Phase 2），经用户裁决暂不做。原规格：
 
 - 发现器：`artifacts.py` 加 `discover_sim_portfolios()` 与 `discover_live_portfolios()`，分别扫 `results/sim_portfolios/` 与 `results/live_portfolios/`。注意 sim 的 `nav.csv` 列是 `total_value` 而非回测的 `net_value`，读取层要归一。
 - 展示：当前权重 vs 目标权重（双色条形图）、pending intents 表、最近一张下单票原文、real_nav vs 影子 sim nav 对比曲线。

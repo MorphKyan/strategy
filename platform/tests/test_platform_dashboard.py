@@ -20,13 +20,17 @@ from src.platform_dashboard.artifacts import (
     filter_runs,
     latest_positions,
     latest_ticket,
+    list_tickets,
     market_history_for_window,
     infer_slippage_scenario,
     max_drawdown,
     nav_analytics,
+    nav_summary_metrics,
     position_weights,
     read_portfolio_nav,
     read_run_metrics,
+    read_sim_run_table,
+    read_ticket_orders,
     read_run_table,
     read_run_tables,
     read_corporate_actions,
@@ -477,6 +481,61 @@ def test_trailing_returns_uses_window_start_and_guards_short_history() -> None:
     assert young_returns["成立以来"] == pytest.approx(young["net_value"].iloc[-1] / young["net_value"].iloc[0] - 1)
 
     assert trailing_returns(pd.DataFrame())["成立以来"] is None
+
+
+def test_nav_summary_metrics_gates_annualized_on_small_sample() -> None:
+    long_nav = _make_nav("2024-07-01", 300, 0.001)
+    summary = nav_summary_metrics(long_nav)
+    assert summary["observations"] == 300
+    daily = long_nav["net_value"].pct_change().dropna()
+    years = len(daily) / 252
+    expected = (long_nav["net_value"].iloc[-1] / long_nav["net_value"].iloc[0]) ** (1 / years) - 1
+    assert summary["annualized_return"] == pytest.approx(expected)
+    assert summary["max_drawdown"] == pytest.approx(0.0)  # 恒正收益无回撤
+    assert summary["current_drawdown"] == pytest.approx(0.0)
+
+    # 5 天样本：回撤照算，年化类一律 None（几天数据年化是噪声）
+    short = pd.DataFrame({"date": pd.bdate_range("2026-07-10", periods=5), "net_value": [1.0, 1.01, 0.99, 1.0, 1.02]})
+    summary = nav_summary_metrics(short)
+    assert summary["observations"] == 5
+    assert summary["annualized_return"] is None and summary["sharpe_ratio"] is None
+    assert summary["max_drawdown"] == pytest.approx(0.99 / 1.01 - 1)
+
+    assert nav_summary_metrics(pd.DataFrame())["observations"] == 0
+
+
+def test_ticket_history_and_sim_run_tables(tmp_path: Path) -> None:
+    tickets = tmp_path / "tickets"
+    tickets.mkdir()
+    (tickets / "ticket_2026-07-09.txt").write_text("【调仓单】基于 2026-07-09 收盘估算", encoding="utf-8")
+    pd.DataFrame([{"asset_id": "A", "code": "510300", "side": "BUY", "date": "2026-07-09"}]).to_csv(
+        tickets / "ticket_2026-07-09.csv", index=False
+    )
+    (tickets / "ticket_2026-07-10.txt").write_text("【无操作】2026-07-10 阈值带内", encoding="utf-8")
+
+    frame = list_tickets(tmp_path)
+    assert frame["date"].tolist() == ["2026-07-10", "2026-07-09"]  # 新在前
+    assert frame["kind"].tolist() == ["无操作", "调仓"]
+    assert frame["has_detail"].tolist() == [False, True]
+    assert list_tickets(tmp_path / "nowhere").empty
+
+    orders = read_ticket_orders(tmp_path)
+    assert len(orders) == 1 and orders["code"].iloc[0] == "510300"
+
+    # sim runs 增量段拼接 + 整行去重（同日重跑 advance 场景）
+    for run_name, rows in (
+        ("2026-07-09_100000", [{"date": "2026-07-09", "asset_id": "A", "quantity": 100}]),
+        ("2026-07-10_100000", [{"date": "2026-07-09", "asset_id": "A", "quantity": 100},
+                               {"date": "2026-07-10", "asset_id": "B", "quantity": 200}]),
+    ):
+        run_dir = tmp_path / "runs" / run_name
+        run_dir.mkdir(parents=True)
+        pd.DataFrame(rows).to_csv(run_dir / "trades.csv", index=False)
+    trades = read_sim_run_table(tmp_path, "trades")
+    assert len(trades) == 2  # 重复的 07-09 行被去重
+    assert trades["date"].iloc[0] == "2026-07-10"  # 倒序
+    with pytest.raises(ValueError, match="Unsupported sim run table"):
+        read_sim_run_table(tmp_path, "nav")
 
 
 def test_max_drawdown_and_staleness() -> None:
