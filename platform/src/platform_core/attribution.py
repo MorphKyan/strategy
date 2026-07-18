@@ -32,13 +32,22 @@ MIN_OBSERVATIONS = 5  # 少于 5 个共同收益观测视为样本不足
 
 
 def load_real_nav(live_dir: str | Path) -> list[dict[str, Any]]:
-    """读取真实净值序列，返回按日期升序的 [{date, total_value, cash}, ...]。"""
+    """读取真实净值序列，返回按日期升序的 [{date, total_value, nav_value, cash}, ...]。
+
+    nav_value 是收益计算口径：份额化后优先单位净值（申赎不污染收益率），
+    旧格式档案无 unit_nav 列时回退 total_value（历史无申赎，两者等价）。
+    """
     path = Path(live_dir) / "real_nav.csv"
     if not path.exists():
         raise FileNotFoundError(f"真实净值文件不存在: {path}")
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         rows = [
-            {"date": row["date"], "total_value": float(row["total_value"]), "cash": float(row["cash"])}
+            {
+                "date": row["date"],
+                "total_value": float(row["total_value"]),
+                "nav_value": float(row["unit_nav"]) if row.get("unit_nav") else float(row["total_value"]),
+                "cash": float(row["cash"]),
+            }
             for row in csv.DictReader(handle)
         ]
     return sorted(rows, key=lambda row: row["date"])
@@ -108,7 +117,7 @@ def build_live_attribution(
     if len(aligned_dates) < 2:
         return result
 
-    real_series = [real_by_date[d]["total_value"] for d in aligned_dates]
+    real_series = [real_by_date[d].get("nav_value", real_by_date[d]["total_value"]) for d in aligned_dates]
     shadow_series = [shadow_by_date[d]["total_value"] for d in aligned_dates]
     real_returns = [b / a - 1.0 for a, b in zip(real_series, real_series[1:])]
     shadow_returns = [b / a - 1.0 for a, b in zip(shadow_series, shadow_series[1:])]

@@ -752,7 +752,7 @@ def render_portfolio_overview(portfolios: list[PortfolioRecord]) -> None:
                 "组合": record.portfolio_id,
                 "类型": record.kind,
                 "最新净值日期": last_label,
-                "总值": f"{nav['net_value'].iloc[-1]:,.0f}" if not nav.empty else "—",
+                "总值": f"{(nav['total_value'] if 'total_value' in nav else nav['net_value']).iloc[-1]:,.0f}" if not nav.empty else "—",
                 **{period: metric_text(returns.get(period), "percent") for period in TRAILING_RETURN_PERIODS},
                 "成立以来": metric_text(returns.get("成立以来"), "percent"),
                 "最大回撤": metric_text(max_drawdown(nav), "percent"),
@@ -788,7 +788,8 @@ def render_portfolio_detail(portfolios: list[PortfolioRecord], runs: list[RunRec
     returns = trailing_returns(nav)
 
     cols = st.columns(5)
-    cols[0].metric("最新总值", f"{nav['net_value'].iloc[-1]:,.0f}" if not nav.empty else "—")
+    total_series = nav["total_value"] if "total_value" in nav else nav["net_value"] if not nav.empty else None
+    cols[0].metric("最新总值", f"{total_series.iloc[-1]:,.0f}" if not nav.empty else "—")
     cols[1].metric("现金", f"{float(state.get('cash') or 0):,.0f}")
     if nav.empty:
         cols[2].metric("最新净值日期", "—")
