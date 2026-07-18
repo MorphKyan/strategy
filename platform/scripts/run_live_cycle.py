@@ -6,6 +6,12 @@
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py reconcile ^
       --config configs\\baseline_r1_domestic_rolling.yaml --holdings my_holdings.csv --cash 12345.67
 
+  # ①b 当日有本金出入时必须申报 --external-flow（申购为正、赎回为负）：
+  #    份额化核算按当日单位净值增发/注销份额，单位净值曲线连续，收益率不被资金出入污染。
+  #    cost_basis 建议抄券商真实成本价，已实现/浮动盈亏拆分才准确。
+  .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py reconcile ^
+      --config ... --holdings my_holdings.csv --cash 62345.67 --external-flow 50000
+
   # ② 生成明日下单票（打印到终端，同时落盘 tickets/ticket_<date>.csv/.txt）
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py plan ^
       --config configs\\baseline_r1_domestic_rolling.yaml [--notify]
@@ -95,6 +101,12 @@ def main() -> int:
     p_reconcile = sub.add_parser("reconcile", parents=[common], help="Overwrite state from real holdings CSV.")
     p_reconcile.add_argument("--holdings", required=True, help="CSV with header code,quantity[,cost_basis].")
     p_reconcile.add_argument("--cash", required=True, type=float, help="Real account cash balance.")
+    p_reconcile.add_argument(
+        "--external-flow",
+        type=float,
+        default=0.0,
+        help="当日外部申赎金额（申购为正、赎回为负）。份额按当日单位净值增发/注销，收益率不受资金出入污染。",
+    )
 
     p_plan = sub.add_parser("plan", parents=[common], help="Generate next-day order ticket from current state.")
     p_plan.add_argument("--notify", action="store_true", help="Push the ticket via configured channels.")
@@ -102,6 +114,12 @@ def main() -> int:
     p_cycle = sub.add_parser("cycle", parents=[common], help="sync -> [reconcile] -> plan -> [notify]; skips non-trading days.")
     p_cycle.add_argument("--holdings", help="Optional holdings CSV; omit to plan from the last reconciled state.")
     p_cycle.add_argument("--cash", type=float, help="Real cash balance, required together with --holdings.")
+    p_cycle.add_argument(
+        "--external-flow",
+        type=float,
+        default=0.0,
+        help="当日外部申赎金额（须与 --holdings/--cash 同时提供）。",
+    )
     p_cycle.add_argument("--sync", action="store_true", help="Force market data sync even if config data.fetch is false.")
     p_cycle.add_argument("--notify", action="store_true", help="Push the ticket via configured channels.")
     p_cycle.add_argument("--force", action="store_true", help="Plan from the latest bar even if asof is not a trading day.")
@@ -111,7 +129,14 @@ def main() -> int:
     portfolio, config = build_portfolio(args)
 
     if args.command == "reconcile":
-        result = portfolio.reconcile(resolve_holdings_path(args.holdings), cash=args.cash, asof_date=args.asof_date)
+        result = portfolio.reconcile(
+            resolve_holdings_path(args.holdings),
+            cash=args.cash,
+            asof_date=args.asof_date,
+            external_flow=args.external_flow,
+        )
+        if args.external_flow:
+            print(f"已申报{'申购' if args.external_flow > 0 else '赎回'} {args.external_flow:+,.2f} 元（份额按当日单位净值调整）")
         print(f"已对齐真实持仓: {result.portfolio_id} @ {result.asof_date}")
         print(f"现金 {result.cash:,.2f} + 持仓市值 {result.positions_value:,.2f} = 总值 {result.total_value:,.2f}")
         print(f"状态: {result.state_path}")
@@ -139,6 +164,7 @@ def main() -> int:
         do_sync=True if args.sync else None,
         notifier=notifier,
         force=args.force,
+        external_flow=args.external_flow,
     )
     if result.skipped_non_trading:
         print(f"{args.asof_date} 不是交易日（或行情尚未更新到当日），本次跳过。--force 可强制按最近交易日出票。")

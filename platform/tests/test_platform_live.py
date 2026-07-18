@@ -197,6 +197,94 @@ def test_cycle_digest_reports_asset_daily_change_and_inception_pnl(tmp_path: Pat
     assert "成立以来" not in first_day_text
 
 
+def _real_nav_rows(portfolio: LivePortfolio) -> list[dict]:
+    with portfolio.real_nav_path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def test_external_flow_issues_units_and_keeps_returns_clean(tmp_path: Path):
+    """申购按当日单位净值增发份额：总值跳变不产生假收益（2026-07-18 需求）。"""
+    portfolio = _make_portfolio(tmp_path)  # 价格恒为 10
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7000.0, asof_date="2024-01-29")  # 总值 10000
+
+    # 01-30 申购 5000：现金 7000 → 12000，价格未动
+    portfolio.reconcile(holdings, cash=12000.0, asof_date="2024-01-30", external_flow=5000.0)
+    # 同日 mark_to_market 重估（cycle 的日常路径）必须继承申报过的申赎金额
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    rows = _real_nav_rows(portfolio)
+    assert [float(row["units"]) for row in rows] == pytest.approx([10000.0, 15000.0])
+    assert [float(row["unit_nav"]) for row in rows] == pytest.approx([1.0, 1.0])
+    assert float(rows[1]["external_flow"]) == pytest.approx(5000.0)
+    # 申购日收益率为 0（价格没动），金额变动剔除申赎后也是 0
+    assert valuation["external_flow"] == pytest.approx(5000.0)
+    assert valuation["unit_nav"] == pytest.approx(1.0)
+    assert valuation["net_invested"] == pytest.approx(15000.0)
+    _, text = portfolio._render_daily_digest(
+        valuation, PlanResult(portfolio.portfolio_id, parse_date("2024-01-30"), False, 0, None, Path("x"), "")
+    )
+    assert "本日申购" in text and "+5,000.00 元" in text
+    assert "+0.00%" in text  # 较上一估值日:份额口径,申购不算收益
+
+
+def test_withdrawal_redeems_units_and_split_pnl_identity(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    _write_market_data(data_dir, closes={"AAA": {"2024-01-31": 11}})
+    portfolio = LivePortfolio("live_test", _live_config(data_dir), output_root=tmp_path / "live")
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7000.0, asof_date="2024-01-29")  # 总值 10000
+
+    # 01-30 赎回 3000（价格未动）：份额 10000 → 7000，单位净值仍 1.0
+    portfolio.reconcile(holdings, cash=4000.0, asof_date="2024-01-30", external_flow=-3000.0)
+    rows = _real_nav_rows(portfolio)
+    assert float(rows[1]["units"]) == pytest.approx(7000.0)
+    assert float(rows[1]["unit_nav"]) == pytest.approx(1.0)
+
+    # 01-31 AAA 10→11：总值 4000+3300=7300，单位净值 7300/7000
+    valuation = portfolio.mark_to_market("2024-01-31")
+    assert valuation["unit_nav"] == pytest.approx(7300.0 / 7000.0)
+    # 净投入 10000−3000=7000,累计盈亏 300;浮动 =300×(11−10)=300(成本=建仓日收盘 10),已实现 0
+    assert valuation["net_invested"] == pytest.approx(7000.0)
+    assert valuation["total_pnl"] == pytest.approx(300.0)
+    assert valuation["float_pnl"] == pytest.approx(300.0)
+    assert valuation["realized_pnl"] == pytest.approx(0.0)
+    _, text = portfolio._render_daily_digest(
+        valuation, PlanResult(portfolio.portfolio_id, parse_date("2024-01-31"), False, 0, None, Path("x"), "")
+    )
+    assert "净投入 7,000.00 元" in text
+    assert "已实现 +0.00 元 + 浮动 +300.00 元" in text
+    assert "+4.29%" in text  # 7300/7000-1,份额口径
+
+
+def test_legacy_real_nav_backfills_unit_chain(tmp_path: Path):
+    """旧三列档案在下一次写盘时自动回填份额链，历史收益率不变（免迁移）。"""
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+    # 手工降级为旧格式（date,cash,positions_value,total_value）
+    portfolio.real_nav_path.write_text(
+        "date,cash,positions_value,total_value\n2024-01-29,7100.00,3000.00,10100.00\n",
+        encoding="utf-8",
+    )
+
+    portfolio.mark_to_market("2024-01-30")
+
+    rows = _real_nav_rows(portfolio)
+    assert [row["date"] for row in rows] == ["2024-01-29", "2024-01-30"]
+    assert [float(row["unit_nav"]) for row in rows] == pytest.approx([1.0, 1.0])  # 价格恒定
+    assert float(rows[0]["units"]) == pytest.approx(10100.0)
+    assert float(rows[0]["external_flow"]) == pytest.approx(0.0)
+
+
+def test_cycle_rejects_flow_without_holdings(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+    with pytest.raises(ValueError, match="external_flow"):
+        portfolio.cycle(asof_date="2024-01-30", external_flow=5000.0)
+
+
 def test_cycle_no_op_day_sends_single_digest(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])

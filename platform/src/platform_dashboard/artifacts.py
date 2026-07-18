@@ -698,11 +698,20 @@ def read_portfolio_nav(portfolio_dir: Path, kind: str) -> pd.DataFrame:
     if "date" not in frame or "total_value" not in frame:
         return pd.DataFrame()
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
-    frame["net_value"] = pd.to_numeric(frame["total_value"], errors="coerce")
+    frame["total_value"] = pd.to_numeric(frame["total_value"], errors="coerce")
+    # 收益口径优先用单位净值（份额化后申赎不污染收益率；旧档案无此列回退总值）
+    if "unit_nav" in frame and pd.to_numeric(frame["unit_nav"], errors="coerce").notna().all():
+        frame["net_value"] = pd.to_numeric(frame["unit_nav"], errors="coerce")
+    else:
+        frame["net_value"] = frame["total_value"]
     frame = frame.dropna(subset=["date", "net_value"])
     # 稳定排序保持段内先后，同日保留最后（=最新一次 advance）的估值
     frame = frame.sort_values("date", kind="stable").drop_duplicates("date", keep="last")
-    columns = [column for column in ("date", "net_value", "cash", "positions_value", "pending_intent_count") if column in frame]
+    columns = [
+        column
+        for column in ("date", "net_value", "total_value", "cash", "positions_value", "external_flow", "pending_intent_count")
+        if column in frame
+    ]
     return frame[columns].reset_index(drop=True)
 
 

@@ -434,6 +434,25 @@ def test_discover_portfolios_and_nav_readers(tmp_path: Path) -> None:
     assert read_portfolio_nav(tmp_path / "missing", "live").empty
 
 
+def test_read_portfolio_nav_prefers_unit_nav_and_keeps_total(tmp_path: Path) -> None:
+    """份额化档案：收益口径用 unit_nav（申购日不算涨），总值列保留供展示。"""
+    live_dir = tmp_path / "results" / "live_portfolios" / "live_flow"
+    _write_state(live_dir)
+    pd.DataFrame(
+        [
+            {"date": "2026-07-10", "cash": 100.0, "positions_value": 900.0, "total_value": 1000.0,
+             "external_flow": 0.0, "units": 1000.0, "unit_nav": 1.0},
+            {"date": "2026-07-13", "cash": 600.0, "positions_value": 900.0, "total_value": 1500.0,
+             "external_flow": 500.0, "units": 1500.0, "unit_nav": 1.0},
+        ]
+    ).to_csv(live_dir / "real_nav.csv", index=False)
+
+    nav = read_portfolio_nav(live_dir, "live")
+    assert list(nav["net_value"]) == pytest.approx([1.0, 1.0])  # 申购 500 不产生假收益
+    assert list(nav["total_value"]) == pytest.approx([1000.0, 1500.0])
+    assert trailing_returns(nav)["成立以来"] == pytest.approx(0.0)
+
+
 def test_latest_ticket_prefers_newest_and_tolerates_missing_csv(tmp_path: Path) -> None:
     tickets = tmp_path / "tickets"
     tickets.mkdir()

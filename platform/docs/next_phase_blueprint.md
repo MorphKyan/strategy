@@ -211,6 +211,15 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 - 输出：`platform/reports/live/<YYYY-MM>_attribution.md`（中文），内容：两条净值曲线对比、月度 tracking error（bp）、差异归因粗拆（手续费差/成交价差/现金拖累），**只记录，不据此改持仓或改参数**。
 - 前提是同一 checkpoint 起点同时维护一个纸面 sim 组合作为影子——`run_live_cycle.py cycle` 里顺带 `SimPortfolio.advance()` 推进影子组合即可。
 
+### A6. 资金出入份额化（已完成，2026-07-18）
+
+**竣工说明**：实盘组合支持本金追加/取出，公募基金同构的份额化核算。
+
+- **契约**：`real_nav.csv` 增列 `external_flow / units / unit_nav`；申赎经 `reconcile --external-flow <金额>`（申购为正、赎回为负）**显式申报**——现金变动的另两种来源（交易、分红）是内部现金流，程序不做自动侦测。申赎当日必须同时提供 `--holdings/--cash`。
+- **核算**：首行整笔视为申购（unit_nav=1）；申赎日先用"扣除当日申赎的组合值"对旧份额算单位净值，再按该净值增发/注销份额——单位净值曲线对资金流连续。每次写盘从首行重放整条链（`_recompute_unit_chain`），因此**旧格式档案在下一次写盘自动回填，无迁移脚本**；同日重估（cycle 的 mark-to-market）继承 reconcile 申报过的申赎金额。
+- **口径切换**：收益率一律走单位净值——看板读取层（`read_portfolio_nav` 优先 `unit_nav` 作 `net_value`，`total_value` 保留供展示）、日报（较上一估值日/成立以来百分比）、月度归因（`load_real_nav` 的 `nav_value`）三处；金额类口径：净投入 = 首行总值 + 后续申赎净额，累计盈亏 = 总值 − 净投入。
+- **已实现/浮动盈亏**（日报"盈亏拆分"行）：浮动 = Σ(现价 − cost_basis)×数量，已实现 = 累计盈亏 − 浮动（会计恒等式，免逐笔流水）。**拆分准确性取决于 reconcile 时抄入的券商真实成本价**；两者之和恒等于真实累计盈亏，不会错账。已知局限：若把携带既有浮盈的持仓"转入"组合（成本价早于组合成立），拆分会出现常数偏移，本组合（成立日现金建仓）不受影响。
+
 ---
 
 ## 6. 主线 B：看板升级（优先级 P1）
@@ -320,7 +329,8 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 - `portfolio_state.json`：`cash, positions{asset_id→{quantity,cost_basis}}, pending_intents{...}, cooldown_pool, strategy_state, last_date, dividend_receivables` —— 见 `models.py:PortfolioState.to_dict()`。
 - 回测 `nav.csv` 用 `net_value` 列；sim 的 `nav.csv` 用 `total_value` 列（历史差异，读取层归一，勿改历史产物）。
-- 下单票、real_holdings 契约见 §5 A2/A4。
+- live 的 `real_nav.csv`：`date, cash, positions_value, total_value, external_flow, units, unit_nav`（份额化见 A6；收益率一律用 `unit_nav`，`total_value` 仅作规模展示）。
+- 下单票、real_holdings 契约见 §5 A2/A4；申赎申报见 A6。
 
 ### 9.3 建议施工顺序（每项一个独立会话/PR 即可完成）
 
