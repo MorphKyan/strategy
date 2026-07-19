@@ -277,6 +277,38 @@ def test_legacy_real_nav_backfills_unit_chain(tmp_path: Path):
     assert float(rows[0]["external_flow"]) == pytest.approx(0.0)
 
 
+def test_amend_flow_equals_timely_declaration(tmp_path: Path):
+    """忘报申赎 → amend-flow 补报,份额链与当时就申报精确等价（回档重算）。"""
+    data_dir = tmp_path / "data"
+    _write_market_data(data_dir, closes={"AAA": {"2024-01-31": 11}})
+    config = _live_config(data_dir)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+
+    # 组合 A:01-30 申购 5000 当天就申报
+    timely = LivePortfolio("live_test", config, output_root=tmp_path / "a")
+    timely.reconcile(holdings, cash=7000.0, asof_date="2024-01-29")
+    timely.reconcile(holdings, cash=12000.0, asof_date="2024-01-30", external_flow=5000.0)
+    timely.mark_to_market("2024-01-31")
+
+    # 组合 B:忘了申报（flow=0 → 当日出现 +50% 假收益），事后补报
+    forgot = LivePortfolio("live_test", config, output_root=tmp_path / "b")
+    forgot.reconcile(holdings, cash=7000.0, asof_date="2024-01-29")
+    forgot.reconcile(holdings, cash=12000.0, asof_date="2024-01-30")  # 忘报
+    forgot.mark_to_market("2024-01-31")
+    fake = _real_nav_rows(forgot)
+    assert float(fake[1]["unit_nav"]) == pytest.approx(1.5)  # 假收益证据
+
+    result = forgot.amend_flow("2024-01-30", 5000.0)
+
+    assert result["old_flow"] == pytest.approx(0.0)
+    assert [item["date"] for item in result["changed"]] == ["2024-01-30", "2024-01-31"]
+    # 补报后与组合 A 的台账逐字节一致（估值列本就相同,派生链确定性重放）
+    assert forgot.real_nav_path.read_text(encoding="utf-8") == timely.real_nav_path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="不存在"):
+        forgot.amend_flow("2024-02-05", 100.0)
+
+
 def test_cycle_rejects_flow_without_holdings(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])

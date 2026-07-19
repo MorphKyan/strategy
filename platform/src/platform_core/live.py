@@ -683,6 +683,10 @@ class LivePortfolio:
         )
         rows.sort(key=lambda row: row["date"])
         self._recompute_unit_chain(rows)
+        self._write_real_nav(rows)
+        return rows
+
+    def _write_real_nav(self, rows: list[dict[str, str]]) -> None:
         with self.real_nav_path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(
                 handle,
@@ -690,7 +694,38 @@ class LivePortfolio:
             )
             writer.writeheader()
             writer.writerows(rows)
-        return rows
+
+    def amend_flow(self, asof_date: str | date, external_flow: float) -> dict[str, Any]:
+        """补报/修正历史某日的申赎金额（忘了 --external-flow 的回档通道）。
+
+        只改该行的 flow 标注——total_value 等估值列受历史冻结保护，一律不动；
+        份额链随后从首行全量重放，补报与当时申报的结果精确等价。
+        返回 {date, old_flow, new_flow, changed: [{date, unit_nav_before, unit_nav_after}, ...]}。
+        """
+        asof = parse_date(asof_date)
+        rows = self._read_real_nav_rows()
+        target = [row for row in rows if row["date"] == date_str(asof)]
+        if not target:
+            known = f"{rows[0]['date']} ~ {rows[-1]['date']}" if rows else "空台账"
+            raise ValueError(f"real_nav 中不存在 {date_str(asof)} 的估值行（现有区间: {known}），无法补报申赎")
+        old_flow = float(target[-1].get("external_flow") or 0.0)
+        before = {row["date"]: row.get("unit_nav") or "" for row in rows}
+        for row in rows:
+            if row["date"] == date_str(asof):
+                row["external_flow"] = f"{float(external_flow):.2f}"
+        self._recompute_unit_chain(rows)
+        self._write_real_nav(rows)
+        changed = [
+            {"date": row["date"], "unit_nav_before": before[row["date"]], "unit_nav_after": row["unit_nav"]}
+            for row in rows
+            if before[row["date"]] != row["unit_nav"]
+        ]
+        return {
+            "date": date_str(asof),
+            "old_flow": old_flow,
+            "new_flow": float(external_flow),
+            "changed": changed,
+        }
 
     @staticmethod
     def _write_ticket_csv(path: Path, rows: list[dict[str, Any]]) -> None:

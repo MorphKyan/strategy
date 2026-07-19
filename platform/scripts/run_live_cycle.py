@@ -12,6 +12,11 @@
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py reconcile ^
       --config ... --holdings my_holdings.csv --cash 62345.67 --external-flow 50000
 
+  # ①c 忘记申报的补救：amend-flow 只改该日的申赎标注（估值行冻结不动），
+  #    份额链从首行重放，补报与当时申报的结果精确等价。
+  .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py amend-flow ^
+      --config ... --date 2026-07-20 --external-flow 50000
+
   # ② 生成明日下单票（打印到终端，同时落盘 tickets/ticket_<date>.csv/.txt）
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py plan ^
       --config configs\\baseline_r1_domestic_rolling.yaml [--notify]
@@ -111,6 +116,14 @@ def main() -> int:
     p_plan = sub.add_parser("plan", parents=[common], help="Generate next-day order ticket from current state.")
     p_plan.add_argument("--notify", action="store_true", help="Push the ticket via configured channels.")
 
+    p_amend = sub.add_parser(
+        "amend-flow",
+        parents=[common],
+        help="补报/修正历史某日的申赎金额（估值行不动，份额链从头重放，与当时申报等价）。",
+    )
+    p_amend.add_argument("--date", required=True, help="要修正的估值日, YYYY-MM-DD（须已存在于 real_nav）。")
+    p_amend.add_argument("--external-flow", required=True, type=float, help="该日正确的申赎金额（申购为正、赎回为负）。")
+
     p_cycle = sub.add_parser("cycle", parents=[common], help="sync -> [reconcile] -> plan -> [notify]; skips non-trading days.")
     p_cycle.add_argument("--holdings", help="Optional holdings CSV; omit to plan from the last reconciled state.")
     p_cycle.add_argument("--cash", type=float, help="Real cash balance, required together with --holdings.")
@@ -140,6 +153,17 @@ def main() -> int:
         print(f"已对齐真实持仓: {result.portfolio_id} @ {result.asof_date}")
         print(f"现金 {result.cash:,.2f} + 持仓市值 {result.positions_value:,.2f} = 总值 {result.total_value:,.2f}")
         print(f"状态: {result.state_path}")
+        return 0
+
+    if args.command == "amend-flow":
+        result = portfolio.amend_flow(args.date, args.external_flow)
+        print(f"已修正 {result['date']} 申赎: {result['old_flow']:+,.2f} → {result['new_flow']:+,.2f} 元")
+        if result["changed"]:
+            print("受影响的单位净值（重放后）:")
+            for item in result["changed"]:
+                print(f"  {item['date']}: {item['unit_nav_before'] or '—'} → {item['unit_nav_after']}")
+        else:
+            print("单位净值链无变化（金额与原申报一致）。")
         return 0
 
     if args.command == "plan":
