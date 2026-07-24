@@ -139,3 +139,9 @@ data_manifest.json
 
 # Personal live-portfolio attribution reports (contain real account values)
 /platform/reports/live/
+
+# Licensed vendor data (Wind/WDS exports carry per-account watermarks).
+# Raw dumps and the cleaned per-index files both hold verbatim vendor values,
+# so neither is tracked. The ingest script and the public ETF->index mapping are.
+/index_performance/
+/platform/data/index_valuation/

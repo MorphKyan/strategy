@@ -1475,3 +1475,7 @@ BUILTIN_STRATEGIES[FixedWeightThresholdStrategy.name] = FixedWeightThresholdStra
 
 # strategies/rotation.py（R039 行业动量轮动）为 research-only，验收 Failed 后
 # 按 Hard Rule 3 撤销注册；复研时 import IndustryMomentumRotationStrategy 并在此注册。
+
+# strategies/value_rotation.py（R049 行业估值分位轮动，左侧价值）同为 research-only，
+# 验收 Failed（2026-07-25，冻结样本累计跑输基线 29.29pp，败因价值陷阱）后按
+# Hard Rule 3 撤销注册；结论见 reports/r049_value_rotation_report.md。
