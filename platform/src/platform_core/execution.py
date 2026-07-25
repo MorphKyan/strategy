@@ -104,7 +104,10 @@ class ExecutionEngine:
             side = "BUY" if diff_value > 0 else "SELL"
             planned_quantity = self._round_quantity(abs(diff_value) / valuation_price, asset.lot_size)
             if side == "SELL":
-                planned_quantity = min(planned_quantity, self._round_quantity(position.quantity, asset.lot_size))
+                # 卖出上限必须向下取整到手：份额折算（如 512200 於 2024-08-09 1:0.3581）会
+                # 让持仓变成非整数股，用 round_mode="round" 钳制会向上取整而超过实际持仓，
+                # 订单被判 insufficient_position 并按 retry_next_day 每日重试，仓位永远清不掉。
+                planned_quantity = min(planned_quantity, self._floor_to_lot(position.quantity, asset.lot_size))
             execution_price = self._execution_price(valuation_price, side, asset, bar, planned_quantity)
             if side == "BUY" and bar.limit_up is not None:
                 execution_price = min(execution_price, bar.limit_up)
@@ -320,6 +323,12 @@ class ExecutionEngine:
         if self.config.order_priority == "price_desc":
             return sorted(trade_plan, key=lambda item: (item[1] > 0, -item[2], -abs(item[1]), item[0]))
         return sorted(trade_plan, key=lambda item: (item[1] > 0, item[0]))
+
+    @staticmethod
+    def _floor_to_lot(quantity: float, lot_size: int) -> float:
+        """向下取整到整手：卖出数量的硬上限，任何 round_mode 下都不得超卖。"""
+        lot = max(1, int(lot_size))
+        return float(int(max(0.0, quantity) // lot) * lot)
 
     def _round_quantity(self, quantity: float, lot_size: int) -> float:
         lot = max(1, int(lot_size))

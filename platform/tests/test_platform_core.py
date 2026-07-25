@@ -13,7 +13,7 @@ from src.platform_core.engine import PlatformBacktestEngine, load_checkpoint
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
 from src.platform_core.experiment import run_platform_experiment
 from src.platform_core.metrics import build_platform_metrics
-from src.platform_core.models import Asset, Bar, PendingIntent, PortfolioState, TargetPortfolio
+from src.platform_core.models import Asset, Bar, PendingIntent, PortfolioState, Position, TargetPortfolio
 from src.platform_core.sim import SimPortfolio
 from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, apply_slippage_scenario
 from src.platform_core.storage import SQLiteStore, InMemoryStore
@@ -110,6 +110,33 @@ def test_execution_applies_default_and_qdii_commodity_slippage():
     state = PortfolioState(cash=1000)
     _, trades = engine.apply_target(date(2024, 1, 1), state, {"A": commodity_asset}, {"A": bar}, TargetPortfolio({"A": 0.5}))
     assert trades[0].price == pytest.approx(10.006)
+
+
+def test_sell_quantity_never_exceeds_fractional_position_after_split():
+    """份额折算后持仓变成非整数股，清仓卖出必须向下取整，不得超卖。
+
+    实测回归（R049 训练样本）：512200 房地产ETF 2024-08-09 做 1:0.3581 份额折算后
+    持仓 207,260.74 股，卖出钳制若用 round_mode="round" 会取整到 207,300 > 实际持仓，
+    订单被判 insufficient_position 且按 retry_next_day 每日重试，仓位永远清不掉。
+    """
+    bar = Bar(date=date(2024, 1, 1), asset_id="A", open=10, high=10, low=10, close=10)
+    asset = Asset(asset_id="A", code="512200", name="房地产ETF", lot_size=100)
+    engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=0.0), round_mode="round"))
+
+    state = PortfolioState(cash=0.0)
+    state.positions["A"] = Position(asset_id="A", quantity=207260.74, cost_basis=10.0)
+    orders, trades = engine.apply_target(
+        date(2024, 1, 1), state, {"A": asset}, {"A": bar}, TargetPortfolio({"A": 0.0})
+    )
+
+    assert [order.status for order in orders] == ["FILLED"]
+    assert orders[0].side == "SELL"
+    # 向下取整到整手：207,200 而非 207,300
+    assert orders[0].quantity == pytest.approx(207200.0)
+    assert trades[0].quantity == pytest.approx(207200.0)
+    # 剩余零股（60.74）留在账上，绝不出现负持仓
+    assert state.positions["A"].quantity == pytest.approx(60.74)
+    assert state.positions["A"].quantity >= 0
 
 
 def test_execution_applies_dynamic_participation_slippage():
