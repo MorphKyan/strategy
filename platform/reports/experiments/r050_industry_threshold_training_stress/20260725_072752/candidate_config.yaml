@@ -1,0 +1,182 @@
+# R050 候选：行业池等权 + Swedroe 5/25 阈值带（卫星仓）。
+# 把 R038 在核心仓验证成功的"零自适应阈值纪律"移植到 R039/R049 留下的 16 行业池：
+# 不做任何行业选择（等权持有全部），唯一差异是"阈值触发 vs 日历触发"。
+# 对照基线 domestic_industry_equal_weight.yaml（同池同权重，月频日历调仓），
+# 回答"在行业池上，阈值带能否像 R038 那样以更低换手取得同等或更好绩效"。
+# 注意：16 资产时目标权重 6.25%，相对带 25%×6.25%=1.56pp 严于绝对带 5pp，
+# 触发由相对带主导（R038 的 4 资产是绝对带主导）——参数仍取先验常数，不调。
+# 设计见 docs/r050_industry_threshold_blueprint.md。
+platform:
+  run_name: r9_industry_equal_weight_threshold
+data:
+  data_dir: data
+assets:
+- asset_id: CN_ETF:512880.SH
+  code: '512880'
+  name: 证券ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512800.SH
+  code: '512800'
+  name: 银行ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512010.SH
+  code: '512010'
+  name: 医药ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:159928.SZ
+  code: '159928'
+  name: 消费ETF
+  asset_type: etf
+  exchange: SZ
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512690.SH
+  code: '512690'
+  name: 酒ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512660.SH
+  code: '512660'
+  name: 军工ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512400.SH
+  code: '512400'
+  name: 有色金属ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512980.SH
+  code: '512980'
+  name: 传媒ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:515000.SH
+  code: '515000'
+  name: 科技ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512480.SH
+  code: '512480'
+  name: 半导体ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:515050.SH
+  code: '515050'
+  name: 5G通信ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512200.SH
+  code: '512200'
+  name: 房地产ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:515220.SH
+  code: '515220'
+  name: 煤炭ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:515700.SH
+  code: '515700'
+  name: 新能车ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:515210.SH
+  code: '515210'
+  name: 钢铁ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:159996.SZ
+  code: '159996'
+  name: 家电ETF
+  asset_type: etf
+  exchange: SZ
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+backtest:
+  enable_checkpoints: false
+execution:
+  round_mode: round
+  price_field: close
+  weight_tolerance: 0.0005
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+output:
+  results_dir: results/backtests
+strategy:
+  strategy_name: fixed_weight_threshold
+  strategy_version_id: null
+  cancel_pending_on_start: false
+  params:
+    abs_band: 0.05
+    rel_band: 0.25
+    cooldown_days: 0
+    universe:
+    - CN_ETF:512880.SH
+    - CN_ETF:512800.SH
+    - CN_ETF:512010.SH
+    - CN_ETF:159928.SZ
+    - CN_ETF:512690.SH
+    - CN_ETF:512660.SH
+    - CN_ETF:512400.SH
+    - CN_ETF:512980.SH
+    - CN_ETF:515000.SH
+    - CN_ETF:512480.SH
+    - CN_ETF:515050.SH
+    - CN_ETF:512200.SH
+    - CN_ETF:515220.SH
+    - CN_ETF:515700.SH
+    - CN_ETF:515210.SH
+    - CN_ETF:159996.SZ

@@ -1,0 +1,1 @@
+D:\qcy_project\strategy\platform\results\temporary_backtests\experiments\r050_industry_threshold_training_stress\20260725_072752\fixed_weight_threshold\r9_industry_equal_weight_threshold_stress_candidate_20260725_072753_064795

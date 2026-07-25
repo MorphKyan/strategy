@@ -1,0 +1,1 @@
+D:\qcy_project\strategy\platform\results\temporary_backtests\experiments\r050_industry_threshold_frozen_stress\20260725_073037\fixed_weight_threshold\r9_industry_equal_weight_threshold_stress_candidate_20260725_073037_675621
