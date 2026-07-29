@@ -1,0 +1,99 @@
+# R056 候选：R038 永久组合核心 70% + 纳指卫星 30% + 5/25 阈值带 + 溢价闸门。
+#
+# 核心篮子与权重逐字沿用 R038（实盘跟投默认策略），组内等权；卫星为 513100 纳指ETF，
+# 与核心训练段相关仅 0.283（对比 R050 行业池 0.763）。
+#
+# 唯一新增成分是溢价闸门：R056 审计证明 513100 的场内溢价是结构性的（QDII 额度稀缺，
+# 日频自相关 0.855、月均标准差 2.99%），当前 10.42% vs 历史中位 0.44%，
+# 直接建仓等于预付一次性 -9.03%。闸门把这件事变成纪律而非预测——
+# 溢价高于 2%（申赎套利往返成本量级）就不持有卫星，权重回流核心。
+#
+# 参数全部为先验常数，首次运行前冻结，无搜参：
+#   premium_cap=0.02      锚定套利成本，不是从回测挑的
+#   publication_lag_days=2  QDII 净值普遍 T+1~T+2 披露，取上界最保守
+#   gate_eval=month_end   溢价是慢变量，慢信号慢评估；权重漂移仍由 5/25 带每日检查
+#   abs_band/rel_band     逐字沿用 R038
+#
+# 对照基线：
+#   r10_core_satellite_no_gate.yaml            同篮同权，无闸门（隔离闸门的贡献）
+#   r8_permanent_real_fixed_weight_threshold.yaml  纯核心（回答"该不该加卫星"）
+# 设计与验收判据见 docs/r056_premium_gated_satellite_blueprint.md。
+platform:
+  run_name: r10_core_satellite_premium_gated
+data:
+  data_dir: data
+assets:
+- asset_id: CN_ETF:510300.SH
+  code: '510300'
+  name: 沪深300ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511260.SH
+  code: '511260'
+  name: 十年国债ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:518880.SH
+  code: '518880'
+  name: 黄金ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512890.SH
+  code: '512890'
+  name: 红利低波ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:513100.SH
+  code: '513100'
+  name: 纳指ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+backtest:
+  enable_checkpoints: false
+execution:
+  round_mode: round
+  price_field: close
+  weight_tolerance: 0.0005
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+output:
+  results_dir: results/backtests
+strategy:
+  strategy_name: premium_gated_satellite
+  strategy_version_id: null
+  cancel_pending_on_start: false
+  params:
+    abs_band: 0.05
+    rel_band: 0.25
+    cooldown_days: 0
+    satellite: CN_ETF:513100.SH
+    satellite_weight: 0.30
+    premium_cap: 0.02
+    publication_lag_days: 2
+    gate_eval: month_end
+    core_weights:
+      CN_ETF:510300.SH: 0.25
+      CN_ETF:511260.SH: 0.25
+      CN_ETF:518880.SH: 0.25
+      CN_ETF:512890.SH: 0.25

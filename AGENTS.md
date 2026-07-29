@@ -78,6 +78,10 @@ ETF selection is independent from `platform/`; it may generate platform configs 
 4. Research ideas, ETF selection, parameter choices, thresholds, candidate filtering, cache reuse decisions, and research conclusions must not use final test-sample information.
 5. A platform config or ETF basket may be output or submitted only when the common available history from the earliest shared trading date through `2025-06-30` is longer than 3 years.
 6. Final test results may be run only after the candidate strategy, parameters, ETF basket, rebalance rules, and acceptance thresholds are frozen. Do not modify the candidate after seeing final test results.
+7. QDII ETF premium/discount disclosure. A QDII ETF's exchange price return equals underlying return plus premium change, so a market-price-only backtest silently mixes in a non-repeatable, mean-reverting component. Any research whose conclusion depends on a QDII ETF (`513*`, `159920`, `159941`, and equivalents) must:
+   - report both market-price and NAV-caliber annualized return, and disclose the premium level at both ends of every sample window;
+   - state the premium at the intended entry point when recommending a config for live use.
+   Data chain: `platform/scripts/fetch_etf_nav.py` writes `platform/data/etf_nav/<code>.csv`; `platform/src/platform_core/etf_premium.py` loads it. QDII NAV is published T+1~T+2, so any premium used as a decision input must go through that module's publication-lag guard rather than a raw same-day price/NAV ratio. Rationale and the measured 12.64pp/year contamination case: `platform/reports/r056_qdii_premium_feasibility_audit.md`.
 
 ## Platform Research Validation
 
