@@ -1,0 +1,84 @@
+# R056 对照基线：同篮同权的核心70%+纳指卫星30%，5/25 阈值带，**无溢价闸门**。
+# 与候选 r10_core_satellite_premium_gated.yaml 的唯一差异就是闸门，用于隔离闸门本身的贡献。
+# 另一条基线是纯核心 r8_permanent_real_fixed_weight_threshold.yaml（回答"该不该加卫星"）。
+platform:
+  run_name: r10_core_satellite_no_gate
+data:
+  data_dir: data
+assets:
+- asset_id: CN_ETF:510300.SH
+  code: '510300'
+  name: 沪深300ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:511260.SH
+  code: '511260'
+  name: 十年国债ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:518880.SH
+  code: '518880'
+  name: 黄金ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:512890.SH
+  code: '512890'
+  name: 红利低波ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+- asset_id: CN_ETF:513100.SH
+  code: '513100'
+  name: 纳指ETF
+  asset_type: etf
+  exchange: SH
+  currency: CNY
+  lot_size: 100
+  price_limit_pct: 0.1
+portfolio:
+  initial_cash: 1000000.0
+  initial_equity: 1000000.0
+  initial_positions: []
+backtest:
+  enable_checkpoints: false
+execution:
+  round_mode: round
+  price_field: close
+  weight_tolerance: 0.0005
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+output:
+  results_dir: results/backtests
+strategy:
+  strategy_name: fixed_weight_threshold
+  strategy_version_id: null
+  cancel_pending_on_start: false
+  params:
+    abs_band: 0.05
+    rel_band: 0.25
+    cooldown_days: 0
+    universe:
+    - CN_ETF:510300.SH
+    - CN_ETF:511260.SH
+    - CN_ETF:518880.SH
+    - CN_ETF:512890.SH
+    - CN_ETF:513100.SH
+    target_weights:
+      CN_ETF:510300.SH: 0.175
+      CN_ETF:511260.SH: 0.175
+      CN_ETF:518880.SH: 0.175
+      CN_ETF:512890.SH: 0.175
+      CN_ETF:513100.SH: 0.30
