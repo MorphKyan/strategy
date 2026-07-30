@@ -114,6 +114,11 @@ class LivePortfolio:
         self.data_fetch = bool(data_config.get("fetch", False))
         self.market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
 
+        live_config = config.get("live", {}) or {}
+        # 恒等式哨兵容差（元）。未卖出时 realized_pnl 恒为 0，超过该值即报警。
+        # 真实卖出后残差会固定在累计已实现盈亏水平，届时把本值调到略高于它即可。
+        self.realized_residual_tolerance = float(live_config.get("realized_residual_tolerance", 1.0))
+
         execution_config = config.get("execution", {})
         fee_config = execution_config.get("fee", {})
         slippage_config = execution_config.get("slippage", {})
@@ -421,6 +426,14 @@ class LivePortfolio:
         total_pnl = total_value - net_invested if net_invested is not None else None
         realized_pnl = total_pnl - float_pnl if total_pnl is not None else None
 
+        # 恒等式哨兵：未发生卖出时 realized_pnl 必须为 0。非零意味着账本内部不自洽，
+        # 而 total_value 仍然正确——这类"总值对、拆分错"的故障不会被任何现有检查发现。
+        # 2026-07 实测踩过两次：①cost_basis 存了成交价而非实付(漏手续费)，残差 +3.80 潜伏三周；
+        # ②real_nav 首行基线用 07-10 收盘市值而非实际入金，残差 +20.15。
+        # 真实卖出后残差会变成累计已实现盈亏并保持该水平，届时按实际值调高容差即可。
+        tolerance = self.realized_residual_tolerance
+        residual_alert = realized_pnl is not None and abs(realized_pnl) > tolerance
+
         return {
             "date": asof,
             "cash": state.cash,
@@ -439,6 +452,8 @@ class LivePortfolio:
             "total_pnl": total_pnl,
             "float_pnl": float_pnl,
             "realized_pnl": realized_pnl,
+            "realized_residual_alert": residual_alert,
+            "realized_residual_tolerance": tolerance,
             "written": written,
         }
 
@@ -486,6 +501,14 @@ class LivePortfolio:
             float_pnl = valuation.get("float_pnl")
             if realized is not None and float_pnl is not None:
                 lines.append(f"- **盈亏拆分**: 已实现 {realized:+,.2f} 元 + 浮动 {float_pnl:+,.2f} 元")
+                if valuation.get("realized_residual_alert"):
+                    tol = valuation.get("realized_residual_tolerance", 0.0)
+                    lines.append(
+                        f"- ⚠️ **账本自检未通过**: 未发生卖出时「已实现」应为 0，当前 {realized:+,.2f} 元"
+                        f"（容差 {tol:,.2f}）。总值不受影响，但拆分口径有误——"
+                        f"优先核对 ①holdings 的 cost_basis 是否为交割单实付÷数量（含手续费）"
+                        f" ②real_nav 首行基线是否为实际入金而非当日收盘市值。"
+                    )
         cash = valuation["cash"]
         cash_pct = cash / total if total > 0 else 0.0
         lines.append(f"- **现金**: {cash:,.2f} 元（{cash_pct:.1%}）")
