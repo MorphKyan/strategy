@@ -373,6 +373,66 @@ def test_mark_to_market_appends_daily_real_nav(tmp_path: Path):
     assert [row["date"] for row in rows] == ["2024-01-29", "2024-01-30"]
 
 
+def test_residual_sentinel_silent_when_ledger_consistent(tmp_path: Path):
+    """cost_basis 与建仓价一致时残差为 0，哨兵不报警。"""
+    portfolio = _make_portfolio(tmp_path)
+    # 10 元买 300 股 = 3000，现金 7100，净投入 10100；cost_basis 如实填 10
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    assert valuation["realized_pnl"] == pytest.approx(0.0, abs=1e-6)
+    assert valuation["realized_residual_alert"] is False
+
+
+def test_residual_sentinel_fires_when_cost_basis_exceeds_inception_mark(tmp_path: Path):
+    """R056 实盘踩过的故障：实付(含手续费/成交价高于收盘)高于建仓日收盘市值。
+
+    首行基线按收盘 mark-to-market，而 cost_basis 是实付——两者的差被恒等式挤进
+    「已实现」且符号为正（实际是损失）。这类"总值对、拆分错"的故障不会被任何
+    总值类检查发现，哨兵是唯一的守门人。实盘 2026-07 潜伏了三周才被发现。
+    """
+    portfolio = _make_portfolio(tmp_path)
+    # 收盘 10，实付 10.10/股（含费）→ 300 股多付 30 元，基线却按收盘记
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,10.10"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    assert valuation["float_pnl"] == pytest.approx(-30.0, abs=1e-6)
+    assert valuation["realized_pnl"] == pytest.approx(30.0, abs=1e-6)
+    assert valuation["realized_residual_alert"] is True
+    _, digest = portfolio._render_daily_digest(
+        valuation,
+        PlanResult(
+            portfolio_id="live_test",
+            plan_date=parse_date("2024-01-30"),
+            has_target=False,
+            order_count=0,
+            ticket_csv=None,
+            ticket_txt=tmp_path / "ticket.txt",
+            text="",
+        ),
+    )
+    assert "账本自检未通过" in digest
+
+
+def test_residual_sentinel_tolerance_is_configurable(tmp_path: Path):
+    """真实卖出后残差固定在累计已实现盈亏水平，调高容差即可止警。"""
+    config = _live_config(tmp_path / "data")
+    config["live"] = {"realized_residual_tolerance": 50.0}
+    _write_market_data(tmp_path / "data")
+    portfolio = LivePortfolio("live_test", config, output_root=tmp_path / "out")
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,10.10"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    assert valuation["realized_pnl"] == pytest.approx(30.0, abs=1e-6)
+    assert valuation["realized_residual_alert"] is False
+
+
 def test_cycle_notifier_failure_does_not_break_cycle(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
