@@ -27,12 +27,15 @@
 
 from __future__ import annotations
 
+import html as html_module
 import logging
 import os
+import re
 import smtplib
 import urllib.parse
 import urllib.request
 from email.header import Header
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
 
@@ -106,6 +109,122 @@ def _send_serverchan(channel: dict[str, Any], title: str, text: str) -> bool:
     return ok
 
 
+# --------------------------------------------------------------------- markdown
+
+# 本仓库的推送正文都是自己生成的 markdown（日报 / 归因 / 调仓票），语法子集固定且可控：
+# 标题、无序与有序列表、引用、表格、**粗体**、`代码`。Server酱会自己渲染，
+# 但 SMTP 发纯文本时 Gmail 只会原样显示源码（表格尤其难读），故在此转成 HTML。
+# 不引通用 markdown 依赖：输入不是任意用户内容，覆盖这个子集即可，且邮件必须内联样式
+# ——Gmail 等客户端会剥掉 <style> 块。
+
+_STYLE = {
+    "body": "margin:0;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',"
+    "'PingFang SC','Microsoft YaHei',sans-serif;font-size:15px;line-height:1.6;color:#1f2328;",
+    "h1": "font-size:20px;margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid #d8dee4;",
+    "h2": "font-size:17px;margin:16px 0 8px;",
+    "h3": "font-size:15px;margin:14px 0 6px;",
+    "p": "margin:8px 0;",
+    "ul": "margin:8px 0;padding-left:22px;",
+    "ol": "margin:8px 0;padding-left:22px;",
+    "li": "margin:3px 0;",
+    "quote": "margin:10px 0;padding:8px 12px;border-left:3px solid #d0d7de;background:#f6f8fa;color:#57606a;",
+    "table": "border-collapse:collapse;margin:10px 0;width:100%;font-size:14px;",
+    "th": "border:1px solid #d0d7de;padding:6px 10px;background:#f6f8fa;text-align:left;",
+    "td": "border:1px solid #d0d7de;padding:6px 10px;",
+    "code": "background:#f0f1f3;padding:1px 5px;border-radius:4px;font-family:Consolas,Monaco,monospace;font-size:90%;",
+}
+
+_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
+
+
+def _inline(text: str) -> str:
+    """行内标记。先转义 HTML 再套标记——反过来会把生成的标签自己转义掉。"""
+    out = html_module.escape(text, quote=False)
+    out = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", out)
+    out = re.sub(r"`([^`]+?)`", rf'<code style="{_STYLE["code"]}">\1</code>', out)
+    return out
+
+
+def _split_row(line: str) -> list[str]:
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def markdown_to_html(text: str) -> str:
+    """把本仓库生成的 markdown 转成内联样式的 HTML 邮件正文。"""
+    lines = text.split("\n")
+    out: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+
+        if not stripped:
+            index += 1
+            continue
+
+        # 表格：当前行以 | 开头且下一行是分隔行
+        if stripped.startswith("|") and index + 1 < len(lines) and _TABLE_SEP.match(lines[index + 1]):
+            header = _split_row(stripped)
+            index += 2
+            body: list[list[str]] = []
+            while index < len(lines) and lines[index].strip().startswith("|"):
+                body.append(_split_row(lines[index].strip()))
+                index += 1
+            cells = "".join(f'<th style="{_STYLE["th"]}">{_inline(c)}</th>' for c in header)
+            rows = "".join(
+                "<tr>" + "".join(f'<td style="{_STYLE["td"]}">{_inline(c)}</td>' for c in row) + "</tr>"
+                for row in body
+            )
+            out.append(f'<table style="{_STYLE["table"]}"><thead><tr>{cells}</tr></thead><tbody>{rows}</tbody></table>')
+            continue
+
+        heading = re.match(r"^(#{1,6})\s+(.*)$", stripped)
+        if heading:
+            level = min(len(heading.group(1)), 3)
+            out.append(f'<h{level} style="{_STYLE[f"h{level}"]}">{_inline(heading.group(2))}</h{level}>')
+            index += 1
+            continue
+
+        if stripped.startswith(">"):
+            block = []
+            while index < len(lines) and lines[index].strip().startswith(">"):
+                block.append(_inline(re.sub(r"^\s*>\s?", "", lines[index])))
+                index += 1
+            out.append(f'<div style="{_STYLE["quote"]}">{"<br>".join(block)}</div>')
+            continue
+
+        if re.match(r"^[-*]\s+", stripped):
+            items = []
+            while index < len(lines) and re.match(r"^[-*]\s+", lines[index].strip()):
+                items.append(f'<li style="{_STYLE["li"]}">{_inline(re.sub(r"^[-*]\s+", "", lines[index].strip()))}</li>')
+                index += 1
+            out.append(f'<ul style="{_STYLE["ul"]}">{"".join(items)}</ul>')
+            continue
+
+        if re.match(r"^\d+\.\s+", stripped):
+            items = []
+            while index < len(lines) and re.match(r"^\d+\.\s+", lines[index].strip()):
+                items.append(f'<li style="{_STYLE["li"]}">{_inline(re.sub(r"^\d+\.\s+", "", lines[index].strip()))}</li>')
+                index += 1
+            out.append(f'<ol style="{_STYLE["ol"]}">{"".join(items)}</ol>')
+            continue
+
+        # 普通段落：连续非空且非块级起始的行合并
+        para = []
+        while index < len(lines):
+            current = lines[index].strip()
+            if not current or current.startswith(("#", ">", "|")) or re.match(r"^([-*]|\d+\.)\s+", current):
+                break
+            para.append(_inline(current))
+            index += 1
+        out.append(f'<p style="{_STYLE["p"]}">{"<br>".join(para)}</p>')
+
+    return f'<html><body style="{_STYLE["body"]}">{"".join(out)}</body></html>'
+
+
+# --------------------------------------------------------------------- 渠道
+
+
 def _send_smtp(channel: dict[str, Any], title: str, text: str) -> bool:
     host = channel.get("host", "")
     username = channel.get("username", "")
@@ -117,7 +236,11 @@ def _send_smtp(channel: dict[str, Any], title: str, text: str) -> bool:
     if not password:
         logger.warning("SMTP 密码未设置（环境变量 %s）", channel.get("password_env", SMTP_PASSWORD_ENV))
         return False
-    message = MIMEText(text, "plain", "utf-8")
+    # multipart/alternative：纯文本兜底 + HTML 正文。Gmail 等客户端优先取后者，
+    # 不支持 HTML 的客户端仍能看到原 markdown（本身可读）。
+    message = MIMEMultipart("alternative")
+    message.attach(MIMEText(text, "plain", "utf-8"))
+    message.attach(MIMEText(markdown_to_html(text), "html", "utf-8"))
     message["Subject"] = Header(title, "utf-8")
     message["From"] = username
     message["To"] = ", ".join(recipients)
