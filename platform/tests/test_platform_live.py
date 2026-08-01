@@ -469,6 +469,85 @@ def _clear_notify_env(monkeypatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
+def test_markdown_to_html_renders_repo_syntax_subset():
+    """覆盖本仓库推送正文实际用到的全部语法：标题/引用/列表/有序/表格/行内。"""
+    from src.platform_core.notify import markdown_to_html
+
+    html = markdown_to_html(
+        "# 标题\n"
+        "\n"
+        "> 引用第一行\n"
+        "> 引用第二行\n"
+        "\n"
+        "## 小标题\n"
+        "\n"
+        "- **粗体项**：值\n"
+        "- 普通项 `code`\n"
+        "\n"
+        "| 指标 | 值 |\n"
+        "|---|---:|\n"
+        "| 累计差异 | +0.3 bp |\n"
+        "\n"
+        "1. 买入 512890\n"
+        "2. 卖出 510300\n"
+        "\n"
+        "普通段落。\n"
+    )
+
+    assert "<h1" in html and "<h2" in html
+    assert "引用第一行<br>引用第二行" in html          # 连续引用合并为一块
+    assert "<ul" in html and "<strong>粗体项</strong>" in html and "<code" in html
+    assert "<table" in html and "<th" in html and "+0.3 bp" in html
+    assert "<ol" in html and "买入 512890" in html
+    assert "<p" in html and "普通段落。" in html
+    assert "<style>" not in html                        # 必须内联，Gmail 会剥掉 style 块
+
+
+def test_markdown_to_html_escapes_html():
+    from src.platform_core.notify import markdown_to_html
+
+    html = markdown_to_html("- 值 <b>x</b> & <script>alert(1)</script>\n")
+    assert "&lt;script&gt;" in html and "&amp;" in html
+    assert "<script>" not in html
+
+
+def test_smtp_sends_multipart_with_html_alternative(monkeypatch):
+    """Gmail 不渲染 markdown 纯文本，故必须同时带 HTML 分支。"""
+    from src.platform_core import notify as notify_mod
+
+    sent: dict = {}
+
+    class _FakeSMTP:
+        def __init__(self, host, port, timeout=None):
+            sent["host"] = host
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def login(self, username, password):
+            sent["user"] = username
+
+        def sendmail(self, sender, recipients, raw):
+            sent["raw"] = raw
+
+    monkeypatch.setattr(notify_mod.smtplib, "SMTP_SSL", _FakeSMTP)
+    monkeypatch.setenv("RQ_SMTP_PASSWORD", "pw")
+
+    ok = notify_mod._send_smtp(
+        {"host": "smtp.test", "port": 465, "username": "me@test", "to": ["you@test"]},
+        "标题",
+        "## 日报\n\n- **总值**: 105,029.64 元\n",
+    )
+
+    assert ok is True
+    raw = sent["raw"]
+    assert "multipart/alternative" in raw
+    assert 'Content-Type: text/plain' in raw and 'Content-Type: text/html' in raw
+
+
 def test_send_notification_without_channels_returns_false(monkeypatch):
     _clear_notify_env(monkeypatch)
     assert send_notification("t", "x", None) is False
