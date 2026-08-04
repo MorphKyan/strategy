@@ -79,11 +79,11 @@ candidates:
   sleeve: bond
   subtype: long_duration_bond
   include: true
-- asset_id: CN_ETF:511260_3X.SH
-  code: '511260_3X'
-  name: 模拟30年国债期货
-  exchange: SH
-  asset_type: etf
+- asset_id: CN_INDEX:CBA21801
+  code: 'CBA21801'
+  name: 中债30年期国债财富指数
+  exchange: CN
+  asset_type: index
   sleeve: bond
   subtype: long_duration_bond
   include: true
