@@ -1,5 +1,5 @@
 platform:
-  run_name: domestic_cvar_dynamic_budget_bond_30y_511090
+  run_name: domestic_expected_shortfall_fixed_budget_bond_30y_511090
 data:
   data_dir: data
 assets:
@@ -44,7 +44,7 @@ execution:
 output:
   results_dir: results/backtests
 strategy:
-  strategy_name: risk_parity_cvar_dynamic_budget
+  strategy_name: risk_parity_expected_shortfall_fixed_budget
   strategy_version_id: null
   cancel_pending_on_start: false
   params:
@@ -54,9 +54,11 @@ strategy:
     rebalance_threshold: 0.05
     rebalance_relative_threshold: 0.25
     confidence_level: 0.95
-    cvar_sensitivity: 1.0
     volatility_target: 0.08
-    cov_estimator: ledoit_wolf
+    risk_budgets:
+      'CN_ETF:510300.SH': 0.45
+      'CN_ETF:518880.SH': 0.25
+      'CN_ETF:511090.SH': 0.30
     universe:
     - CN_ETF:510300.SH
     - CN_ETF:518880.SH

@@ -1,4 +1,4 @@
-﻿platform:
+platform:
   run_name: domestic_cvar_dynamic_budget_bond_30y_511090_capital_100k
 data:
   data_dir: data
@@ -50,7 +50,7 @@ strategy:
   params:
     rebalance_frequency: monthly
     rolling_window: 120
-    min_periods: 20
+    min_periods: 120
     rebalance_threshold: 0.05
     rebalance_relative_threshold: 0.25
     confidence_level: 0.95
