@@ -1,0 +1,17 @@
+etf_code,name,industry,index_code,index_name,verified_by
+512880,证券ETF,券商,399975.SZ,中证全指证券公司,etf_pe_doc
+512800,银行ETF,银行,399986.SZ,中证银行,wind_con_num_16
+512010,医药ETF,医药,000913.SH,沪深300医药卫生,etf_pe_doc
+159928,消费ETF,主要消费,000932.SH,中证主要消费,etf_pe_doc
+512690,酒ETF,白酒,399987.SZ,中证酒,etf_pe_doc
+512660,军工ETF,军工,399967.SZ,中证军工,etf_pe_doc
+512400,有色金属ETF,有色,000819.SH,中证申万有色金属,etf_pe_doc
+512980,传媒ETF,传媒,399971.SZ,中证传媒,etf_pe_doc
+515000,科技ETF,科技综合,931087.CSI,中证科技龙头,etf_pe_doc
+512480,半导体ETF,半导体,H30184.CSI,中证全指半导体产品与设备,wind_lowercase_h30184
+515050,5G通信ETF,通信,931079.CSI,中证5G通信主题,etf_pe_doc
+512200,房地产ETF,地产,931775.CSI,中证全指房地产,etf_pe_doc
+515220,煤炭ETF,煤炭,399998.SZ,中证煤炭,etf_pe_doc
+515700,新能车ETF,新能源车,930997.CSI,中证新能源汽车产业,etf_pe_doc
+515210,钢铁ETF,钢铁,930606.CSI,中证钢铁,etf_pe_doc
+159996,家电ETF,家电,930697.CSI,中证全指家用电器,etf_pe_doc

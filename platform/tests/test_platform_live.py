@@ -7,16 +7,21 @@ from pathlib import Path
 import pytest
 
 from src.platform_core import notify as notify_module
-from src.platform_core.live import LivePortfolio
+from src.platform_core.live import LivePortfolio, PlanResult
+from src.platform_core.models import parse_date
 from src.platform_core.notify import resolve_channels, send_notification
 
 
-def _write_market_data(data_dir: Path) -> None:
+def _write_market_data(data_dir: Path, closes: dict[str, dict[str, float]] | None = None) -> None:
+    """closes: code -> {date: close}，缺省恒为 10（OHLC 同价）。"""
     data_dir.mkdir(parents=True, exist_ok=True)
     header = "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor"
     dates = ["2024-01-29", "2024-01-30", "2024-01-31"]
     for code in ("AAA", "BBB"):
-        rows = [header] + [f"{code},{d},10,10,10,10,1000,10000,1" for d in dates]
+        rows = [header]
+        for d in dates:
+            price = (closes or {}).get(code, {}).get(d, 10)
+            rows.append(f"{code},{d},{price},{price},{price},{price},1000,10000,1")
         (data_dir / f"{code}.csv").write_text("\n".join(rows), encoding="utf-8")
 
 
@@ -164,6 +169,154 @@ def test_cycle_reconciles_plans_and_notifies_two_messages(tmp_path: Path):
     assert "买入" in ticket_text
 
 
+def test_cycle_digest_reports_asset_daily_change_and_inception_pnl(tmp_path: Path):
+    """日报含各持仓当日涨跌幅/盈亏额与组合成立以来盈亏（2026-07-16 用户需求）。"""
+    data_dir = tmp_path / "data"
+    # AAA 收盘: 01-29 10 → 01-30 11（+10%）→ 01-31 12.1（+10%）
+    _write_market_data(data_dir, closes={"AAA": {"2024-01-30": 11, "2024-01-31": 12.1}})
+    portfolio = LivePortfolio("live_test", _live_config(data_dir), output_root=tmp_path / "live")
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")  # 起点总值 10100
+    portfolio.mark_to_market("2024-01-30")
+    sent: list[tuple[str, str]] = []
+
+    portfolio.cycle(asof_date="2024-01-31", notifier=lambda title, text: sent.append((title, text)) or True)
+
+    _, text = sent[0]
+    # 当日涨跌：AAA +10%，盈亏 300 股 ×（12.1 − 11）= +330 元
+    assert "+10.00%" in text and "+330.00 元" in text
+    # 成立以来：总值 7100 + 300×12.1 = 10730，对起点 10100 为 +630 / +6.24%
+    assert "成立以来" in text
+    assert "+630.00 元 / +6.24%" in text and "起点 2024-01-29" in text
+
+    # 成立首日（尚无早于当日的基准）不显示"成立以来"行
+    valuation = portfolio.mark_to_market("2024-01-29")
+    _, first_day_text = portfolio._render_daily_digest(
+        valuation, PlanResult(portfolio.portfolio_id, parse_date("2024-01-29"), False, 0, None, Path("x"), "")
+    )
+    assert "成立以来" not in first_day_text
+
+
+def _real_nav_rows(portfolio: LivePortfolio) -> list[dict]:
+    with portfolio.real_nav_path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def test_external_flow_issues_units_and_keeps_returns_clean(tmp_path: Path):
+    """申购按当日单位净值增发份额：总值跳变不产生假收益（2026-07-18 需求）。"""
+    portfolio = _make_portfolio(tmp_path)  # 价格恒为 10
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7000.0, asof_date="2024-01-29")  # 总值 10000
+
+    # 01-30 申购 5000：现金 7000 → 12000，价格未动
+    portfolio.reconcile(holdings, cash=12000.0, asof_date="2024-01-30", external_flow=5000.0)
+    # 同日 mark_to_market 重估（cycle 的日常路径）必须继承申报过的申赎金额
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    rows = _real_nav_rows(portfolio)
+    assert [float(row["units"]) for row in rows] == pytest.approx([10000.0, 15000.0])
+    assert [float(row["unit_nav"]) for row in rows] == pytest.approx([1.0, 1.0])
+    assert float(rows[1]["external_flow"]) == pytest.approx(5000.0)
+    # 申购日收益率为 0（价格没动），金额变动剔除申赎后也是 0
+    assert valuation["external_flow"] == pytest.approx(5000.0)
+    assert valuation["unit_nav"] == pytest.approx(1.0)
+    assert valuation["net_invested"] == pytest.approx(15000.0)
+    _, text = portfolio._render_daily_digest(
+        valuation, PlanResult(portfolio.portfolio_id, parse_date("2024-01-30"), False, 0, None, Path("x"), "")
+    )
+    assert "本日申购" in text and "+5,000.00 元" in text
+    assert "+0.00%" in text  # 较上一估值日:份额口径,申购不算收益
+
+
+def test_withdrawal_redeems_units_and_split_pnl_identity(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    _write_market_data(data_dir, closes={"AAA": {"2024-01-31": 11}})
+    portfolio = LivePortfolio("live_test", _live_config(data_dir), output_root=tmp_path / "live")
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7000.0, asof_date="2024-01-29")  # 总值 10000
+
+    # 01-30 赎回 3000（价格未动）：份额 10000 → 7000，单位净值仍 1.0
+    portfolio.reconcile(holdings, cash=4000.0, asof_date="2024-01-30", external_flow=-3000.0)
+    rows = _real_nav_rows(portfolio)
+    assert float(rows[1]["units"]) == pytest.approx(7000.0)
+    assert float(rows[1]["unit_nav"]) == pytest.approx(1.0)
+
+    # 01-31 AAA 10→11：总值 4000+3300=7300，单位净值 7300/7000
+    valuation = portfolio.mark_to_market("2024-01-31")
+    assert valuation["unit_nav"] == pytest.approx(7300.0 / 7000.0)
+    # 净投入 10000−3000=7000,累计盈亏 300;浮动 =300×(11−10)=300(成本=建仓日收盘 10),已实现 0
+    assert valuation["net_invested"] == pytest.approx(7000.0)
+    assert valuation["total_pnl"] == pytest.approx(300.0)
+    assert valuation["float_pnl"] == pytest.approx(300.0)
+    assert valuation["realized_pnl"] == pytest.approx(0.0)
+    _, text = portfolio._render_daily_digest(
+        valuation, PlanResult(portfolio.portfolio_id, parse_date("2024-01-31"), False, 0, None, Path("x"), "")
+    )
+    assert "净投入 7,000.00 元" in text
+    assert "已实现 +0.00 元 + 浮动 +300.00 元" in text
+    assert "+4.29%" in text  # 7300/7000-1,份额口径
+
+
+def test_legacy_real_nav_backfills_unit_chain(tmp_path: Path):
+    """旧三列档案在下一次写盘时自动回填份额链，历史收益率不变（免迁移）。"""
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+    # 手工降级为旧格式（date,cash,positions_value,total_value）
+    portfolio.real_nav_path.write_text(
+        "date,cash,positions_value,total_value\n2024-01-29,7100.00,3000.00,10100.00\n",
+        encoding="utf-8",
+    )
+
+    portfolio.mark_to_market("2024-01-30")
+
+    rows = _real_nav_rows(portfolio)
+    assert [row["date"] for row in rows] == ["2024-01-29", "2024-01-30"]
+    assert [float(row["unit_nav"]) for row in rows] == pytest.approx([1.0, 1.0])  # 价格恒定
+    assert float(rows[0]["units"]) == pytest.approx(10100.0)
+    assert float(rows[0]["external_flow"]) == pytest.approx(0.0)
+
+
+def test_amend_flow_equals_timely_declaration(tmp_path: Path):
+    """忘报申赎 → amend-flow 补报,份额链与当时就申报精确等价（回档重算）。"""
+    data_dir = tmp_path / "data"
+    _write_market_data(data_dir, closes={"AAA": {"2024-01-31": 11}})
+    config = _live_config(data_dir)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+
+    # 组合 A:01-30 申购 5000 当天就申报
+    timely = LivePortfolio("live_test", config, output_root=tmp_path / "a")
+    timely.reconcile(holdings, cash=7000.0, asof_date="2024-01-29")
+    timely.reconcile(holdings, cash=12000.0, asof_date="2024-01-30", external_flow=5000.0)
+    timely.mark_to_market("2024-01-31")
+
+    # 组合 B:忘了申报（flow=0 → 当日出现 +50% 假收益），事后补报
+    forgot = LivePortfolio("live_test", config, output_root=tmp_path / "b")
+    forgot.reconcile(holdings, cash=7000.0, asof_date="2024-01-29")
+    forgot.reconcile(holdings, cash=12000.0, asof_date="2024-01-30")  # 忘报
+    forgot.mark_to_market("2024-01-31")
+    fake = _real_nav_rows(forgot)
+    assert float(fake[1]["unit_nav"]) == pytest.approx(1.5)  # 假收益证据
+
+    result = forgot.amend_flow("2024-01-30", 5000.0)
+
+    assert result["old_flow"] == pytest.approx(0.0)
+    assert [item["date"] for item in result["changed"]] == ["2024-01-30", "2024-01-31"]
+    # 补报后与组合 A 的台账逐字节一致（估值列本就相同,派生链确定性重放）
+    assert forgot.real_nav_path.read_text(encoding="utf-8") == timely.real_nav_path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="不存在"):
+        forgot.amend_flow("2024-02-05", 100.0)
+
+
+def test_cycle_rejects_flow_without_holdings(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+    with pytest.raises(ValueError, match="external_flow"):
+        portfolio.cycle(asof_date="2024-01-30", external_flow=5000.0)
+
+
 def test_cycle_no_op_day_sends_single_digest(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
@@ -220,6 +373,66 @@ def test_mark_to_market_appends_daily_real_nav(tmp_path: Path):
     assert [row["date"] for row in rows] == ["2024-01-29", "2024-01-30"]
 
 
+def test_residual_sentinel_silent_when_ledger_consistent(tmp_path: Path):
+    """cost_basis 与建仓价一致时残差为 0，哨兵不报警。"""
+    portfolio = _make_portfolio(tmp_path)
+    # 10 元买 300 股 = 3000，现金 7100，净投入 10100；cost_basis 如实填 10
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    assert valuation["realized_pnl"] == pytest.approx(0.0, abs=1e-6)
+    assert valuation["realized_residual_alert"] is False
+
+
+def test_residual_sentinel_fires_when_cost_basis_exceeds_inception_mark(tmp_path: Path):
+    """R056 实盘踩过的故障：实付(含手续费/成交价高于收盘)高于建仓日收盘市值。
+
+    首行基线按收盘 mark-to-market，而 cost_basis 是实付——两者的差被恒等式挤进
+    「已实现」且符号为正（实际是损失）。这类"总值对、拆分错"的故障不会被任何
+    总值类检查发现，哨兵是唯一的守门人。实盘 2026-07 潜伏了三周才被发现。
+    """
+    portfolio = _make_portfolio(tmp_path)
+    # 收盘 10，实付 10.10/股（含费）→ 300 股多付 30 元，基线却按收盘记
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,10.10"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    assert valuation["float_pnl"] == pytest.approx(-30.0, abs=1e-6)
+    assert valuation["realized_pnl"] == pytest.approx(30.0, abs=1e-6)
+    assert valuation["realized_residual_alert"] is True
+    _, digest = portfolio._render_daily_digest(
+        valuation,
+        PlanResult(
+            portfolio_id="live_test",
+            plan_date=parse_date("2024-01-30"),
+            has_target=False,
+            order_count=0,
+            ticket_csv=None,
+            ticket_txt=tmp_path / "ticket.txt",
+            text="",
+        ),
+    )
+    assert "账本自检未通过" in digest
+
+
+def test_residual_sentinel_tolerance_is_configurable(tmp_path: Path):
+    """真实卖出后残差固定在累计已实现盈亏水平，调高容差即可止警。"""
+    config = _live_config(tmp_path / "data")
+    config["live"] = {"realized_residual_tolerance": 50.0}
+    _write_market_data(tmp_path / "data")
+    portfolio = LivePortfolio("live_test", config, output_root=tmp_path / "out")
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,10.10"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-29")
+
+    valuation = portfolio.mark_to_market("2024-01-30")
+
+    assert valuation["realized_pnl"] == pytest.approx(30.0, abs=1e-6)
+    assert valuation["realized_residual_alert"] is False
+
+
 def test_cycle_notifier_failure_does_not_break_cycle(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
@@ -254,6 +467,85 @@ class _FakeResponse:
 def _clear_notify_env(monkeypatch) -> None:
     for name in ("RQ_SERVERCHAN_KEY", "RQ_SMTP_HOST", "RQ_SMTP_USERNAME", "RQ_SMTP_PASSWORD", "RQ_SMTP_TO"):
         monkeypatch.delenv(name, raising=False)
+
+
+def test_markdown_to_html_renders_repo_syntax_subset():
+    """覆盖本仓库推送正文实际用到的全部语法：标题/引用/列表/有序/表格/行内。"""
+    from src.platform_core.notify import markdown_to_html
+
+    html = markdown_to_html(
+        "# 标题\n"
+        "\n"
+        "> 引用第一行\n"
+        "> 引用第二行\n"
+        "\n"
+        "## 小标题\n"
+        "\n"
+        "- **粗体项**：值\n"
+        "- 普通项 `code`\n"
+        "\n"
+        "| 指标 | 值 |\n"
+        "|---|---:|\n"
+        "| 累计差异 | +0.3 bp |\n"
+        "\n"
+        "1. 买入 512890\n"
+        "2. 卖出 510300\n"
+        "\n"
+        "普通段落。\n"
+    )
+
+    assert "<h1" in html and "<h2" in html
+    assert "引用第一行<br>引用第二行" in html          # 连续引用合并为一块
+    assert "<ul" in html and "<strong>粗体项</strong>" in html and "<code" in html
+    assert "<table" in html and "<th" in html and "+0.3 bp" in html
+    assert "<ol" in html and "买入 512890" in html
+    assert "<p" in html and "普通段落。" in html
+    assert "<style>" not in html                        # 必须内联，Gmail 会剥掉 style 块
+
+
+def test_markdown_to_html_escapes_html():
+    from src.platform_core.notify import markdown_to_html
+
+    html = markdown_to_html("- 值 <b>x</b> & <script>alert(1)</script>\n")
+    assert "&lt;script&gt;" in html and "&amp;" in html
+    assert "<script>" not in html
+
+
+def test_smtp_sends_multipart_with_html_alternative(monkeypatch):
+    """Gmail 不渲染 markdown 纯文本，故必须同时带 HTML 分支。"""
+    from src.platform_core import notify as notify_mod
+
+    sent: dict = {}
+
+    class _FakeSMTP:
+        def __init__(self, host, port, timeout=None):
+            sent["host"] = host
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def login(self, username, password):
+            sent["user"] = username
+
+        def sendmail(self, sender, recipients, raw):
+            sent["raw"] = raw
+
+    monkeypatch.setattr(notify_mod.smtplib, "SMTP_SSL", _FakeSMTP)
+    monkeypatch.setenv("RQ_SMTP_PASSWORD", "pw")
+
+    ok = notify_mod._send_smtp(
+        {"host": "smtp.test", "port": 465, "username": "me@test", "to": ["you@test"]},
+        "标题",
+        "## 日报\n\n- **总值**: 105,029.64 元\n",
+    )
+
+    assert ok is True
+    raw = sent["raw"]
+    assert "multipart/alternative" in raw
+    assert 'Content-Type: text/plain' in raw and 'Content-Type: text/html' in raw
 
 
 def test_send_notification_without_channels_returns_false(monkeypatch):

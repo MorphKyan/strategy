@@ -364,9 +364,11 @@ TRAILING_MONTHS = {"近1月": 1, "近3月": 3, "近6月": 6, "近1年": 12, "近
 def window_start_date(last_date: Any, period: str) -> pd.Timestamp | None:
     """把区间标签换算成起始日期；"全部"或未知标签返回 None（不裁剪）。
 
-    "今年"取 last_date 当年 1 月 1 日；"近N月/年"按日历偏移回看。
-    组合列表页（蓝图 B4）的近 N 期收益也应复用本函数保证口径一致。
+    "今年"取 last_date 当年 1 月 1 日；"近N周/月/年"按日历偏移回看。
+    组合列表页（蓝图 B4）的近 N 期收益也复用本函数保证口径一致。
     """
+    if period == "近1周":
+        return pd.Timestamp(last_date) - pd.DateOffset(weeks=1)
     if period in TRAILING_MONTHS:
         return pd.Timestamp(last_date) - pd.DateOffset(months=TRAILING_MONTHS[period])
     if period == "今年":
@@ -633,3 +635,289 @@ def infer_slippage_scenario(run_id: str, metrics: dict[str, Any]) -> str:
         if scenario in lowered:
             return scenario
     return "unknown"
+
+
+# ---------------------------------------------------------------- 组合页（蓝图 B3/B4）
+# sim/live 组合目录只有文件、没有元数据库（A1 有意未接 SQLite），读取层全部
+# 基于文件契约：portfolio_state.json / real_nav.csv / runs/*/nav.csv / tickets/。
+
+
+@dataclass(frozen=True)
+class PortfolioRecord:
+    portfolio_id: str
+    kind: str  # "sim" | "live"
+    path: Path
+    state: dict[str, Any]
+
+
+def read_portfolio_state(portfolio_dir: Path) -> dict[str, Any]:
+    path = portfolio_dir / "portfolio_state.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def discover_portfolios(root: Path | None = None) -> list[PortfolioRecord]:
+    """扫描 results/{live,sim}_portfolios/ 下有状态文件的组合，live 在前。"""
+    root = (root or platform_root()).resolve()
+    records: list[PortfolioRecord] = []
+    for kind, dirname in (("live", "live_portfolios"), ("sim", "sim_portfolios")):
+        base = root / "results" / dirname
+        if not base.exists():
+            continue
+        for portfolio_dir in sorted(path for path in base.iterdir() if path.is_dir()):
+            state = read_portfolio_state(portfolio_dir)
+            if state:
+                records.append(PortfolioRecord(portfolio_dir.name, kind, portfolio_dir, state))
+    return records
+
+
+def read_portfolio_nav(portfolio_dir: Path, kind: str) -> pd.DataFrame:
+    """组合净值序列，统一为 date/net_value 列（蓝图 9.2：sim 历史产物用
+    total_value 列，勿改产物，读取层归一）。
+
+    live 读 real_nav.csv（reconcile/每日估值追加的真实净值台账）；
+    sim 拼接 runs/*/nav.csv 的增量段——advance() 每次只写新处理的日期段，
+    全史 = 各段并集；同日重复时保留时间戳更新的一段。
+    """
+    parts: list[pd.DataFrame] = []
+    if kind == "live":
+        paths = [portfolio_dir / "real_nav.csv"]
+    else:
+        paths = sorted(portfolio_dir.glob("runs/*/nav.csv"))
+    for path in paths:
+        try:
+            if path.exists() and path.stat().st_size:
+                parts.append(pd.read_csv(path))
+        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            continue
+    if not parts:
+        return pd.DataFrame()
+    frame = pd.concat(parts, ignore_index=True)
+    if "date" not in frame or "total_value" not in frame:
+        return pd.DataFrame()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["total_value"] = pd.to_numeric(frame["total_value"], errors="coerce")
+    # 收益口径优先用单位净值（份额化后申赎不污染收益率；旧档案无此列回退总值）
+    if "unit_nav" in frame and pd.to_numeric(frame["unit_nav"], errors="coerce").notna().all():
+        frame["net_value"] = pd.to_numeric(frame["unit_nav"], errors="coerce")
+    else:
+        frame["net_value"] = frame["total_value"]
+    frame = frame.dropna(subset=["date", "net_value"])
+    # 稳定排序保持段内先后，同日保留最后（=最新一次 advance）的估值
+    frame = frame.sort_values("date", kind="stable").drop_duplicates("date", keep="last")
+    columns = [
+        column
+        for column in ("date", "net_value", "total_value", "cash", "positions_value", "external_flow", "pending_intent_count")
+        if column in frame
+    ]
+    return frame[columns].reset_index(drop=True)
+
+
+def latest_ticket(portfolio_dir: Path) -> dict[str, Any] | None:
+    """最近一张下单票：txt 正文必有（含"无操作"日），csv 明细仅调仓日存在。"""
+    tickets_dir = portfolio_dir / "tickets"
+    if not tickets_dir.exists():
+        return None
+    txt_paths = sorted(tickets_dir.glob("ticket_*.txt"))
+    if not txt_paths:
+        return None
+    txt_path = txt_paths[-1]
+    try:
+        text = txt_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    csv_path = txt_path.with_suffix(".csv")
+    orders = pd.DataFrame()
+    if csv_path.exists():
+        try:
+            orders = pd.read_csv(csv_path, dtype={"code": str})
+        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            orders = pd.DataFrame()
+    return {"date": txt_path.stem.removeprefix("ticket_"), "text": text, "orders": orders}
+
+
+def asset_code(asset_id: str) -> str:
+    """CN_ETF:510300.SH -> 510300，与行情 CSV 文件名对应。"""
+    return asset_id.split(":")[-1].split(".")[0]
+
+
+def position_weights(state: dict[str, Any], prices: dict[str, float]) -> pd.DataFrame:
+    """由状态持仓 × 最新收盘估算当前权重，含现金行；缺价资产权重为 NaN 但保留行。
+
+    prices 以 asset_id 为键。返回列：asset_id, code, quantity, price, market_value, weight。
+    """
+    rows: list[dict[str, Any]] = []
+    for asset_id, position in (state.get("positions") or {}).items():
+        quantity = float(position.get("quantity") or 0)
+        price = prices.get(asset_id)
+        rows.append(
+            {
+                "asset_id": asset_id,
+                "code": asset_code(asset_id),
+                "quantity": quantity,
+                "price": price,
+                "market_value": quantity * price if price is not None else None,
+            }
+        )
+    cash = float(state.get("cash") or 0)
+    rows.append({"asset_id": "现金", "code": "现金", "quantity": None, "price": None, "market_value": cash})
+    frame = pd.DataFrame(rows)
+    known_total = frame["market_value"].dropna().sum()
+    frame["weight"] = frame["market_value"] / known_total if known_total > 0 else pd.NA
+    return frame
+
+
+TRAILING_RETURN_PERIODS = ["近1周", "近1月", "近3月", "近6月", "今年"]
+
+
+def trailing_returns(nav: pd.DataFrame, periods: list[str] | None = None) -> dict[str, float | None]:
+    """近 N 期收益：nav 两点回看，区间口径复用 window_start_date（蓝图 B4）。
+
+    组合历史短于区间时返回 None（显示为 —），避免把"成立以来"冒充"近3月"。
+    额外附带 key "成立以来" = 全样本收益。
+    """
+    periods = periods or TRAILING_RETURN_PERIODS
+    out: dict[str, float | None] = {period: None for period in periods}
+    out["成立以来"] = None
+    if nav.empty or "net_value" not in nav or len(nav) < 2:
+        return out
+    frame = nav[["date", "net_value"]].dropna().sort_values("date")
+    if len(frame) < 2:
+        return out
+    first_date = frame["date"].iloc[0]
+    last_value = float(frame["net_value"].iloc[-1])
+    first_value = float(frame["net_value"].iloc[0])
+    if first_value > 0:
+        out["成立以来"] = last_value / first_value - 1.0
+    for period in periods:
+        start = window_start_date(frame["date"].iloc[-1], period)
+        if start is None or start < first_date:
+            continue
+        window = frame[frame["date"] >= start]
+        if len(window) < 2:
+            continue
+        base = float(window["net_value"].iloc[0])
+        if base > 0:
+            out[period] = last_value / base - 1.0
+    return out
+
+
+def nav_summary_metrics(nav: pd.DataFrame, min_annualize_obs: int = 20) -> dict[str, Any]:
+    """组合详情页指标行：从 nav 现算年化收益/波动/Sharpe/最大及当前回撤。
+
+    观测少于 min_annualize_obs 天时年化类指标返回 None（几天样本年化出来
+    是噪声，宁可显示 —），回撤类不受限。与 A5 归因"观测<5 判样本不足"同思路。
+    """
+    out: dict[str, Any] = {
+        "observations": 0,
+        "annualized_return": None,
+        "annualized_volatility": None,
+        "sharpe_ratio": None,
+        "max_drawdown": None,
+        "current_drawdown": None,
+    }
+    if nav.empty or "net_value" not in nav or "date" not in nav:
+        return out
+    frame = nav[["date", "net_value"]].dropna().sort_values("date")
+    series = pd.to_numeric(frame["net_value"], errors="coerce").dropna()
+    if len(series) < 2 or (series <= 0).any():
+        return out
+    out["observations"] = int(len(series))
+    drawdown = series / series.cummax() - 1.0
+    out["max_drawdown"] = float(drawdown.min())
+    out["current_drawdown"] = float(drawdown.iloc[-1])
+    if len(series) >= min_annualize_obs:
+        daily = series.pct_change().dropna()
+        years = len(daily) / 252
+        if years > 0:
+            out["annualized_return"] = float((series.iloc[-1] / series.iloc[0]) ** (1 / years) - 1)
+        volatility = float(daily.std() * math.sqrt(252))
+        out["annualized_volatility"] = volatility
+        if volatility > 0:
+            out["sharpe_ratio"] = float(daily.mean() * 252 / volatility)
+    return out
+
+
+def list_tickets(portfolio_dir: Path) -> pd.DataFrame:
+    """全部下单票列表（新在前）：date, kind（调仓/无操作）, summary（正文首行）。"""
+    tickets_dir = portfolio_dir / "tickets"
+    if not tickets_dir.exists():
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for txt_path in sorted(tickets_dir.glob("ticket_*.txt"), reverse=True):
+        try:
+            first_line = txt_path.read_text(encoding="utf-8").strip().splitlines()[0]
+        except (OSError, IndexError):
+            continue
+        rows.append(
+            {
+                "date": txt_path.stem.removeprefix("ticket_"),
+                "kind": "无操作" if "无操作" in first_line else "调仓",
+                "summary": first_line,
+                "has_detail": txt_path.with_suffix(".csv").exists(),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def read_ticket_orders(portfolio_dir: Path) -> pd.DataFrame:
+    """拼接全部 ticket_*.csv 调仓明细，按日期倒序（live 组合的"订单历史"）。"""
+    parts: list[pd.DataFrame] = []
+    for path in sorted((portfolio_dir / "tickets").glob("ticket_*.csv")) if (portfolio_dir / "tickets").exists() else []:
+        try:
+            if path.stat().st_size:
+                parts.append(pd.read_csv(path, dtype={"code": str}))
+        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            continue
+    if not parts:
+        return pd.DataFrame()
+    frame = pd.concat(parts, ignore_index=True)
+    if "date" in frame:
+        frame = frame.sort_values("date", ascending=False)
+    return frame.reset_index(drop=True)
+
+
+def read_sim_run_table(portfolio_dir: Path, name: str) -> pd.DataFrame:
+    """拼接 sim 组合 runs/*/{name}.csv 增量段（同 read_portfolio_nav 的口径）。
+
+    同日重跑 advance 会产生重复行，按整行去重。
+    """
+    if name not in {"trades", "suggested_orders"}:
+        raise ValueError(f"Unsupported sim run table: {name}")
+    parts: list[pd.DataFrame] = []
+    for path in sorted(portfolio_dir.glob(f"runs/*/{name}.csv")):
+        try:
+            if path.exists() and path.stat().st_size:
+                parts.append(pd.read_csv(path))
+        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            continue
+    if not parts:
+        return pd.DataFrame()
+    frame = pd.concat(parts, ignore_index=True).drop_duplicates()
+    if "date" in frame:
+        frame = frame.sort_values("date", ascending=False)
+    return frame.reset_index(drop=True)
+
+
+def max_drawdown(nav: pd.DataFrame) -> float | None:
+    if nav.empty or "net_value" not in nav or len(nav) < 2:
+        return None
+    series = pd.to_numeric(nav["net_value"], errors="coerce").dropna()
+    if len(series) < 2 or series.cummax().le(0).any():
+        return None
+    return float((series / series.cummax() - 1.0).min())
+
+
+def business_days_behind(last_date: Any, today: Any = None) -> int:
+    """净值末日距今的工作日滞后数（近似交易日：未剔除 A 股节假日）。
+
+    组合列表页以 >=3 判"疑似定时任务挂了"标黄——长假会有误报，可接受，
+    这是发现环路中断的最廉价手段（蓝图 B4）。
+    """
+    last = pd.Timestamp(last_date).normalize()
+    now = (pd.Timestamp(today) if today is not None else pd.Timestamp.today()).normalize()
+    if last >= now:
+        return 0
+    return max(0, len(pd.bdate_range(last, now)) - 1)

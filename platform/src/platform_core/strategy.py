@@ -1481,3 +1481,15 @@ BUILTIN_STRATEGIES[
 
 # strategies/rotation.py（R039 行业动量轮动）为 research-only，验收 Failed 后
 # 按 Hard Rule 3 撤销注册；复研时 import IndustryMomentumRotationStrategy 并在此注册。
+
+# strategies/value_rotation.py（R049 行业估值分位轮动，左侧价值）同为 research-only，
+# 验收 Failed（2026-07-25，冻结样本累计跑输基线 29.29pp，败因价值陷阱）后按
+# Hard Rule 3 撤销注册；结论见 reports/r049_value_rotation_report.md。
+
+# strategies/premium_gated_satellite.py（R056 QDII 溢价闸门卫星）同为 research-only，
+# 验收 Failed（2026-07-30：训练段年化换手由无闸门的 9.34% 暴增至 135.41%、交易数 28→146，
+# 远超 30% 红线；最大回撤反而由 -12.99% 恶化到 -16.28%，收益无提升）。
+# 败因：premium_cap=0.02 恰落在溢价分布众数区（训练段 78 个月里 (1%,2%] 10 个月、
+# (2%,3%] 12 个月），二值闸门在阈值上反复穿越，78 个月翻转 26 次。
+# 按 Hard Rule 3 撤销注册；结论见 reports/r056_premium_gated_satellite_report.md。
+# 数据链 `etf_premium.py` 与 `scripts/fetch_etf_nav.py` 保留（通用能力，非本策略专属）。

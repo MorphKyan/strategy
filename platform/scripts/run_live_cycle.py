@@ -6,6 +6,17 @@
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py reconcile ^
       --config configs\\baseline_r1_domestic_rolling.yaml --holdings my_holdings.csv --cash 12345.67
 
+  # ①b 当日有本金出入时必须申报 --external-flow（申购为正、赎回为负）：
+  #    份额化核算按当日单位净值增发/注销份额，单位净值曲线连续，收益率不被资金出入污染。
+  #    cost_basis 建议抄券商真实成本价，已实现/浮动盈亏拆分才准确。
+  .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py reconcile ^
+      --config ... --holdings my_holdings.csv --cash 62345.67 --external-flow 50000
+
+  # ①c 忘记申报的补救：amend-flow 只改该日的申赎标注（估值行冻结不动），
+  #    份额链从首行重放，补报与当时申报的结果精确等价。
+  .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py amend-flow ^
+      --config ... --date 2026-07-20 --external-flow 50000
+
   # ② 生成明日下单票（打印到终端，同时落盘 tickets/ticket_<date>.csv/.txt）
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py plan ^
       --config configs\\baseline_r1_domestic_rolling.yaml [--notify]
@@ -18,10 +29,19 @@
 
 推送渠道零配置：设环境变量 RQ_SERVERCHAN_KEY（Server酱/微信）或
 RQ_SMTP_HOST/RQ_SMTP_USERNAME/RQ_SMTP_PASSWORD/RQ_SMTP_TO（邮件）即自动启用，
-详见 src/platform_core/notify.py 模块注释。任务计划注册示例：
+详见 src/platform_core/notify.py 模块注释。
 
-  schtasks /Create /TN "RetailQuant Live Cycle" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 19:00 ^
-      /TR "D:\\qcy_project\\strategy\\env\\Scripts\\python.exe D:\\qcy_project\\strategy\\platform\\scripts\\run_live_cycle.py cycle --config configs\\baseline_r1_domestic_rolling.yaml --sync --notify"
+任务计划注册【必须用 PowerShell，勿用 schtasks】——schtasks /TR 有 261 字符
+上限且超长时**静默截断**（2026-07-15 实测：--shadow sim_r8_permanent_shadow
+被截成 sim_r8_permanent_s，影子组合连续数晚推进失败无人察觉）：
+
+  $action = New-ScheduledTaskAction -Execute "D:\\qcy_project\\strategy\\env\\Scripts\\python.exe" `
+      -Argument "D:\\qcy_project\\strategy\\platform\\scripts\\run_live_cycle.py cycle --config configs\\r8_permanent_real_fixed_weight_threshold.yaml --portfolio live_r8_permanent_100k --sync --notify --shadow sim_r8_permanent_shadow"
+  $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At 19:00
+  Register-ScheduledTask -TaskName "RetailQuant Live Cycle" -Action $action -Trigger $trigger
+
+注册后务必回读校验参数完整（截断不报错）：
+  (Get-ScheduledTask "RetailQuant Live Cycle").Actions.Arguments
 
 推送分两条：组合日报（总值/日变动/权重，markdown）每个交易日必发；
 触发调仓时下单票作为独立第二条发送。每日估值同时追加进 real_nav.csv。
@@ -86,13 +106,33 @@ def main() -> int:
     p_reconcile = sub.add_parser("reconcile", parents=[common], help="Overwrite state from real holdings CSV.")
     p_reconcile.add_argument("--holdings", required=True, help="CSV with header code,quantity[,cost_basis].")
     p_reconcile.add_argument("--cash", required=True, type=float, help="Real account cash balance.")
+    p_reconcile.add_argument(
+        "--external-flow",
+        type=float,
+        default=0.0,
+        help="当日外部申赎金额（申购为正、赎回为负）。份额按当日单位净值增发/注销，收益率不受资金出入污染。",
+    )
 
     p_plan = sub.add_parser("plan", parents=[common], help="Generate next-day order ticket from current state.")
     p_plan.add_argument("--notify", action="store_true", help="Push the ticket via configured channels.")
 
+    p_amend = sub.add_parser(
+        "amend-flow",
+        parents=[common],
+        help="补报/修正历史某日的申赎金额（估值行不动，份额链从头重放，与当时申报等价）。",
+    )
+    p_amend.add_argument("--date", required=True, help="要修正的估值日, YYYY-MM-DD（须已存在于 real_nav）。")
+    p_amend.add_argument("--external-flow", required=True, type=float, help="该日正确的申赎金额（申购为正、赎回为负）。")
+
     p_cycle = sub.add_parser("cycle", parents=[common], help="sync -> [reconcile] -> plan -> [notify]; skips non-trading days.")
     p_cycle.add_argument("--holdings", help="Optional holdings CSV; omit to plan from the last reconciled state.")
     p_cycle.add_argument("--cash", type=float, help="Real cash balance, required together with --holdings.")
+    p_cycle.add_argument(
+        "--external-flow",
+        type=float,
+        default=0.0,
+        help="当日外部申赎金额（须与 --holdings/--cash 同时提供）。",
+    )
     p_cycle.add_argument("--sync", action="store_true", help="Force market data sync even if config data.fetch is false.")
     p_cycle.add_argument("--notify", action="store_true", help="Push the ticket via configured channels.")
     p_cycle.add_argument("--force", action="store_true", help="Plan from the latest bar even if asof is not a trading day.")
@@ -102,10 +142,28 @@ def main() -> int:
     portfolio, config = build_portfolio(args)
 
     if args.command == "reconcile":
-        result = portfolio.reconcile(resolve_holdings_path(args.holdings), cash=args.cash, asof_date=args.asof_date)
+        result = portfolio.reconcile(
+            resolve_holdings_path(args.holdings),
+            cash=args.cash,
+            asof_date=args.asof_date,
+            external_flow=args.external_flow,
+        )
+        if args.external_flow:
+            print(f"已申报{'申购' if args.external_flow > 0 else '赎回'} {args.external_flow:+,.2f} 元（份额按当日单位净值调整）")
         print(f"已对齐真实持仓: {result.portfolio_id} @ {result.asof_date}")
         print(f"现金 {result.cash:,.2f} + 持仓市值 {result.positions_value:,.2f} = 总值 {result.total_value:,.2f}")
         print(f"状态: {result.state_path}")
+        return 0
+
+    if args.command == "amend-flow":
+        result = portfolio.amend_flow(args.date, args.external_flow)
+        print(f"已修正 {result['date']} 申赎: {result['old_flow']:+,.2f} → {result['new_flow']:+,.2f} 元")
+        if result["changed"]:
+            print("受影响的单位净值（重放后）:")
+            for item in result["changed"]:
+                print(f"  {item['date']}: {item['unit_nav_before'] or '—'} → {item['unit_nav_after']}")
+        else:
+            print("单位净值链无变化（金额与原申报一致）。")
         return 0
 
     if args.command == "plan":
@@ -130,6 +188,7 @@ def main() -> int:
         do_sync=True if args.sync else None,
         notifier=notifier,
         force=args.force,
+        external_flow=args.external_flow,
     )
     if result.skipped_non_trading:
         print(f"{args.asof_date} 不是交易日（或行情尚未更新到当日），本次跳过。--force 可强制按最近交易日出票。")

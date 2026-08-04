@@ -211,6 +211,16 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 - 输出：`platform/reports/live/<YYYY-MM>_attribution.md`（中文），内容：两条净值曲线对比、月度 tracking error（bp）、差异归因粗拆（手续费差/成交价差/现金拖累），**只记录，不据此改持仓或改参数**。
 - 前提是同一 checkpoint 起点同时维护一个纸面 sim 组合作为影子——`run_live_cycle.py cycle` 里顺带 `SimPortfolio.advance()` 推进影子组合即可。
 
+### A6. 资金出入份额化（已完成，2026-07-18）
+
+**竣工说明**：实盘组合支持本金追加/取出，公募基金同构的份额化核算。
+
+- **契约**：`real_nav.csv` 增列 `external_flow / units / unit_nav`；申赎经 `reconcile --external-flow <金额>`（申购为正、赎回为负）**显式申报**——现金变动的另两种来源（交易、分红）是内部现金流，程序不做自动侦测。申赎当日必须同时提供 `--holdings/--cash`。
+- **核算**：首行整笔视为申购（unit_nav=1）；申赎日先用"扣除当日申赎的组合值"对旧份额算单位净值，再按该净值增发/注销份额——单位净值曲线对资金流连续。每次写盘从首行重放整条链（`_recompute_unit_chain`），因此**旧格式档案在下一次写盘自动回填，无迁移脚本**；同日重估（cycle 的 mark-to-market）继承 reconcile 申报过的申赎金额。
+- **口径切换**：收益率一律走单位净值——看板读取层（`read_portfolio_nav` 优先 `unit_nav` 作 `net_value`，`total_value` 保留供展示）、日报（较上一估值日/成立以来百分比）、月度归因（`load_real_nav` 的 `nav_value`）三处；金额类口径：净投入 = 首行总值 + 后续申赎净额，累计盈亏 = 总值 − 净投入。
+- **补报通道**（2026-07-18 同日增补）：忘报申赎用 `amend-flow --date <日> --external-flow <金额>` 回档——只改该行 flow 标注（估值列冻结不动），份额链从首行重放，**补报与当时申报精确等价**（确定性重放，有等价性测试兜底）。注意 flow 应记在"这笔钱首次出现在台账总值里"的那一行（通常=入金后首次 reconcile 日）。
+- **已实现/浮动盈亏**（日报"盈亏拆分"行）：浮动 = Σ(现价 − cost_basis)×数量，已实现 = 累计盈亏 − 浮动（会计恒等式，免逐笔流水）。**拆分准确性取决于 reconcile 时抄入的券商真实成本价**；两者之和恒等于真实累计盈亏，不会错账。已知局限：若把携带既有浮盈的持仓"转入"组合（成本价早于组合成立），拆分会出现常数偏移，本组合（成立日现金建仓）不受影响。
+
 ---
 
 ## 6. 主线 B：看板升级（优先级 P1）
@@ -227,13 +237,19 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 已落地：`st.multiselect` 选 2–5 个 run，`align_navs()` 裁剪到共同重叠区间（可选）并在所选区间首日各自归一（净值模式从 1.0、收益率模式从 0% 出发），净值/回撤叠加 + 全样本指标对照表。区间与显示控件与 B1 完全一致。
 
-### B3. 模拟/实盘组合页（新页面，依赖主线 A 落地）
+### B3. 模拟/实盘组合页（已完成，2026-07-15）
+
+**竣工说明（as-built，与下方原规格的差异）**：发现器合并为一个 `discover_portfolios()`（live 在前）；sim 全史 = 拼接 `runs/*/nav.csv` 增量段、同日保留最新段，统一归一为 `net_value` 列（`read_portfolio_nav`）。目标权重优先取 `pending_intents`，否则取最近一张下单票的 `weight_target`（票只含需交易资产，图注已说明）；非行情代码（演示组合）跳过取价，权重留空。real_nav vs 影子 sim 用 `align_navs` 在共同区间首日归一（收益率口径）。组合目录无元数据（A1 有意未接 SQLite），策略名列暂缺。
+
+**2026-07-16 增补（复用回测分析充实详情页）**：详情页改为四分节（概览/净值与回撤/收益分解/票据与交易）。`render_performance` 泛化为接受 `{标签: 惰性净值加载器}` 的基准字典，回测分析与组合详情共用——实盘组合的基准可选影子 sim 或**任意回测 run**（实盘 vs 回测预期一图对比，取代原影子专用对比图）；收益分解（月度热力图/滚动指标）零成本挂接；新增 nav 派生指标行（`nav_summary_metrics`，观测 <20 天时年化类显示 — 防小样本噪声）与票据/交易历史（`list_tickets`/`read_ticket_orders`/`read_sim_run_table`）。持仓面积图需每日权重快照落盘（Phase 2），经用户裁决暂不做。原规格：
 
 - 发现器：`artifacts.py` 加 `discover_sim_portfolios()` 与 `discover_live_portfolios()`，分别扫 `results/sim_portfolios/` 与 `results/live_portfolios/`。注意 sim 的 `nav.csv` 列是 `total_value` 而非回测的 `net_value`，读取层要归一。
 - 展示：当前权重 vs 目标权重（双色条形图）、pending intents 表、最近一张下单票原文、real_nav vs 影子 sim nav 对比曲线。
 - 保持**只读**。reconcile 录入仍走命令行，看板不做写操作（避免把看板变成需要认真测试的应用）。
 
-### B4. 组合总览列表页（多组合横向视图，依赖主线 A 产出组合）
+### B4. 组合总览列表页（已完成，2026-07-15）
+
+**竣工说明**：`trailing_returns`（复用 `window_start_date`，新增"近1周"标签；历史短于区间显示 —，另附"成立以来"）+ `business_days_behind`（工作日近似交易日，未剔除节假日，>=3 整行标黄）。上线当天即抓到真实故障：影子组合净值滞后 3 个工作日（任务计划 `--shadow` 参数被 schtasks 261 字符上限截断）。原规格：
 
 投资者日常最高频的问题是"我所有在跑的组合最近表现如何"，一页列表回答它：
 
@@ -314,14 +330,15 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 
 - `portfolio_state.json`：`cash, positions{asset_id→{quantity,cost_basis}}, pending_intents{...}, cooldown_pool, strategy_state, last_date, dividend_receivables` —— 见 `models.py:PortfolioState.to_dict()`。
 - 回测 `nav.csv` 用 `net_value` 列；sim 的 `nav.csv` 用 `total_value` 列（历史差异，读取层归一，勿改历史产物）。
-- 下单票、real_holdings 契约见 §5 A2/A4。
+- live 的 `real_nav.csv`：`date, cash, positions_value, total_value, external_flow, units, unit_nav`（份额化见 A6；收益率一律用 `unit_nav`，`total_value` 仅作规模展示）。
+- 下单票、real_holdings 契约见 §5 A2/A4；申赎申报见 A6。
 
 ### 9.3 建议施工顺序（每项一个独立会话/PR 即可完成）
 
 1. ~~A1+A2：`live.py` 的 reconcile + plan + 下单票~~ **已完成（2026-07-05）**：`live.py` + `run_live_cycle.py`（reconcile/plan），端到端验证通过（真实配置 + 全真数据出票）。SQLite 集成与 notify/cycle 留给下一步。
 2. ~~A3+A4：notify + cycle + 任务计划~~ **已完成（2026-07-05）**：`notify.py`（Server酱/SMTP，环境变量零配置自动发现）+ `cycle` 子命令（非交易日自动跳过）。任务计划命令已写进脚本 docstring，由用户设好推送密钥后自行注册。
 3. ~~B1：收益多尺度视图~~ **已完成（2026-07-05）**：净值/收益率双模式（收益率按区间首日归零）、区间选择、对数坐标、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、月度序列、滚动波动与滚动 Sharpe，持仓面积图含现金层。派生计算在 `artifacts.py`（`nav_analytics`/`rebase_benchmark`/`window_start_date`），测试在 `test_platform_dashboard.py`。
-4. B3+B4：sim/实盘组合页 + 组合总览列表（近 1 周/1 月/3 月/半年收益，配合 A 使用）
+4. ~~B3+B4：sim/实盘组合页 + 组合总览列表~~ **已完成（2026-07-15）**：`discover_portfolios`/`read_portfolio_nav`/`trailing_returns`/`business_days_behind` 等读取层 + "组合总览"/"组合详情"两页，测试在 `test_platform_dashboard.py`。**主线 B（看板升级）全部竣工。**
 5. ~~A5：月度归因报告~~ **已完成（2026-07-11）**：attribution.py + report_live_attribution.py + cycle --shadow 影子跟跑；reports/live/ 因含真实账户金额已 gitignore。**主线 A（实战环路）全部竣工。**
 6. ~~B2：多回测对比页~~ **已完成（2026-07-05）**：`align_navs` 对齐重叠区间、在所选区间首日归一叠加（净值/收益率双模式）+ 回撤叠加 + 指标对照表，控件与回测分析页统一。
 7. C1 流程文档化 + C2（真要做个股时再启动）

@@ -114,6 +114,11 @@ class LivePortfolio:
         self.data_fetch = bool(data_config.get("fetch", False))
         self.market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
 
+        live_config = config.get("live", {}) or {}
+        # 恒等式哨兵容差（元）。未卖出时 realized_pnl 恒为 0，超过该值即报警。
+        # 真实卖出后残差会固定在累计已实现盈亏水平，届时把本值调到略高于它即可。
+        self.realized_residual_tolerance = float(live_config.get("realized_residual_tolerance", 1.0))
+
         execution_config = config.get("execution", {})
         fee_config = execution_config.get("fee", {})
         slippage_config = execution_config.get("slippage", {})
@@ -145,11 +150,22 @@ class LivePortfolio:
 
     # ---------------------------------------------------------------- reconcile
 
-    def reconcile(self, holdings_csv: str | Path, cash: float, asof_date: str | date) -> ReconcileResult:
+    def reconcile(
+        self,
+        holdings_csv: str | Path,
+        cash: float,
+        asof_date: str | date,
+        external_flow: float = 0.0,
+    ) -> ReconcileResult:
         """真值重置：用真实持仓+现金构造全新组合状态覆盖写入。
 
         holdings_csv 契约（表头必需）：code,quantity[,cost_basis]
-        cost_basis 缺省时用 asof 日收盘价近似（只影响展示，不影响策略）。
+        cost_basis 缺省时用 asof 日收盘价近似（影响已实现/浮动盈亏拆分与展示，
+        不影响策略；拆分要准确请抄券商 App 的真实成本价）。
+
+        external_flow：当日外部资金流（申购为正、赎回为负）。份额化核算的
+        唯一申报入口——现金变动的另两种来源（交易、分红到账）是内部现金流,
+        程序无法可靠区分，因此申赎必须由用户显式申报，缺省 0。
         """
         asof = parse_date(asof_date)
         holdings = self._read_holdings(holdings_csv)
@@ -183,7 +199,7 @@ class LivePortfolio:
 
         positions_value = sum(pos.quantity * prices.get(asset_id, 0.0) for asset_id, pos in positions.items())
         total_value = float(cash) + positions_value
-        self._append_real_nav(asof, float(cash), positions_value, total_value)
+        self._append_real_nav(asof, float(cash), positions_value, total_value, external_flow=float(external_flow))
         return ReconcileResult(self.portfolio_id, asof, float(cash), positions_value, total_value, self.state_path)
 
     # ---------------------------------------------------------------- plan
@@ -281,6 +297,7 @@ class LivePortfolio:
         do_sync: bool | None = None,
         notifier: Callable[[str, str], bool] | None = None,
         force: bool = False,
+        external_flow: float = 0.0,
     ) -> CycleResult:
         """一条命令跑完整环路：sync →（可选）reconcile → plan → 每日估值 →（可选）notify。
 
@@ -308,8 +325,10 @@ class LivePortfolio:
         if holdings_csv is not None:
             if cash is None:
                 raise ValueError("reconcile 需要同时提供 cash（真实账户现金余额）。")
-            self.reconcile(holdings_csv, cash=cash, asof_date=asof)
+            self.reconcile(holdings_csv, cash=cash, asof_date=asof, external_flow=external_flow)
             reconciled = True
+        elif external_flow:
+            raise ValueError("申报 external_flow 必须同时提供 --holdings/--cash（申赎当日需要对齐真实持仓）。")
 
         plan_result = self.plan(asof)
         valuation = self.mark_to_market(plan_result.plan_date)
@@ -344,20 +363,26 @@ class LivePortfolio:
             for asset_id, position in state.positions.items()
         }
 
-        previous_total = None
-        has_newer = False
-        same_day_total = None
-        if self.real_nav_path.exists():
-            # utf-8-sig：容忍 Excel/PowerShell 手工编辑留下的 BOM
-            with self.real_nav_path.open("r", encoding="utf-8-sig", newline="") as handle:
-                rows = list(csv.DictReader(handle))
-            earlier = [row for row in rows if row["date"] < date_str(asof)]
-            if earlier:
-                previous_total = float(earlier[-1]["total_value"])
-            has_newer = any(row["date"] > date_str(asof) for row in rows)
-            same = [row for row in rows if row["date"] == date_str(asof)]
-            if same:
-                same_day_total = float(same[-1]["total_value"])
+        # 各持仓当日涨跌幅与盈亏额（对比前一交易日收盘；持仓以上次 reconcile 为准，
+        # 当日已交易未对齐时与真实盈亏有偏差，次日 reconcile 后自愈——与 nav 同一口径）
+        earlier_days = [day for day in data.calendar if day < asof]
+        prev_bars = data.bars_on(max(earlier_days)) if earlier_days else {}
+        asset_changes: dict[str, dict[str, float]] = {}
+        for asset_id, position in state.positions.items():
+            bar, prev_bar = bars.get(asset_id), prev_bars.get(asset_id)
+            if bar is None or prev_bar is None or prev_bar.close <= 0:
+                continue
+            asset_changes[asset_id] = {
+                "pct": bar.close / prev_bar.close - 1.0,
+                "pnl": position.quantity * (bar.close - prev_bar.close),
+            }
+
+        rows = self._read_real_nav_rows()
+        earlier = [row for row in rows if row["date"] < date_str(asof)]
+        previous_total = float(earlier[-1]["total_value"]) if earlier else None
+        has_newer = any(row["date"] > date_str(asof) for row in rows)
+        same = [row for row in rows if row["date"] == date_str(asof)]
+        same_day_total = float(same[-1]["total_value"]) if same else None
 
         # 历史行冻结：real_nav 是真实净值台账，一旦出现更新日期的估值，旧日期
         # 不允许被重估值改写（曾发生：数据处于研究中间状态时 --force 重跑，把
@@ -369,9 +394,45 @@ class LivePortfolio:
                     f"real_nav {date_str(asof)} 同日重估值差异 {(total_value / same_day_total - 1.0):+.2%}"
                     f"（{same_day_total:,.2f} → {total_value:,.2f}），已替换；若非当日数据修正请检查数据状态"
                 )
-            self._append_real_nav(asof, state.cash, positions_value, total_value)
+            rows = self._append_real_nav(asof, state.cash, positions_value, total_value)
         else:
             logger.warning("real_nav 已存在晚于 %s 的估值行，跳过历史回写（修正历史请用 reconcile）", date_str(asof))
+
+        # ---- 份额口径派生（申赎不污染收益率；旧格式档案无 unit_nav 时各字段为 None，
+        #      展示层回退 total_value 口径——下一次写盘链会自动回填）
+        def _unit_nav_of(row: dict[str, str] | None) -> float | None:
+            if row and row.get("unit_nav"):
+                return float(row["unit_nav"])
+            return None
+
+        current_row = next((row for row in rows if row["date"] == date_str(asof)), None)
+        chain_earlier = [row for row in rows if row["date"] < date_str(asof)]
+        first_row = rows[0] if rows else None
+        external_flow = float(current_row.get("external_flow") or 0.0) if current_row else 0.0
+        net_invested = None
+        if first_row is not None:
+            # 首行整笔即初始投入，其后申赎净额累加（申购为正、赎回为负）
+            net_invested = float(first_row["total_value"]) + sum(
+                float(row.get("external_flow") or 0.0) for row in rows[1:]
+            )
+
+        # 已实现 = 累计总盈亏 − 浮动盈亏（会计恒等式，免逐笔流水）；
+        # 拆分准确性取决于 reconcile 提供的 cost_basis（建议抄券商真实成本价）
+        float_pnl = sum(
+            position.quantity * (prices[asset_id] - position.cost_basis)
+            for asset_id, position in state.positions.items()
+            if asset_id in prices
+        )
+        total_pnl = total_value - net_invested if net_invested is not None else None
+        realized_pnl = total_pnl - float_pnl if total_pnl is not None else None
+
+        # 恒等式哨兵：未发生卖出时 realized_pnl 必须为 0。非零意味着账本内部不自洽，
+        # 而 total_value 仍然正确——这类"总值对、拆分错"的故障不会被任何现有检查发现。
+        # 2026-07 实测踩过两次：①cost_basis 存了成交价而非实付(漏手续费)，残差 +3.80 潜伏三周；
+        # ②real_nav 首行基线用 07-10 收盘市值而非实际入金，残差 +20.15。
+        # 真实卖出后残差会变成累计已实现盈亏并保持该水平，届时按实际值调高容差即可。
+        tolerance = self.realized_residual_tolerance
+        residual_alert = realized_pnl is not None and abs(realized_pnl) > tolerance
 
         return {
             "date": asof,
@@ -379,7 +440,20 @@ class LivePortfolio:
             "positions_value": positions_value,
             "total_value": total_value,
             "weights": weights,
+            "asset_changes": asset_changes,
             "previous_total": previous_total,
+            "inception_date": first_row["date"] if first_row else None,
+            "inception_total": float(first_row["total_value"]) if first_row else None,
+            "unit_nav": _unit_nav_of(current_row),
+            "previous_unit_nav": _unit_nav_of(chain_earlier[-1] if chain_earlier else None),
+            "inception_unit_nav": _unit_nav_of(first_row),
+            "external_flow": external_flow,
+            "net_invested": net_invested,
+            "total_pnl": total_pnl,
+            "float_pnl": float_pnl,
+            "realized_pnl": realized_pnl,
+            "realized_residual_alert": residual_alert,
+            "realized_residual_tolerance": tolerance,
             "written": written,
         }
 
@@ -390,21 +464,65 @@ class LivePortfolio:
         title = f"组合日报 {day} · {total:,.0f}元"[:32]
 
         lines = [f"## {self.portfolio_id} 日报 · {day}", ""]
+        flow = valuation.get("external_flow") or 0.0
+        unit_nav = valuation.get("unit_nav")
         change_line = f"- **总值**: {total:,.2f} 元"
+        if unit_nav:
+            change_line += f" | 单位净值 {unit_nav:.4f}"
         previous = valuation.get("previous_total")
+        previous_unit_nav = valuation.get("previous_unit_nav")
         if previous:
-            diff = total - previous
-            change_line += f"（较上一估值日 {diff:+,.2f} / {diff / previous:+.2%}）"
+            diff = total - previous - flow  # 日变动金额剔除当日申赎
+            if unit_nav and previous_unit_nav:
+                pct = unit_nav / previous_unit_nav - 1.0  # 份额口径,申赎不污染
+            else:
+                pct = diff / previous
+            change_line += f"（较上一估值日 {diff:+,.2f} / {pct:+.2%}）"
         lines.append(change_line)
+        if flow:
+            action = "申购" if flow > 0 else "赎回"
+            lines.append(f"- **本日{action}**: {flow:+,.2f} 元（份额已按当日单位净值调整，收益率不受影响）")
+        inception_total = valuation.get("inception_total")
+        inception_date = valuation.get("inception_date")
+        inception_unit_nav = valuation.get("inception_unit_nav")
+        if inception_total and inception_date and inception_date < day:
+            total_pnl = valuation.get("total_pnl")
+            amount = total_pnl if total_pnl is not None else total - inception_total
+            if unit_nav and inception_unit_nav:
+                pct = unit_nav / inception_unit_nav - 1.0
+            else:
+                pct = (total - inception_total) / inception_total
+            since_line = f"- **成立以来**: {amount:+,.2f} 元 / {pct:+.2%}（起点 {inception_date}"
+            net_invested = valuation.get("net_invested")
+            if net_invested is not None and abs(net_invested - inception_total) > 0.005:
+                since_line += f"，净投入 {net_invested:,.2f} 元"
+            lines.append(since_line + "）")
+            realized = valuation.get("realized_pnl")
+            float_pnl = valuation.get("float_pnl")
+            if realized is not None and float_pnl is not None:
+                lines.append(f"- **盈亏拆分**: 已实现 {realized:+,.2f} 元 + 浮动 {float_pnl:+,.2f} 元")
+                if valuation.get("realized_residual_alert"):
+                    tol = valuation.get("realized_residual_tolerance", 0.0)
+                    lines.append(
+                        f"- ⚠️ **账本自检未通过**: 未发生卖出时「已实现」应为 0，当前 {realized:+,.2f} 元"
+                        f"（容差 {tol:,.2f}）。总值不受影响，但拆分口径有误——"
+                        f"优先核对 ①holdings 的 cost_basis 是否为交割单实付÷数量（含手续费）"
+                        f" ②real_nav 首行基线是否为实际入金而非当日收盘市值。"
+                    )
         cash = valuation["cash"]
         cash_pct = cash / total if total > 0 else 0.0
         lines.append(f"- **现金**: {cash:,.2f} 元（{cash_pct:.1%}）")
         lines.append("")
-        lines.append("**持仓权重**:")
+        lines.append("**持仓权重与当日涨跌**:")
+        asset_changes = valuation.get("asset_changes") or {}
         for asset_id, weight in sorted(valuation["weights"].items(), key=lambda item: -item[1]):
             asset = self.assets.get(asset_id)
             label = f"{asset.code} {asset.name}" if asset else asset_id
-            lines.append(f"- {label}: {weight:.1%}")
+            entry = f"- {label}: {weight:.1%}"
+            change = asset_changes.get(asset_id)
+            if change is not None:
+                entry += f"，{change['pct']:+.2%} / {change['pnl']:+,.2f} 元"
+            lines.append(entry)
         lines.append("")
         if plan_result.has_target and plan_result.order_count > 0:
             lines.append("⚠️ **今日触发调仓**，下单票见另一条推送。")
@@ -524,25 +642,113 @@ class LivePortfolio:
         with self.state_path.open("w", encoding="utf-8") as handle:
             json.dump(state.to_dict(), handle, ensure_ascii=False, indent=2)
 
-    def _append_real_nav(self, asof: date, cash: float, positions_value: float, total_value: float) -> None:
-        rows: list[dict[str, str]] = []
-        if self.real_nav_path.exists():
-            # utf-8-sig：容忍 Excel/PowerShell 手工编辑留下的 BOM
-            with self.real_nav_path.open("r", encoding="utf-8-sig", newline="") as handle:
-                rows = [row for row in csv.DictReader(handle) if row["date"] != date_str(asof)]
+    def _read_real_nav_rows(self) -> list[dict[str, str]]:
+        if not self.real_nav_path.exists():
+            return []
+        # utf-8-sig：容忍 Excel/PowerShell 手工编辑留下的 BOM
+        with self.real_nav_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            return list(csv.DictReader(handle))
+
+    @staticmethod
+    def _recompute_unit_chain(rows: list[dict[str, str]]) -> None:
+        """基金式份额化：就地重算全表 units / unit_nav（申赎不污染收益率）。
+
+        每次写盘都从首行重放整条链，因此旧格式档案（无 flow/units 列）在下一次
+        写盘时自动回填（历史无申赎 → 份额恒定，逐日收益率与 total_value 口径
+        完全一致），不需要独立迁移脚本。
+
+        规则：首行整笔视为申购（unit_nav=1）；此后每日先用"扣除当日申赎的
+        组合值"对旧份额算单位净值，再按该净值增发/赎回份额——单位净值曲线
+        对外部资金流保持连续。极端情形（净值/份额被赎穿归零）按新起点重置。
+        """
+        units = 0.0
+        for row in rows:
+            total = float(row.get("total_value") or 0.0)
+            flow = float(row.get("external_flow") or 0.0)
+            pre_flow_value = total - flow
+            if units <= 0 or pre_flow_value <= 0:
+                units = max(total, 0.0)  # 新起点：整笔申购，unit_nav 从 1 重新出发
+            else:
+                unit_nav = pre_flow_value / units
+                if flow and unit_nav > 0:
+                    units += flow / unit_nav
+            row["external_flow"] = f"{flow:.2f}"
+            row["units"] = f"{units:.6f}"
+            # 8 位小数：unit_nav≈1 量级,6 位会引入 ~1e-6 的日收益率量化误差
+            row["unit_nav"] = f"{total / units:.8f}" if units > 0 else ""
+
+    def _append_real_nav(
+        self,
+        asof: date,
+        cash: float,
+        positions_value: float,
+        total_value: float,
+        external_flow: float | None = None,
+    ) -> list[dict[str, str]]:
+        """追加/替换 asof 日估值行并重算份额链，返回写盘后的全表行。
+
+        external_flow=None 表示"未申报"：同日已有行时继承其申赎金额——
+        cycle 的每日 mark-to-market 重估不得抹掉 reconcile 申报过的申赎。
+        """
+        rows = self._read_real_nav_rows()
+        same_day = [row for row in rows if row["date"] == date_str(asof)]
+        if external_flow is None:
+            external_flow = float(same_day[-1].get("external_flow") or 0.0) if same_day else 0.0
+        rows = [row for row in rows if row["date"] != date_str(asof)]
         rows.append(
             {
                 "date": date_str(asof),
                 "cash": f"{cash:.2f}",
                 "positions_value": f"{positions_value:.2f}",
                 "total_value": f"{total_value:.2f}",
+                "external_flow": f"{external_flow:.2f}",
             }
         )
         rows.sort(key=lambda row: row["date"])
+        self._recompute_unit_chain(rows)
+        self._write_real_nav(rows)
+        return rows
+
+    def _write_real_nav(self, rows: list[dict[str, str]]) -> None:
         with self.real_nav_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["date", "cash", "positions_value", "total_value"])
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=["date", "cash", "positions_value", "total_value", "external_flow", "units", "unit_nav"],
+            )
             writer.writeheader()
             writer.writerows(rows)
+
+    def amend_flow(self, asof_date: str | date, external_flow: float) -> dict[str, Any]:
+        """补报/修正历史某日的申赎金额（忘了 --external-flow 的回档通道）。
+
+        只改该行的 flow 标注——total_value 等估值列受历史冻结保护，一律不动；
+        份额链随后从首行全量重放，补报与当时申报的结果精确等价。
+        返回 {date, old_flow, new_flow, changed: [{date, unit_nav_before, unit_nav_after}, ...]}。
+        """
+        asof = parse_date(asof_date)
+        rows = self._read_real_nav_rows()
+        target = [row for row in rows if row["date"] == date_str(asof)]
+        if not target:
+            known = f"{rows[0]['date']} ~ {rows[-1]['date']}" if rows else "空台账"
+            raise ValueError(f"real_nav 中不存在 {date_str(asof)} 的估值行（现有区间: {known}），无法补报申赎")
+        old_flow = float(target[-1].get("external_flow") or 0.0)
+        before = {row["date"]: row.get("unit_nav") or "" for row in rows}
+        for row in rows:
+            if row["date"] == date_str(asof):
+                row["external_flow"] = f"{float(external_flow):.2f}"
+        self._recompute_unit_chain(rows)
+        self._write_real_nav(rows)
+        changed = [
+            {"date": row["date"], "unit_nav_before": before[row["date"]], "unit_nav_after": row["unit_nav"]}
+            for row in rows
+            if before[row["date"]] != row["unit_nav"]
+        ]
+        return {
+            "date": date_str(asof),
+            "old_flow": old_flow,
+            "new_flow": float(external_flow),
+            "changed": changed,
+        }
 
     @staticmethod
     def _write_ticket_csv(path: Path, rows: list[dict[str, Any]]) -> None:
