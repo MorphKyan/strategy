@@ -192,15 +192,54 @@ def _compute_period_metrics(
             fee_drag_ratio = fee_total / average_total_value
             annualized_fee_drag = fee_drag_ratio / years if years else fee_drag_ratio
 
+    # 查找首个真正发生交易/持仓的日期（扣除预热阶段）
+    first_active_date = None
+    if not trades.empty:
+        trade_date_col = "trade_date" if "trade_date" in trades.columns else ("date" if "date" in trades.columns else None)
+        if trade_date_col:
+            trade_dates = pd.to_datetime(trades[trade_date_col], errors="coerce").dropna()
+            if not trade_dates.empty:
+                first_active_date = trade_dates.min()
+    elif not positions.empty and {"date", "quantity"}.issubset(positions.columns):
+        pos_qty = positions[pd.to_numeric(positions["quantity"], errors="coerce").fillna(0) > 0]
+        if not pos_qty.empty:
+            first_active_date = pd.to_datetime(pos_qty["date"], errors="coerce").min()
+
+    if first_active_date is not None and not pd.isna(first_active_date):
+        active_nav = nav[nav["date"] >= first_active_date]
+    else:
+        active_nav = pd.DataFrame()
+
+    active_days = len(active_nav)
+    first_trade_date_str = first_active_date.strftime("%Y-%m-%d") if (first_active_date is not None and not pd.isna(first_active_date)) else None
+
+    annualized_return_active = annualized_return
+    active_sharpe = sharpe_ratio
+    if active_days > 0:
+        active_net_value = pd.to_numeric(active_nav["net_value"], errors="coerce").dropna()
+        if not active_net_value.empty and active_net_value.iloc[0] > 0:
+            active_total_return = active_net_value.iloc[-1] / active_net_value.iloc[0] - 1.0
+            if active_days >= 5:
+                annualized_return_active = (1.0 + active_total_return) ** (252.0 / active_days) - 1.0
+            else:
+                annualized_return_active = active_total_return
+            active_daily_ret = active_net_value.pct_change().dropna()
+            active_vol = active_daily_ret.std() * math.sqrt(252) if len(active_daily_ret) > 1 else 0.0
+            active_sharpe = annualized_return_active / active_vol if active_vol else 0.0
+
     return {
         "start_date": nav["date"].min().strftime("%Y-%m-%d"),
         "end_date": nav["date"].max().strftime("%Y-%m-%d"),
         "observations": int(days),
+        "first_trade_date": first_trade_date_str,
+        "active_observations": int(active_days),
         "total_return": safe_float(total_return),
         "annualized_return": safe_float(annualized_return),
+        "annualized_return_active": safe_float(annualized_return_active),
         "annualized_volatility": safe_float(annualized_volatility),
         "max_drawdown": safe_float(max_drawdown),
         "sharpe_ratio": safe_float(sharpe_ratio),
+        "active_sharpe_ratio": safe_float(active_sharpe),
         "turnover_total": safe_float(turnover_amount_total),
         "annualized_turnover": safe_float(annualized_turnover_amount),
         "turnover_amount_total": safe_float(turnover_amount_total),
