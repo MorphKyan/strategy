@@ -1473,11 +1473,23 @@ from src.platform_core.strategies.fixed_weight import FixedWeightThresholdStrate
 from src.platform_core.strategies.expected_shortfall import (  # noqa: E402
     RiskParityExpectedShortfallFixedBudgetStrategy,
 )
+from src.platform_core.strategies.macro_factor_es import (  # noqa: E402
+    RiskParityMacroFactorStrategy,
+)
+from src.platform_core.strategies.black_litterman_es import (  # noqa: E402
+    RiskParityBlackLittermanStrategy,
+)
 
 BUILTIN_STRATEGIES[FixedWeightThresholdStrategy.name] = FixedWeightThresholdStrategy
 BUILTIN_STRATEGIES[
     RiskParityExpectedShortfallFixedBudgetStrategy.name
 ] = RiskParityExpectedShortfallFixedBudgetStrategy
+BUILTIN_STRATEGIES[
+    RiskParityMacroFactorStrategy.name
+] = RiskParityMacroFactorStrategy
+BUILTIN_STRATEGIES[
+    RiskParityBlackLittermanStrategy.name
+] = RiskParityBlackLittermanStrategy
 
 # strategies/rotation.py（R039 行业动量轮动）为 research-only，验收 Failed 后
 # 按 Hard Rule 3 撤销注册；复研时 import IndustryMomentumRotationStrategy 并在此注册。

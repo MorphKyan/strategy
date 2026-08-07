@@ -1,0 +1,95 @@
+platform:
+  run_name: domestic_black_litterman_es_index_benchmark_100k
+data:
+  data_dir: data
+assets:
+  - asset_id: CN_INDEX:000300.SH
+    code: '000300'
+    name: 沪深300指数
+    asset_type: index
+    exchange: SH
+    currency: CNY
+    lot_size: 1
+    price_limit_pct: 0.1
+  - asset_id: CN_INDEX:000015.SH
+    code: '000015'
+    name: 上证红利指数
+    asset_type: index
+    exchange: SH
+    currency: CNY
+    lot_size: 1
+    price_limit_pct: 0.1
+  - asset_id: CN_INDEX:CBA21801.CS
+    code: 'CBA21801'
+    name: 中债30年国债财富指数
+    asset_type: index
+    exchange: CS
+    currency: CNY
+    lot_size: 1
+    price_limit_pct: 0.1
+  - asset_id: CN_ETF:518880.SH
+    code: '518880'
+    name: 黄金现货/ETF
+    asset_type: etf
+    exchange: SH
+    currency: CNY
+    lot_size: 100
+    price_limit_pct: 0.1
+  - asset_id: CN_FUTURES:M0.DCE
+    code: 'M0'
+    name: 豆粕期货主力连续
+    asset_type: futures
+    exchange: DCE
+    currency: CNY
+    lot_size: 1
+    price_limit_pct: 0.1
+  - asset_id: CN_FUTURES:TA0.CZCE
+    code: 'TA0'
+    name: PTA能化期货主力连续
+    asset_type: futures
+    exchange: CZCE
+    currency: CNY
+    lot_size: 1
+    price_limit_pct: 0.1
+portfolio:
+  initial_cash: 100000.0
+  initial_equity: 100000.0
+  initial_positions: []
+backtest:
+  enable_checkpoints: false
+execution:
+  round_mode: round
+  price_field: close
+  weight_tolerance: 0.02
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+output:
+  results_dir: results/temporary_backtests/direct
+strategy:
+  strategy_name: risk_parity_black_litterman
+  strategy_version_id: null
+  cancel_pending_on_start: false
+  params:
+    rebalance_frequency: monthly
+    rolling_window: 252
+    min_periods: 120
+    rebalance_threshold: 0.05
+    confidence_level: 0.95
+    volatility_target: 0.08
+    tilt_gamma: 0.08
+    risk_budgets:
+      CN_INDEX:000300.SH: 0.15
+      CN_INDEX:000015.SH: 0.15
+      CN_INDEX:CBA21801.CS: 0.30
+      CN_ETF:518880.SH: 0.15
+      CN_FUTURES:M0.DCE: 0.125
+      CN_FUTURES:TA0.CZCE: 0.125
+    universe:
+      - CN_INDEX:000300.SH
+      - CN_INDEX:000015.SH
+      - CN_INDEX:CBA21801.CS
+      - CN_ETF:518880.SH
+      - CN_FUTURES:M0.DCE
+      - CN_FUTURES:TA0.CZCE

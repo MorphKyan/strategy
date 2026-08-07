@@ -1,0 +1,95 @@
+platform:
+  run_name: domestic_dividend_commodity_expected_shortfall_fixed_budget_cba21801_30y_100k
+data:
+  data_dir: data
+assets:
+  - asset_id: CN_ETF:510300.SH
+    code: '510300'
+    name: 沪深300ETF
+    asset_type: etf
+    exchange: SH
+    currency: CNY
+    lot_size: 100
+    price_limit_pct: 0.1
+  - asset_id: CN_ETF:512890.SH
+    code: '512890'
+    name: 红利低波ETF
+    asset_type: etf
+    exchange: SH
+    currency: CNY
+    lot_size: 100
+    price_limit_pct: 0.1
+  - asset_id: CN_ETF:518880.SH
+    code: '518880'
+    name: 黄金ETF
+    asset_type: etf
+    exchange: SH
+    currency: CNY
+    lot_size: 100
+    price_limit_pct: 0.1
+  - asset_id: CN_INDEX:CBA21801.CS
+    code: 'CBA21801'
+    name: 中债30年国债指数 CBA21801
+    asset_type: index
+    exchange: CS
+    currency: CNY
+    lot_size: 1
+    price_limit_pct: 0.1
+  - asset_id: CN_ETF:159985.SZ
+    code: '159985'
+    name: 豆粕ETF
+    asset_type: etf
+    exchange: SZ
+    currency: CNY
+    lot_size: 100
+    price_limit_pct: 0.1
+  - asset_id: CN_ETF:159981.SZ
+    code: '159981'
+    name: 能源化工ETF
+    asset_type: etf
+    exchange: SZ
+    currency: CNY
+    lot_size: 100
+    price_limit_pct: 0.1
+portfolio:
+  initial_cash: 100000.0
+  initial_equity: 100000.0
+  initial_positions: []
+backtest:
+  enable_checkpoints: false
+execution:
+  round_mode: round
+  price_field: close
+  weight_tolerance: 0.02
+  unfilled_policy: retry_next_day
+  fee:
+    rate: 0.0002
+    min_fee: 5.0
+output:
+  results_dir: results/temporary_backtests/direct
+strategy:
+  strategy_name: risk_parity_expected_shortfall_fixed_budget
+  strategy_version_id: null
+  cancel_pending_on_start: false
+  params:
+    rebalance_frequency: monthly
+    rolling_window: 120
+    min_periods: 120
+    rebalance_threshold: 0.05
+    rebalance_relative_threshold: 0.25
+    confidence_level: 0.95
+    volatility_target: 0.08
+    risk_budgets:
+      CN_ETF:510300.SH: 0.15
+      CN_ETF:512890.SH: 0.15
+      CN_ETF:518880.SH: 0.15
+      CN_INDEX:CBA21801.CS: 0.30
+      CN_ETF:159985.SZ: 0.125
+      CN_ETF:159981.SZ: 0.125
+    universe:
+      - CN_ETF:510300.SH
+      - CN_ETF:512890.SH
+      - CN_ETF:518880.SH
+      - CN_INDEX:CBA21801.CS
+      - CN_ETF:159985.SZ
+      - CN_ETF:159981.SZ

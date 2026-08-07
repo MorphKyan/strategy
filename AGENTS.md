@@ -82,6 +82,8 @@ ETF selection is independent from `platform/`; it may generate platform configs 
    - report both market-price and NAV-caliber annualized return, and disclose the premium level at both ends of every sample window;
    - state the premium at the intended entry point when recommending a config for live use.
    Data chain: `platform/scripts/fetch_etf_nav.py` writes `platform/data/etf_nav/<code>.csv`; `platform/src/platform_core/etf_premium.py` loads it. QDII NAV is published T+1~T+2, so any premium used as a decision input must go through that module's publication-lag guard rather than a raw same-day price/NAV ratio. Rationale and the measured 12.64pp/year contamination case: `platform/reports/r056_qdii_premium_feasibility_audit.md`.
+8. Index Benchmark Research Usage Boundary. Published financial indices (where `asset_type` is `index`, e.g., `000300`, `000015`, `CBA21801`) are permitted in virtual buy/sell backtest simulations for strategy research and algorithm evaluation. However, published indices are non-tradable benchmarks and MUST NOT be used to replace live executable portfolios. Executable live recommendation configs (e.g. under `platform/configs/capital_100k/`) must map to real tradable ETF or futures instruments with actual market volume and liquidity.
+
 
 ## Platform Research Validation
 
