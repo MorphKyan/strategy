@@ -1,126 +1,84 @@
-# Quant Research Repo Rules
+# Strategy Workspace Instructions
+
+## Project Positioning
+
+This repository is a quantitative strategy development and simulation workspace. It supports:
+
+- platform engineering and maintenance;
+- user-directed research and historical scenario analysis;
+- an explicitly invoked autonomous research pipeline.
+
+Do not treat every backtest as autonomous candidate discovery. Follow the user's stated research direction, instruments, window, and intended strength of conclusion. The autonomous protocol applies only when the user asks agents to select or claim research directions themselves, or explicitly invokes `$run-autonomous-quant-research` / `$orchestrate-quant-research`.
 
 ## Repository Layout
 
-This workspace contains two independent systems:
-
 - `platform/`: daily event-driven retail backtest and simulated-portfolio platform.
 - `etf_selection/`: standalone ETF sleeve screening and basket construction workflow.
+- `research-dashboard/`: autonomous-research backlog, notes, review handoffs, and history.
+- `.agents/`: repository agents and task-specific skills.
+- `env/`: shared project Python environment.
 
-Do not mix their source, configs, scripts, reports, or results. Shared workspace-level files are limited to root documentation, dependency files, agent configuration, and `env/`.
+Keep `platform/` and `etf_selection/` source, configs, scripts, reports, and results independent. ETF selection may generate platform configs and call platform CLI commands, but platform internals must not depend on ETF selection.
 
-## Canonical Rule Sources
+Read the closest subsystem `AGENTS.md` before working below that directory. User instructions for the current task take priority; an agent harness or skill may add stricter rules for its own workflow but must not silently broaden its scope.
 
-- This file is the canonical workspace rule file.
-- `etf_selection/AGENTS.md` may add ETF-selection-specific rules, but must not weaken this file.
-- `.agents/agents/*/agent.json` are harness prompts. They must summarize or reference these rules instead of introducing conflicting gates.
-- Deprecated or duplicate instruction files should be deleted instead of kept as separate rule sources.
+## Workspace Rules
 
-When documents conflict, apply this priority order: user instruction for the current task, this file, subsystem `AGENTS.md`, harness prompts, README files.
+1. On Windows, use the project Python: prefer `.\env\Scripts\python.exe`; use `.\env\python.exe` when that is the environment's actual layout.
+2. Do not overwrite historical results, reports, generated configs, checkpoints, or raw execution artifacts unless the user explicitly requests it.
+3. Delete agent-created temporary scripts before completion. Retained scripts must be reusable and parameterized rather than task-specific.
+4. Write newly generated Markdown reports, research notes, dashboards, and summaries in Chinese. Preserve exact commands, paths, identifiers, and metric keys where needed.
+5. Read metrics from actual artifacts, preferably `metrics.json`; do not reconstruct results from memory.
 
-## Platform System Facts
+## Market Data Preconditions
 
-- Platform source: `platform/src/platform_core/`
-- Platform configs: `platform/configs/`
-- Platform docs: `platform/docs/`
-- Platform tests: `platform/tests/`
-- Platform raw artifacts: `platform/results/`
-- Platform fixed-config backtests: `platform/results/backtests/`
-- Platform temporary backtests: `platform/results/temporary_backtests/`
-- Platform reports: `platform/reports/`
-- Platform metadata/data: `platform/data/`
-- Platform backtest entry: `.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml` (or `.\env\python.exe` when the local env uses that layout)
-- Platform experiment entry: `.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml` (or `.\env\python.exe` when the local env uses that layout)
-- Platform sensitivity entry: `.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml` (or `.\env\python.exe` when the local env uses that layout)
-- Platform data sync entry: `.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml` (or `.\env\python.exe` when the local env uses that layout)
-- Platform all-market data sync entry: `.\env\Scripts\python.exe platform\scripts\sync_all_market_data.py` (or `.\env\python.exe` when the local env uses that layout)
-- Platform common date range entry: `.\env\Scripts\python.exe platform\scripts\get_common_date_range.py --config platform\configs\baseline_r1_domestic_rolling.yaml` (or `.\env\python.exe` when the local env uses that layout)
+Before market-data screening, research, backtests, or config generation:
 
-Platform entrypoints resolve relative paths from `platform/`. Do not use commands that reference missing configs.
+1. Verify every required symbol is aligned and its latest local date is no more than 7 calendar days before the current date.
+2. If data are stale, sync all required symbols and re-check freshness and alignment.
+3. If sync or alignment fails, stop the affected research or backtest and report the failure. Do not continue with stale or misaligned data, including for bounded historical analysis.
 
-## ETF Selection Facts
+## Research Standards
 
-- ETF selection source: `etf_selection/src/`
-- ETF selection config: `etf_selection/config/etf_universe.yaml`
-- ETF selection entry: `.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml` (or `.\env\python.exe` when the local env uses that layout)
-- ETF selection agent rules: `etf_selection/AGENTS.md`
-- Generated platform configs: `etf_selection/generated_configs/<timestamp>/`
-- ETF selection reports: `etf_selection/reports/<timestamp>/`
+These standards apply to both user-directed and autonomous research:
 
-ETF selection is independent from `platform/`; it may generate platform configs and call platform CLI commands, but platform internals must not depend on ETF selection.
+- State the hypothesis or question, instruments, `asset_type`, sample window, price/NAV convention, benchmark, transaction-cost assumptions, and intended conclusion.
+- Prevent look-ahead. Data used at a decision point must have been available at that point; respect publication and reporting lags.
+- Preserve transaction-cost handling and trade reporting. When artifacts exist, report annualized return, annualized volatility, Sharpe, max drawdown, turnover, trade count, order count, and rejection count, plus other metrics material to the question.
+- For platform strategy or portfolio research, run start-date sensitivity using one runtime start date every 2 calendar months across the applicable research window. Report material changes in ranking and core metrics.
+- Distinguish exploratory evidence from an executable recommendation. Clearly disclose limitations caused by short history, selected windows, proxy assets, missing liquidity, or non-tradable instruments.
 
-## Hard Rules
+### User-directed research
 
-1. Use the project Python on Windows: prefer `.\env\Scripts\python.exe` for venv/uv layouts; use `.\env\python.exe` when the local environment is laid out that way.
-2. Platform strategy work must stay under `platform/` and use the platform `Strategy.generate_targets(context)` API.
-3. Strategy variants must be additive. Register a strategy in `BUILTIN_STRATEGIES` only when it is intended to be loadable by platform configs. Failed or research-only variants must not remain registered in the submitted diff.
-4. Do not introduce deep learning, reinforcement learning, unrelated factor models, broad architecture rewrites, hidden benchmark changes, or unrestricted parameter searches unless explicitly requested.
-5. Preserve transaction-cost handling and trade reporting. If backtest artifacts exist, report turnover, trade count, order count, and rejection count.
-6. Do not overwrite generated historical results, reports, configs, checkpoints, or raw execution artifacts unless the user explicitly asks.
-7. Agent-created temporary scripts used for backtests, analysis, or one-off reporting must be deleted before task completion.
-8. Reusable platform configs under `platform/configs/`, including retained generated configs, may be kept when they encode one strategy and one portfolio useful for baseline/candidate comparison. These configs must not include fixed backtest `start_date` or `end_date`; runtime commands must provide sample windows when a bounded sample is required. Platform configs must use a single `strategy` mapping and must not use multi-segment strategy schedules.
-9. Only reusable, parameterized tools may be added under `platform/scripts/`. Do not add task-specific backtest scripts, hardcoded config matrices, hardcoded strategy sweeps, or one-off report generators there. A retained script must have a stable CLI, avoid hardcoded research config lists, document its usage, and have a clear maintenance owner.
-10. All newly generated markdown reports and summaries must be written in Chinese. Keep code identifiers, file names, metric keys, and commands unchanged when exactness matters.
-11. Backtest artifacts must be separated by configuration status and sample window:
-    - YAML files directly under `platform/configs/` or any of its subdirectories other than `generated/` are fixed configs. Only their full-common-history runs may be written under `platform/results/backtests/`.
-    - A full-common-history run starts at the earliest trading date shared by every configured asset and ends at their latest shared trading date. That latest date must be no more than 7 calendar days before the run date.
-    - Runs using `platform/configs/generated/`, any non-fixed config, a training window, a final-test window, a sensitivity window, an experiment comparison, an explicitly bounded partial window, or any temporary/ad hoc setup must be written under `platform/results/temporary_backtests/`.
-    - Use `platform/results/temporary_backtests/direct/` for temporary direct backtests and `platform/results/temporary_backtests/experiments/` for standardized experiments. Sensitivity runs remain isolated under `platform/results/sensitivity/` and must never be loaded by Streamlit, even when temporary backtests are enabled. Results whose provenance cannot prove both a fixed config and the full common-history window are temporary.
-    - Streamlit must load only `platform/results/backtests/` by default. It may include `platform/results/temporary_backtests/` only through one global option whose default is off.
+When the user defines the direction, instruments, or historical window:
 
-## Data Freshness And Sample Isolation
+- Use the requested window; the repository's autonomous training/final-test split does not apply unless the user opts into it.
+- Run the `default` and `stress` slippage scenarios for platform backtests, experiments, and sensitivity analysis. In this repository, `stress` is the fixed-bps pressure scenario.
+- Run `dynamic_participation` only when the user requests it, when participation/liquidity impact is central to the question, or when the conclusion is being promoted to autonomous-style candidate acceptance.
+- Do not add autonomous topic-selection preferences or acceptance thresholds that the user did not request.
 
-1. Before using market data for screening, research, backtests, or generated configs, verify that every required symbol is aligned and that the latest local date is no more than 7 calendar days before the current date.
-2. If data are stale, sync all required symbols and re-check alignment before continuing. If sync or alignment fails, stop the task and report the failure; do not backtest, screen, or output configs.
-3. Fixed sample split:
-   - Training/research sample: data up to `2025-06-30`.
-   - Final test sample: data from `2025-07-01` onward.
-4. Research ideas, ETF selection, parameter choices, thresholds, candidate filtering, cache reuse decisions, and research conclusions must not use final test-sample information.
-5. A platform config or ETF basket may be output or submitted only when the common available history from the earliest shared trading date through `2025-06-30` is longer than 3 years.
-6. Final test results may be run only after the candidate strategy, parameters, ETF basket, rebalance rules, and acceptance thresholds are frozen. Do not modify the candidate after seeing final test results.
-7. QDII ETF premium/discount disclosure. A QDII ETF's exchange price return equals underlying return plus premium change, so a market-price-only backtest silently mixes in a non-repeatable, mean-reverting component. Any research whose conclusion depends on a QDII ETF (`513*`, `159920`, `159941`, and equivalents) must:
-   - report both market-price and NAV-caliber annualized return, and disclose the premium level at both ends of every sample window;
-   - state the premium at the intended entry point when recommending a config for live use.
-   Data chain: `platform/scripts/fetch_etf_nav.py` writes `platform/data/etf_nav/<code>.csv`; `platform/src/platform_core/etf_premium.py` loads it. QDII NAV is published T+1~T+2, so any premium used as a decision input must go through that module's publication-lag guard rather than a raw same-day price/NAV ratio. Rationale and the measured 12.64pp/year contamination case: `platform/reports/r056_qdii_premium_feasibility_audit.md`.
-8. Index Benchmark Research Usage Boundary. Published financial indices (where `asset_type` is `index`, e.g., `000300`, `000015`, `CBA21801`) are permitted in virtual buy/sell backtest simulations for strategy research and algorithm evaluation. However, published indices are non-tradable benchmarks and MUST NOT be used to replace live executable portfolios. Executable live recommendation configs (e.g. under `platform/configs/capital_100k/`) must map to real tradable ETF or futures instruments with actual market volume and liquidity.
+### Autonomous research
 
+When agents choose or claim research directions themselves, read and follow `.agents/skills/run-autonomous-quant-research/SKILL.md`. That skill owns the fixed sample split, candidate freeze, three-scenario execution validation, minimum-history gate, acceptance rules, and independent review workflow. Do not copy those values back into this file.
 
-## Platform Research Validation
+## Instrument Semantics
 
-Before claiming a platform research result is successful:
+### Published indices
 
-1. Confirm the baseline and candidate configs or algorithms.
-2. Run training-sample comparisons with runtime backtest end date capped at `2025-06-30`.
-3. Every platform backtest, experiment, sensitivity run, and final test validation must include all three required slippage scenarios: `default`, `stress`, and `dynamic_participation`. The `default` scenario uses ordinary fixed bps slippage, `stress` uses widened fixed bps slippage, and `dynamic_participation` adds trade-value-versus-daily-amount impact on top of ordinary slippage. Reports must identify the slippage scenario for every metric set and must not claim a candidate is successful unless execution risk is acceptable under all three scenarios.
-4. Scope the comparison set explicitly:
-   - Strategy API or engine changes: active non-generated baseline configs under `platform/configs/`.
-   - Strategy-variant research: the baseline configs relevant to the claimed asset universe, plus any config where the variant is intended to be used.
-   - ETF sleeve expansion: multiple built-in strategy algorithms, for example `risk_parity`, `risk_parity_ewma`, and `risk_parity_ewma_dd_recovery`.
-   - Generated, demo, or archived configs are included only when the claim depends on them or the user asks.
-5. Run start-date sensitivity without touching the final test sample. Generate one runtime `start_date` every 2 calendar months from the earliest common available trading date through `2025-06-30`, and cap every run at `2025-06-30`.
-6. Report whether ranking, Sharpe, annualized return, max drawdown, turnover, trade count, order count, and rejection count materially change across start dates and across the three slippage scenarios.
-7. Use `platform/results/backtest_cache/` only for cache entries whose symbols, config hash or parameter set, sample window, data freshness timestamp, code version, and slippage scenario match the requested run. Cache entries using `2025-07-01` or later data must not be reused for research decisions.
-8. If a data sync occurred, treat older cache entries as expired unless they can prove they were generated from the same or newer data snapshot.
-9. Run final test-sample validation only after the candidate is frozen.
-10. Verify raw artifacts exist under `platform/results/` and standardized artifacts exist under `platform/reports/`.
-11. Read generated metrics from actual artifacts, preferably `metrics.json`; do not infer metrics from memory.
-12. Reports must include hypothesis, files changed, exact commands, baseline/candidate metrics, start-date sensitivity, final test-sample metrics if run, turnover, trade count, rejection count, slippage-scenario metrics, and recommendation.
+Published financial indices (`asset_type: index`, for example `000300`, `000015`, and `CBA21801`) may be used in virtual buy/sell simulations, historical scenario analysis, and algorithm evaluation. They are non-tradable benchmarks:
 
-## Acceptance Guidance
+- label index results as research simulations;
+- do not use index liquidity or simulated fills as evidence of executable capacity;
+- do not replace a live executable portfolio with an index.
 
-- A candidate may be submitted only if training-sample comparisons pass, start-date sensitivity is stable, final test-sample performance remains acceptable versus baseline, and execution risk does not worsen materially.
-- If a candidate only has local advantage, is unstable, overfits, increases annualized two-sided turnover by more than 30% without clear compensating benefit, or fails final testing, mark it as `Failed` or `research-only`.
-- Research-only findings may be summarized in `platform/reports/non_baseline_research_history_summary.md` and `research-dashboard/research_history_summary.md`, but should not leave registered strategy code or new platform baseline configs behind.
+Any executable live recommendation must map to real tradable ETF or futures instruments with actual market volume and liquidity.
 
-## Research Orientation
+### QDII ETFs
 
-For platform strategy implementation tasks, prefer ideas adjacent to risk parity:
+For conclusions that depend on a QDII ETF (`513*`, `159920`, `159941`, and equivalents):
 
-- volatility estimation changes, such as EWMA or robust rolling volatility
-- covariance shrinkage or robust covariance
-- volatility targeting overlays
-- rebalance frequency or threshold changes
-- turnover-aware constraints
-- ETF basket selection within the configured ETF universe
+- report market-price and NAV-caliber annualized return and endpoint premium levels for each sample window;
+- state the premium at the intended entry point for live recommendations;
+- obtain decision inputs through `platform/src/platform_core/etf_premium.py` and its publication-lag guard, never a raw same-day price/NAV ratio.
 
-Topic exploration may be broader when the idea can be validated in this repository and the report clearly states the expected validation path, risk, and cost. Avoid hidden benchmark changes, large refactors during a research task, and post-hoc tuning after seeing backtest results. Deep learning, reinforcement learning, broad factor models, and large parameter searches are allowed only when explicitly requested or clearly marked as exploratory rather than default implementation work.
+NAV data are written by `platform/scripts/fetch_etf_nav.py` under `platform/data/etf_nav/`. See `platform/reports/r056_qdii_premium_feasibility_audit.md` for the rationale and measured contamination example.
