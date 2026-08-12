@@ -59,7 +59,6 @@ backtest:
   enable_checkpoints: false
 execution:
   round_mode: round
-  price_field: close
   weight_tolerance: 0.01
   unfilled_policy: retry_next_day
   fee:

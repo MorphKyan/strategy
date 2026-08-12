@@ -12,16 +12,21 @@ from src.platform_core.models import parse_date
 from src.platform_core.notify import resolve_channels, send_notification
 
 
-def _write_market_data(data_dir: Path, closes: dict[str, dict[str, float]] | None = None) -> None:
-    """closes: code -> {date: close}，缺省恒为 10（OHLC 同价）。"""
+def _write_market_data(
+    data_dir: Path,
+    closes: dict[str, dict[str, float]] | None = None,
+    opens: dict[str, dict[str, float]] | None = None,
+) -> None:
+    """closes / opens: code -> {date: price}，缺省 OHLC 同价为 10。"""
     data_dir.mkdir(parents=True, exist_ok=True)
     header = "code,trade_date,open_price,high_price,low_price,close_price,volume,amount,adjust_factor"
     dates = ["2024-01-29", "2024-01-30", "2024-01-31"]
     for code in ("AAA", "BBB"):
         rows = [header]
         for d in dates:
-            price = (closes or {}).get(code, {}).get(d, 10)
-            rows.append(f"{code},{d},{price},{price},{price},{price},1000,10000,1")
+            close = (closes or {}).get(code, {}).get(d, 10)
+            open_price = (opens or {}).get(code, {}).get(d, close)
+            rows.append(f"{code},{d},{open_price},{close},{open_price},{close},1000,10000,1")
         (data_dir / f"{code}.csv").write_text("\n".join(rows), encoding="utf-8")
 
 
@@ -109,6 +114,27 @@ def test_plan_renders_lot_rounded_ticket_without_touching_real_state(tmp_path: P
     assert state["positions"]["A"]["quantity"] == pytest.approx(300.0)
     assert "B" not in state["positions"]
     assert state["pending_intents"]["B"]["target_weight"] == pytest.approx(0.5)
+
+
+def test_plan_uses_configured_execution_price_field(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    _write_market_data(
+        data_dir,
+        closes={"AAA": {"2024-01-31": 10}, "BBB": {"2024-01-31": 10}},
+        opens={"AAA": {"2024-01-31": 8}, "BBB": {"2024-01-31": 9}},
+    )
+    config = _live_config(data_dir)
+    config["execution"].update({"execution_price_field": "open", "slippage_bps": 0.0})
+    portfolio = LivePortfolio("live_test", config, output_root=tmp_path / "live")
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-30")
+
+    result = portfolio.plan(asof_date="2024-01-31")
+
+    with result.ticket_csv.open(newline="", encoding="utf-8") as handle:
+        rows = {row["asset_id"]: row for row in csv.DictReader(handle)}
+    assert float(rows["A"]["est_price"]) == pytest.approx(8.0)
+    assert float(rows["B"]["est_price"]) == pytest.approx(9.0)
 
 
 def test_plan_without_target_writes_no_op_ticket(tmp_path: Path):

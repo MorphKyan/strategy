@@ -39,7 +39,6 @@ execution:
   fee:
     min_fee: 5.0
     rate: 0.0002
-  price_field: close
   unfilled_policy: retry_next_day
   weight_tolerance: 0.0005
 output:

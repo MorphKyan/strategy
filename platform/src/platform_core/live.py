@@ -13,8 +13,8 @@
   real_nav.csv           每次 reconcile 追加一行真实净值（月度归因的数据源）
   tickets/ticket_<date>.csv / .txt   下单票（CSV 供程序读，TXT 人可照做）
 
-票面股数按 plan 日收盘价估算（执行引擎 price_field 强制为 close），次日实际
-成交价的偏差无需在意。与 SQLite 元数据库的集成留待主线 A4。
+票面股数按配置的 `execution.execution_price_field` 估算，和回测执行器保持一致。
+次日实际成交价的偏差无需在意。与 SQLite 元数据库的集成留待主线 A4。
 """
 
 from __future__ import annotations
@@ -125,8 +125,7 @@ class LivePortfolio:
         self.execution = ExecutionEngine(
             ExecutionConfig(
                 fee_profile=FeeProfile(rate=float(fee_config.get("rate", 0.0002)), min_fee=float(fee_config.get("min_fee", 0.0))),
-                # 票面按 plan 日收盘价估算，与配置的回测执行价字段无关
-                price_field="close",
+                price_field=execution_config.get("execution_price_field", "open"),
                 weight_tolerance=float(execution_config.get("weight_tolerance", 0.0005)),
                 unfilled_policy=execution_config.get("unfilled_policy", "retry_next_day"),
                 cash_buffer_pct=float(execution_config.get("cash_buffer_pct", 0.0)),

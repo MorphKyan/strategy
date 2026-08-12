@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 os.chdir(ROOT)
 
 from src.platform_core.data_store import MarketDataStore, assets_from_config
+from src.platform_core.sync_universe import etf_assets
 
 
 def load_config(path: Path) -> dict:
@@ -41,6 +42,13 @@ def main() -> int:
     print(f"Market data checked: {market_dir}")
     for note in market_report.notes:
         print(f"- {note}")
+    if args.fetch:
+        etfs = etf_assets(config.get("assets", []) or [])
+        if etfs:
+            from scripts.fetch_etf_dividends import sync_etf_corporate_actions
+
+            print(f"Fetching dividend and split histories for {len(etfs)} configured ETFs...")
+            sync_etf_corporate_actions(etfs, data_dir=market_dir)
     return 0
 
 
