@@ -44,7 +44,7 @@ assets:
   lot_size: 100
   price_limit_pct: 0.1
 - asset_id: CN_ETF:511260.SH
-  code: 511260
+  code: '511260'
   name: 10年国债ETF
   asset_type: etf
   exchange: SH
