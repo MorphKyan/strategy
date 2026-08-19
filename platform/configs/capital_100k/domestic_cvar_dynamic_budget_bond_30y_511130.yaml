@@ -1,4 +1,4 @@
-﻿platform:
+platform:
   run_name: domestic_cvar_dynamic_budget_bond_30y_511130_capital_100k
 data:
   data_dir: data
@@ -35,7 +35,6 @@ backtest:
   enable_checkpoints: false
 execution:
   round_mode: round
-  price_field: close
   weight_tolerance: 0.0005
   unfilled_policy: retry_next_day
   fee:
@@ -50,7 +49,7 @@ strategy:
   params:
     rebalance_frequency: monthly
     rolling_window: 120
-    min_periods: 20
+    min_periods: 120
     rebalance_threshold: 0.05
     rebalance_relative_threshold: 0.25
     confidence_level: 0.95

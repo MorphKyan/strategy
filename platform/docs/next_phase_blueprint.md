@@ -106,7 +106,7 @@
 
 **竣工说明（as-built，与下方原规格的差异）**：已实现 `platform/src/platform_core/live.py`（`reconcile` + `plan` + 下单票渲染）与入口 `platform/scripts/run_live_cycle.py`（`reconcile`/`plan` 子命令），测试在 `test_platform_live.py`。三处实现决策：
 1. **未接 SQLite store**（最小闭环文件即真相，元数据集成留待 A4 一起做）；
-2. 票面估价强制用 plan 日**收盘价**（覆盖配置的 `execution_price_field`）；
+2. 票面估价使用 `execution.execution_price_field`，与回测执行器保持一致；
 3. **数据末日日历补丁**：实盘 plan 时 plan 日必然是数据最后一天，而 `is_month_end()` 等节奏判断把"日历末日"当月末，月频策略会天天触发。已在 plan 内给日历补一个"下一工作日"近似未来日，使实盘节奏与回测一致（极端情形：月末最后几个交易日全是节假日时当月触发顺延，可接受）。后续实现 A3/A4/A5 沿用以下原规格。
 
 原规格：
@@ -140,7 +140,7 @@ class LivePortfolio:
         """
 ```
 
-价格基准说明：票面股数按 asof 日收盘价估算，次日实际成交价会有偏差——这正是阈值带要吸收的东西，票面注明"股数为估算，按券商实际可买数量就近取整即可"。
+价格基准说明：票面股数按 `execution.execution_price_field` 估算，次日实际成交价会有偏差——这正是阈值带要吸收的东西，票面注明"股数为估算，按券商实际可买数量就近取整即可"。
 
 **验收：** pytest 覆盖 reconcile（CSV → state 正确、real_nav 追加）与 plan（有/无目标两分支；dry-run 不改 state_path 落盘内容）；手工端到端一次：造一份假持仓 CSV → reconcile → plan → 检查 ticket 文件人可读、股数是整手。
 

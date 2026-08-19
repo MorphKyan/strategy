@@ -131,29 +131,46 @@ def render_sensitivity_charts(summary_csv_path: str | Path, output_dir: str | Pa
     output_dir = Path(output_dir) if output_dir else summary_csv_path.parent
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    return_col = "annualized_return_active" if ("annualized_return_active" in df.columns and df["annualized_return_active"].notna().any()) else "annualized_return"
+    sharpe_col = "active_sharpe_ratio" if ("active_sharpe_ratio" in df.columns and df["active_sharpe_ratio"].notna().any()) else "sharpe_ratio"
+
     fig, axes = plt.subplots(3, 2, figsize=(16, 15))
     
+    scenarios = df["slippage_scenario"].unique() if "slippage_scenario" in df.columns else ["all"]
+    colors = {"default": "steelblue", "stress": "indianred", "dynamic_participation": "seagreen"}
+    styles = {"default": "-", "stress": "--", "dynamic_participation": "-."}
+
     def plot_metric(row_idx, col_name, title_prefix, scale=1.0, is_pct=False):
-        data = df[col_name].dropna() * scale
-        if data.empty:
+        data_all = df[col_name].dropna() * scale
+        if data_all.empty:
             return
         
         # Hist
         if sns:
-            sns.histplot(data, kde=True, ax=axes[row_idx, 0], color=["skyblue", "salmon", "lightgreen"][row_idx % 3])
+            sns.histplot(data_all, kde=True, ax=axes[row_idx, 0], color=["skyblue", "salmon", "lightgreen"][row_idx % 3])
         else:
-            axes[row_idx, 0].hist(data, bins=10, alpha=0.75, color=["skyblue", "salmon", "lightgreen"][row_idx % 3])
+            axes[row_idx, 0].hist(data_all, bins=12, alpha=0.75, color=["skyblue", "salmon", "lightgreen"][row_idx % 3])
         axes[row_idx, 0].set_title(f"{title_prefix}分布" + (" (%)" if is_pct else ""))
         axes[row_idx, 0].set_xlabel(title_prefix + (" (%)" if is_pct else ""))
 
         # Line
-        axes[row_idx, 1].plot(df["start_date"], data, marker='o', markersize=4, linestyle='-', alpha=0.7, color=["steelblue", "indianred", "seagreen"][row_idx % 3])
+        if "slippage_scenario" in df.columns and len(scenarios) > 1:
+            for sc in scenarios:
+                sub_df = df[df["slippage_scenario"] == sc]
+                sub_data = sub_df[col_name].dropna() * scale
+                c = colors.get(sc, "steelblue")
+                ls = styles.get(sc, "-")
+                axes[row_idx, 1].plot(sub_df["start_date"], sub_data, marker='o', markersize=3, linestyle=ls, alpha=0.85, color=c, label=f"滑点场景: {sc}")
+            axes[row_idx, 1].legend(loc="best", fontsize=9)
+        else:
+            axes[row_idx, 1].plot(df["start_date"], data_all, marker='o', markersize=4, linestyle='-', alpha=0.7, color=["steelblue", "indianred", "seagreen"][row_idx % 3])
+
         axes[row_idx, 1].set_title(f"{title_prefix}随起始日变化" + (" (%)" if is_pct else ""))
         axes[row_idx, 1].set_ylabel(title_prefix + (" (%)" if is_pct else ""))
         axes[row_idx, 1].grid(True, linestyle='--', alpha=0.6)
 
-    plot_metric(0, "annualized_return", "年化收益率", scale=100.0, is_pct=True)
-    plot_metric(1, "sharpe_ratio", "夏普比率")
+    plot_metric(0, return_col, "有效年化收益率(扣除预热期)", scale=100.0, is_pct=True)
+    plot_metric(1, sharpe_col, "有效夏普比率(扣除预热期)")
     plot_metric(2, "max_drawdown", "最大回撤", scale=100.0, is_pct=True)
 
     fig.tight_layout()

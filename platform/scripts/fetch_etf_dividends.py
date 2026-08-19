@@ -1,190 +1,274 @@
 # -*- coding: utf-8 -*-
-import sys
+import argparse
 import re
-import pandas as pd
+import sys
 from pathlib import Path
+from typing import Any, Iterable
+
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import akshare as ak
+from src.platform_core.sync_universe import (
+    discover_fixed_configs,
+    etf_assets,
+    load_assets_from_configs,
+    merge_assets,
+    parse_asset_spec,
+)
 
-# List of ETFs in the universe (core assets + R039 industry rotation candidates)
-ETFS = [
-    {"code": "510300", "name": "沪深300ETF"},
-    {"code": "513500", "name": "标普500ETF"},
-    {"code": "518880", "name": "黄金ETF"},
-    {"code": "511260", "name": "十年国债ETF"},
-    {"code": "159985", "name": "豆粕ETF"},
-    {"code": "159981", "name": "能源化工ETF"},
-    {"code": "512890", "name": "红利低波ETF"},
-    {"code": "513100", "name": "纳指ETF"},
-    {"code": "510500", "name": "中证500ETF"},
-    {"code": "159920", "name": "恒生ETF"},
-    {"code": "513030", "name": "德国ETF"},
-    {"code": "510880", "name": "红利ETF"},
-    # R039 行业轮动候选池（docs/r039_rotation_blueprint.md §3）
-    {"code": "512880", "name": "证券ETF"},
-    {"code": "512800", "name": "银行ETF"},
-    {"code": "512010", "name": "医药ETF"},
-    {"code": "159928", "name": "消费ETF"},
-    {"code": "512690", "name": "酒ETF"},
-    {"code": "512660", "name": "军工ETF"},
-    {"code": "512400", "name": "有色金属ETF"},
-    {"code": "512980", "name": "传媒ETF"},
-    {"code": "515000", "name": "科技ETF"},
-    {"code": "512480", "name": "半导体ETF"},
-    {"code": "515050", "name": "5G通信ETF"},
-    {"code": "512200", "name": "房地产ETF"},
-    {"code": "515220", "name": "煤炭ETF"},
-    {"code": "515700", "name": "新能车ETF"},
-    {"code": "515210", "name": "钢铁ETF"},
-    {"code": "159996", "name": "家电ETF"},
-]
 
-def parse_dividend(text):
+def parse_dividend(text: Any) -> float:
     if not isinstance(text, str) or not text:
         return 0.0
-    # Match value like "分红0.1230元"
-    match = re.search(r"分红([\d\.]+)元", text)
+    match = re.search(r"(?:分红|派息|派现金|派)([\d.]+)元", text)
     if not match:
-        # Try matching "派息X元"
-        match = re.search(r"派息([\d\.]+)元", text)
-    if not match:
-        # Try generic decimal match
-        match = re.search(r"([\d\.]+)", text)
-        
+        match = re.search(r"([\d.]+)", text)
     if not match:
         return 0.0
-        
-    val = float(match.group(1))
-    if "每百份" in text or "每100份" in text:
-        return val / 100.0
-    elif "每十份" in text or "每10份" in text:
-        return val / 10.0
-    return val
 
-def parse_split_ratio(text):
+    value = float(match.group(1))
+    if "每百份" in text or "每100份" in text:
+        return value / 100.0
+    if "每十份" in text or "每10份" in text:
+        return value / 10.0
+    return value
+
+
+def parse_split_ratio(text: Any) -> float:
     if not isinstance(text, str) or not text:
         return 1.0
-    # Usually in format "1:0.3709" or "1:2.5"
     if ":" in text:
         parts = text.split(":")
         try:
             return float(parts[1]) / float(parts[0])
-        except Exception:
+        except (ValueError, ZeroDivisionError):
             pass
-    # Try generic float
     try:
         return float(text)
     except ValueError:
         return 1.0
 
-def main():
-    dividend_records = []
-    split_records = []
-    
+
+def dividend_text(row: pd.Series) -> Any:
+    """Read the payout field across EastMoney's per-share/per-10-share schemas."""
+    for column in ("每份分红", "每10份分红", "分红方案"):
+        value = row.get(column, "")
+        if pd.notna(value) and str(value).strip():
+            return value
+    return ""
+
+
+def sync_etf_corporate_actions(
+    assets: Iterable[dict[str, Any]],
+    data_dir: str | Path,
+    client: Any | None = None,
+) -> None:
+    """Fetch and merge dividend/split histories for every supplied ETF asset."""
+    etfs = etf_assets(assets)
+    if not etfs:
+        print("No ETF assets supplied; nothing to fetch.")
+        return
+    if client is None:
+        import akshare as client
+
+    dividend_records: list[dict[str, Any]] = []
+    split_records: list[dict[str, Any]] = []
+    failures: list[str] = []
     print("Start fetching ETF dividend and split histories from EastMoney via AKShare...")
-    
-    for etf in ETFS:
-        code = etf["code"]
-        name = etf["name"]
+
+    for etf in etfs:
+        code = str(etf["code"])
+        name = str(etf.get("name") or code)
         print(f"Fetching {code} ({name})...")
-        
-        # 1. Fetch Dividends
         try:
-            df_div = ak.fund_open_fund_info_em(symbol=code, indicator="分红送配详情")
-            if not df_div.empty:
-                # Expected columns: ['年份', '权益登记日', '除息日', '每份分红', '分红发放日']
-                for _, row in df_div.iterrows():
-                    raw_div = row.get("每份分红", "")
-                    div_val = parse_dividend(raw_div)
-                    
-                    dividend_records.append({
-                        "code": code,
-                        "name": name,
-                        "year": row.get("年份", ""),
-                        "record_date": row.get("权益登记日", ""),
-                        "ex_date": row.get("除息日", ""),
-                        "raw_text": raw_div,
-                        "dividend_per_share": div_val,
-                        "payment_date": row.get("分红发放日", "")
-                    })
-                print(f"  - Found {len(df_div)} dividend events")
-            else:
+            frame = client.fund_open_fund_info_em(symbol=code, indicator="分红送配详情")
+            if frame.empty:
                 print("  - No dividend events found")
-        except Exception as e:
-            print(f"  - Error fetching dividends: {e}")
-            
-        # 2. Fetch Splits
-        try:
-            df_split = ak.fund_open_fund_info_em(symbol=code, indicator="拆分详情")
-            if not df_split.empty:
-                # Expected columns: ['年份', '拆分折算日', '拆分类型', '拆分折算比例']
-                for _, row in df_split.iterrows():
-                    raw_split = row.get("拆分折算比例", "")
-                    ratio = parse_split_ratio(raw_split)
-                    
-                    split_records.append({
-                        "code": code,
-                        "name": name,
-                        "year": row.get("年份", ""),
-                        "split_date": row.get("拆分折算日", ""),
-                        "split_type": row.get("拆分类型", ""),
-                        "raw_text": raw_split,
-                        "split_ratio": ratio
-                    })
-                print(f"  - Found {len(df_split)} split events")
             else:
+                for _, row in frame.iterrows():
+                    raw_dividend = dividend_text(row)
+                    dividend_per_share = parse_dividend(raw_dividend)
+                    if dividend_per_share <= 0:
+                        print(f"  - Skipped dividend row without a positive payout: {raw_dividend!r}")
+                        continue
+                    dividend_records.append(
+                        {
+                            "code": code,
+                            "name": name,
+                            "year": row.get("年份", ""),
+                            "record_date": row.get("权益登记日", ""),
+                            "ex_date": row.get("除息日", ""),
+                            "raw_text": raw_dividend,
+                            "dividend_per_share": dividend_per_share,
+                            "payment_date": row.get("分红发放日", ""),
+                        }
+                    )
+                print(f"  - Found {len(frame)} dividend events")
+        except Exception as exc:
+            print(f"  - Error fetching dividends: {exc}")
+            failures.append(f"{code} dividends: {exc}")
+
+        try:
+            frame = client.fund_open_fund_info_em(symbol=code, indicator="拆分详情")
+            if frame.empty:
                 print("  - No split events found")
-        except Exception as e:
-            print(f"  - Error fetching splits: {e}")
-            
-    # 事件表写入原则（只增不删 + 新拆分先过价格验证 + 稳定写盘）：
-    # 上游数据异常时整表覆盖曾静默删掉已验证的历史事件（510500 两条拆分被
-    # 替换成错误的 1:0.01）。本地表是"账本"，抓取结果只能追加候选。
+            else:
+                for _, row in frame.iterrows():
+                    raw_split = row.get("拆分折算比例", "")
+                    split_records.append(
+                        {
+                            "code": code,
+                            "name": name,
+                            "year": row.get("年份", ""),
+                            "split_date": row.get("拆分折算日", ""),
+                            "split_type": row.get("拆分类型", ""),
+                            "raw_text": raw_split,
+                            "split_ratio": parse_split_ratio(raw_split),
+                        }
+                    )
+                print(f"  - Found {len(frame)} split events")
+        except Exception as exc:
+            print(f"  - Error fetching splits: {exc}")
+            failures.append(f"{code} splits: {exc}")
+
+    _merge_event_records(dividend_records, split_records, Path(data_dir))
+    from src.platform_core.hfq_factors import sync_corporate_action_hfq_factor
+
+    for etf in etfs:
+        print(f"  [hfq] {sync_corporate_action_hfq_factor(str(etf['code']), data_dir)}")
+    if failures:
+        detail = "; ".join(failures)
+        raise RuntimeError(f"ETF corporate-action sync completed with {len(failures)} failed requests: {detail}")
+
+
+def _merge_event_records(
+    dividend_records: list[dict[str, Any]],
+    split_records: list[dict[str, Any]],
+    data_dir: Path,
+) -> None:
     from src.platform_core.corporate_actions import merge_event_table, validate_split_against_prices
     from src.platform_core.data_store import write_csv_stable
 
-    data_dir = ROOT / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-    def read_existing(path):
-        return pd.read_csv(path, dtype=str).fillna("") if path.exists() else None
-
-    # Output dividends（键：code + ex_date；纯追加）
-    df_out_div = pd.DataFrame(dividend_records)
-    if not df_out_div.empty:
-        output_div_path = data_dir / "platform_dividends.csv"
-        merged, notes, additions = merge_event_table(read_existing(output_div_path), df_out_div, ["code", "ex_date"])
+    dividend_frame = pd.DataFrame(dividend_records)
+    if not dividend_frame.empty:
+        output_path = data_dir / "platform_dividends.csv"
+        existing = pd.read_csv(output_path, dtype=str).fillna("") if output_path.exists() else None
+        if existing is None:
+            merged = dividend_frame.iloc[0:0].copy()
+            notes: list[str] = []
+            additions = dividend_frame.astype(str).fillna("").to_dict("records")
+        else:
+            merged, notes, additions = _merge_scoped_events(
+                existing, dividend_frame, ["code", "ex_date"], merge_event_table
+            )
         for note in notes:
             print(f"  [dividends] {note}")
         if additions:
             merged = pd.concat([merged, pd.DataFrame(additions)], ignore_index=True)
         merged = merged.sort_values(by=["code", "ex_date"], ascending=[True, False])
-        changed = write_csv_stable(output_div_path, merged)
-        print(f"\nDividends: +{len(additions)} new events; file {'updated' if changed else 'unchanged'} ({output_div_path})")
+        changed = write_csv_stable(output_path, merged)
+        print(
+            f"\nDividends: +{len(additions)} new events; "
+            f"file {'updated' if changed else 'unchanged'} ({output_path})"
+        )
 
-    # Output splits（键：code + split_date；新增必须过价格交叉验证）
-    df_out_split = pd.DataFrame(split_records)
-    if not df_out_split.empty:
-        output_split_path = data_dir / "platform_splits.csv"
-        merged, notes, additions = merge_event_table(read_existing(output_split_path), df_out_split, ["code", "split_date"])
+    split_frame = pd.DataFrame(split_records)
+    if not split_frame.empty:
+        output_path = data_dir / "platform_splits.csv"
+        existing = pd.read_csv(output_path, dtype=str).fillna("") if output_path.exists() else None
+        if existing is None:
+            merged = split_frame.iloc[0:0].copy()
+            notes = []
+            additions = split_frame.astype(str).fillna("").to_dict("records")
+        else:
+            merged, notes, additions = _merge_scoped_events(
+                existing, split_frame, ["code", "split_date"], merge_event_table
+            )
         for note in notes:
             print(f"  [splits] {note}")
         accepted = []
         for row in additions:
-            ok, verdict = validate_split_against_prices(row["code"], row["split_date"], float(row["split_ratio"]), data_dir)
+            ok, verdict = validate_split_against_prices(
+                row["code"], row["split_date"], float(row["split_ratio"]), data_dir
+            )
             print(f"  [splits] {'接受' if ok else '拒绝'}: {verdict}")
             if ok:
                 accepted.append(row)
         if accepted:
             merged = pd.concat([merged, pd.DataFrame(accepted)], ignore_index=True)
         merged = merged.sort_values(by=["code", "split_date"], ascending=[True, False])
-        changed = write_csv_stable(output_split_path, merged)
-        print(f"Splits: +{len(accepted)} accepted / {len(additions) - len(accepted)} rejected; file {'updated' if changed else 'unchanged'} ({output_split_path})")
+        changed = write_csv_stable(output_path, merged)
+        print(
+            f"Splits: +{len(accepted)} accepted / {len(additions) - len(accepted)} rejected; "
+            f"file {'updated' if changed else 'unchanged'} ({output_path})"
+        )
 
+
+def _merge_scoped_events(
+    existing: pd.DataFrame,
+    fetched: pd.DataFrame,
+    key_columns: list[str],
+    merge_event_table: Any,
+) -> tuple[pd.DataFrame, list[str], list[dict[str, Any]]]:
+    """Compare only fetched symbols while retaining every unrelated ledger row."""
+    fetched_codes = set(fetched["code"].astype(str))
+    existing_codes = existing["code"].astype(str)
+    untouched = existing[~existing_codes.isin(fetched_codes)]
+    scoped = existing[existing_codes.isin(fetched_codes)]
+    if scoped.empty:
+        merged_scoped = existing.iloc[0:0].copy()
+        notes: list[str] = []
+        additions = fetched.astype(str).fillna("").to_dict("records")
+    else:
+        merged_scoped, notes, additions = merge_event_table(scoped, fetched, key_columns)
+    merged = pd.concat([untouched, merged_scoped], ignore_index=True)
+    return merged, notes, additions
+
+
+def _resolve_path(value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    for candidate in (Path.cwd() / path, ROOT / path, ROOT.parent / path):
+        if candidate.exists():
+            return candidate
+    return ROOT / path
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Fetch dividend and split histories for ETFs from configs or command-line codes."
+    )
+    parser.add_argument("--config", action="append", default=[], help="Platform YAML config; repeatable.")
+    parser.add_argument(
+        "--asset",
+        action="append",
+        default=[],
+        help="Asset as CODE[.EXCHANGE][:TYPE][=NAME]; only resolved ETFs are queried. Repeatable.",
+    )
+    parser.add_argument("--data-dir", default="data", help="Local platform data directory.")
+    args = parser.parse_args(argv)
+
+    if args.config:
+        configured = load_assets_from_configs([_resolve_path(value) for value in args.config])
+    elif args.asset:
+        configured = []
+    else:
+        paths = discover_fixed_configs(ROOT / "configs")
+        configured = load_assets_from_configs(paths)
+        print(f"No --config supplied; discovered ETFs from {len(paths)} fixed platform configs.")
+    direct = [parse_asset_spec(value) for value in args.asset]
+    assets = etf_assets(merge_assets(configured, direct))
+    if not assets:
+        parser.error("no ETF assets were resolved")
+    sync_etf_corporate_actions(assets, data_dir=_resolve_path(args.data_dir))
     return 0
 
+
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

@@ -132,9 +132,13 @@ def main() -> int:
                 for key in [
                     "total_return",
                     "annualized_return",
+                    "annualized_return_active",
+                    "first_trade_date",
+                    "active_observations",
                     "annualized_volatility",
                     "max_drawdown",
                     "sharpe_ratio",
+                    "active_sharpe_ratio",
                     "annualized_turnover",
                     "trade_count",
                     "order_count",

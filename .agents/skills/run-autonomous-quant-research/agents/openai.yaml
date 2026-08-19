@@ -1,0 +1,6 @@
+interface:
+  display_name: "Run Autonomous Quant Research"
+  short_description: "Run strict autonomous quant research workflow"
+  default_prompt: "Use $run-autonomous-quant-research to select, validate, and review autonomous quant research directions."
+policy:
+  allow_implicit_invocation: false

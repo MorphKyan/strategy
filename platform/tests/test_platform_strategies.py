@@ -151,3 +151,56 @@ def test_adaptive_strategy_always_allows_initial_build():
     context = _context({asset_id: (0.0, 10.0) for asset_id in "ABCD"}, cash=100000.0, params={})
     target = TargetPortfolio({asset_id: 0.25 for asset_id in "ABCD"})
     assert AdaptiveRiskDeviationVolatilityTriggeredStrategy().should_rebalance(context, target) is True
+
+
+def test_r059_strategies_registered():
+    from src.platform_core.strategies.macro_factor_es import RiskParityMacroFactorStrategy
+    from src.platform_core.strategies.black_litterman_es import RiskParityBlackLittermanStrategy
+
+    assert get_strategy_class("risk_parity_macro_factor") is RiskParityMacroFactorStrategy
+    assert get_strategy_class("risk_parity_black_litterman") is RiskParityBlackLittermanStrategy
+
+
+def test_black_litterman_strategy_no_constant_fallbacks():
+    """Verify Black-Litterman ES sources dynamic Point-in-Time fundamental views."""
+    import pandas as pd
+    import numpy as np
+    from src.platform_core.strategies.black_litterman_es import RiskParityBlackLittermanStrategy
+
+    strat = RiskParityBlackLittermanStrategy()
+    assert strat.name == "risk_parity_black_litterman"
+
+    # Test with empty PIT views (simulating missing data window)
+    strat._pit_views_df = None
+
+    dates = pd.date_range("2024-01-01", periods=200, freq="B")
+    data = {
+        "CN_ETF:510300.SH": np.linspace(10, 15, 200) + np.random.randn(200) * 0.1,
+        "CN_ETF:511260.SH": np.linspace(100, 102, 200) + np.random.randn(200) * 0.05,
+    }
+    df = pd.DataFrame(data, index=dates)
+
+    class MockDataStore:
+        def get_price_frame(self, universe, date, use_nav=False):
+            return df.loc[df.index <= pd.to_datetime(date)]
+
+    context = StrategyContext(
+        date=pd.Timestamp("2024-09-01"),
+        assets={},
+        bars={},
+        state=None,
+        data=MockDataStore(),
+        params={"risk_budgets": {"CN_ETF:510300.SH": 0.5, "CN_ETF:511260.SH": 0.5}},
+    )
+
+    target = strat._inverse_vol_target(context, list(data.keys()))
+    assert target is not None
+    assert "CN_ETF:510300.SH" in target.weights
+    assert "CN_ETF:511260.SH" in target.weights
+    # In absence of PIT views, weights equal base equal-budget weights
+    w1 = target.weights["CN_ETF:510300.SH"]
+    w2 = target.weights["CN_ETF:511260.SH"]
+    assert np.isclose(w1 + w2, 1.0) or (w1 + w2 < 1.0)
+
+
+

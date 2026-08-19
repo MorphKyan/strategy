@@ -2,6 +2,7 @@
 import argparse
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ORIG_CWD = Path.cwd()
@@ -10,94 +11,95 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-def resolve_path(path_str: str, root_dir: Path, orig_cwd: Path) -> Path:
-    p = Path(path_str)
-    if p.is_absolute():
-        return p
-    if (orig_cwd / p).exists():
-        return orig_cwd / p
-    if (root_dir / p).exists():
-        return root_dir / p
-    if (root_dir.parent / p).exists():
-        return root_dir.parent / p
-    parts = p.parts
-    if parts and parts[0] == "platform":
-        return root_dir.parent / p
-    return root_dir / p
-
 from src.platform_core.data_store import MarketDataStore, assets_from_config
+from src.platform_core.sync_universe import (
+    discover_fixed_configs,
+    etf_assets,
+    load_assets_from_configs,
+    merge_assets,
+    parse_asset_spec,
+)
 
-ALL_ASSETS_DICT = [
-    {"asset_id": "CN_ETF:510300.SH", "code": "510300", "name": "沪深300ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:513500.SH", "code": "513500", "name": "标普500ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:518880.SH", "code": "518880", "name": "黄金ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:511260.SH", "code": "511260", "name": "十年国债ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:511090.SH", "code": "511090", "name": "30年国债ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:159985.SZ", "code": "159985", "name": "豆粕ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:159981.SZ", "code": "159981", "name": "能源化工ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512890.SH", "code": "512890", "name": "红利低波ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:513100.SH", "code": "513100", "name": "纳指ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:510500.SH", "code": "510500", "name": "中证500ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:159920.SZ", "code": "159920", "name": "恒生ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:513030.SH", "code": "513030", "name": "德国ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:510880.SH", "code": "510880", "name": "红利ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    # --- R039 行业轮动候选池（docs/r039_rotation_blueprint.md §3）---
-    {"asset_id": "CN_ETF:512880.SH", "code": "512880", "name": "证券ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512800.SH", "code": "512800", "name": "银行ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512010.SH", "code": "512010", "name": "医药ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:159928.SZ", "code": "159928", "name": "消费ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512690.SH", "code": "512690", "name": "酒ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512660.SH", "code": "512660", "name": "军工ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512400.SH", "code": "512400", "name": "有色金属ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512980.SH", "code": "512980", "name": "传媒ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:515000.SH", "code": "515000", "name": "科技ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512480.SH", "code": "512480", "name": "半导体ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:515050.SH", "code": "515050", "name": "5G通信ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:512200.SH", "code": "512200", "name": "房地产ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:515220.SH", "code": "515220", "name": "煤炭ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:515700.SH", "code": "515700", "name": "新能车ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:515210.SH", "code": "515210", "name": "钢铁ETF", "asset_type": "etf", "exchange": "SH", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-    {"asset_id": "CN_ETF:159996.SZ", "code": "159996", "name": "家电ETF", "asset_type": "etf", "exchange": "SZ", "currency": "CNY", "lot_size": 100, "price_limit_pct": 0.1},
-]
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Sync all market data for all 12 assets in the universe.")
+def resolve_path(path_str: str, root_dir: Path, orig_cwd: Path) -> Path:
+    path = Path(path_str)
+    if path.is_absolute():
+        return path
+    if (orig_cwd / path).exists():
+        return orig_cwd / path
+    if (root_dir / path).exists():
+        return root_dir / path
+    if (root_dir.parent / path).exists():
+        return root_dir.parent / path
+    if path.parts and path.parts[0] == "platform":
+        return root_dir.parent / path
+    return root_dir / path
+
+
+def resolve_asset_dicts(config_args: list[str], asset_args: list[str]) -> list[dict]:
+    explicit_configs = [resolve_path(value, ROOT, ORIG_CWD) for value in config_args]
+    if explicit_configs:
+        configured = load_assets_from_configs(explicit_configs)
+    elif asset_args:
+        configured = []
+    else:
+        config_paths = discover_fixed_configs(ROOT / "configs")
+        configured = etf_assets(load_assets_from_configs(config_paths))
+        print(f"No --config supplied; discovered ETFs from {len(config_paths)} fixed platform configs.")
+    direct = [parse_asset_spec(value) for value in asset_args]
+    assets = merge_assets(configured, direct)
+    if not assets:
+        raise ValueError("No assets were resolved. Supply --config or --asset.")
+    return assets
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Sync market data for assets resolved from platform configs or command-line ETF codes."
+    )
+    parser.add_argument(
+        "--config",
+        action="append",
+        default=[],
+        help="Platform YAML config whose assets should be synced. Repeat for multiple configs.",
+    )
+    parser.add_argument(
+        "--asset",
+        action="append",
+        default=[],
+        help="Additional asset as CODE[.EXCHANGE][:TYPE][=NAME]; TYPE defaults to etf. Repeatable.",
+    )
     parser.add_argument("--start-date", default="2010-01-01", help="Sync start date.")
     parser.add_argument("--data-dir", default="data", help="Local data directory.")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    assets = assets_from_config(ALL_ASSETS_DICT)
+    asset_dicts = resolve_asset_dicts(args.config, args.asset)
+    assets = assets_from_config(asset_dicts)
     data_dir = resolve_path(args.data_dir, ROOT, ORIG_CWD)
 
-    print("Syncing market data for all 12 universe assets from Finshare...")
-    from datetime import datetime
+    print(f"Syncing market data for {len(assets)} resolved assets from Finshare...")
     market_report = MarketDataStore(data_dir).sync_assets(
         assets,
         start=args.start_date,
         end=datetime.now().strftime("%Y-%m-%d"),
-        fetch=True
+        fetch=True,
     )
     print("Market data synced:")
     for note in market_report.notes:
         print(f"- {note}")
 
-    print("\nFetching and syncing ETF dividend and split histories...")
-    try:
-        from scripts.fetch_etf_dividends import main as sync_dividends
-        sync_dividends()
-        print("ETF dividend and split data synced successfully.")
-    except Exception as e:
-        print(f"Warning: Failed to fetch ETF dividend/split data: {e}")
+    etfs = etf_assets(asset_dicts)
+    if etfs:
+        print(f"\nFetching dividend and split histories for {len(etfs)} resolved ETFs...")
+        from scripts.fetch_etf_dividends import sync_etf_corporate_actions
 
-    print("\nGenerating simulated 30-year bond futures (3x leveraged 10-year Treasury ETF)...")
-    try:
-        from scripts.generate_leveraged_etf import generate_3x_etf
-        generate_3x_etf()
-        print("Simulated 30-year bond futures generated successfully.")
-    except Exception as e:
-        print(f"Warning: Failed to generate simulated 30-year bond futures: {e}")
+        sync_etf_corporate_actions(etfs, data_dir=data_dir)
+        print("ETF dividend and split data synced successfully.")
+    else:
+        print("\nNo ETF assets resolved; skipped dividend and split sync.")
 
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
