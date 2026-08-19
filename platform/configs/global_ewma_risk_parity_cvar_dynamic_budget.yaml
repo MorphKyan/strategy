@@ -33,7 +33,7 @@ assets:
   price_limit_pct: 0.1
 - asset_id: CN_ETF:511260.SH
   asset_type: etf
-  code: 511260
+  code: '511260'
   currency: CNY
   exchange: SH
   lot_size: 100
