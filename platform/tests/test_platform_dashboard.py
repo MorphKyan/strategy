@@ -67,6 +67,42 @@ strategy:
     assert records[0].params["rolling_window"] == 120
 
 
+def test_discover_configs_normalizes_unquoted_code_to_str(tmp_path: Path) -> None:
+    """YAML 里未加引号的 code 会被解析成 int，同列混 str/int 时 Arrow 序列化失败。
+
+    实测 27 个既有配置命中（511260 未加引号），Streamlit 渲染"资产篮子"表时
+    每次都抛 ArrowTypeError 并刷自动修复警告。
+    """
+    import pyarrow as pa
+
+    config_dir = tmp_path / "configs"
+    config_dir.mkdir()
+    (config_dir / "mixed.yaml").write_text(
+        """
+platform:
+  run_name: mixed_run
+assets:
+  - asset_id: CN_ETF:510300.SH
+    code: "510300"
+    name: 沪深300ETF
+  - asset_id: CN_ETF:511260.SH
+    code: 511260
+    name: 十年国债ETF
+strategy:
+  strategy_name: fixed_weight_threshold
+""",
+        encoding="utf-8",
+    )
+
+    records = discover_configs(tmp_path)
+    codes = [asset["code"] for asset in records[0].assets]
+
+    assert codes == ["510300", "511260"]
+    assert all(isinstance(code, str) for code in codes)
+    # 真正要防的回归：这张表必须能序列化成 Arrow
+    pa.Table.from_pandas(pd.DataFrame(list(records[0].assets))[["code", "name"]])
+
+
 def test_discover_runs_and_read_tables(tmp_path: Path) -> None:
     run_dir = tmp_path / "results" / "backtests" / "sample_run"
     run_dir.mkdir(parents=True)
