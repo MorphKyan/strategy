@@ -52,7 +52,7 @@ def parse_args():
     parser.add_argument(
         "--config",
         type=str,
-        default="platform/configs/index_benchmark/domestic_baseline_es_index_benchmark_100k.yaml",
+        default="platform/configs/index_benchmark/index_es_120d_hist_100k.yaml",
         help="Path to reusable platform config file.",
     )
     parser.add_argument(

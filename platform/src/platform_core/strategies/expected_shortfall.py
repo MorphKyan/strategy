@@ -70,6 +70,78 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
                 if portfolio_volatility > 0.0:
                     weights *= min(1.0, target / portfolio_volatility)
 
+        trend_filter_window = context.params.get("trend_filter_window")
+        trend_filter_windows = context.params.get("trend_filter_windows")
+        trend_filter_mode = str(context.params.get("trend_filter_mode", "binary")).lower()
+
+        if trend_filter_mode in ("aqr_multi_horizon", "aqr_momentum", "aqr"):
+            if trend_filter_windows is not None:
+                windows = [int(w) for w in trend_filter_windows if int(w) > 1]
+            elif trend_filter_window is not None:
+                tf_window = int(trend_filter_window)
+                windows = [21, 63, tf_window] if tf_window > 63 else [21, 63, 252]
+            else:
+                windows = [21, 63, 252]
+
+            tf_signal = str(context.params.get("trend_filter_signal", "return")).lower()
+            tf_scale_down = float(context.params.get("trend_filter_scale_down", 0.0))
+
+            for index, asset_id in enumerate(universe):
+                series = price_frame[asset_id].dropna()
+                if len(series) == 0:
+                    continue
+                current_price = float(series.iloc[-1])
+                signals = []
+                for w in windows:
+                    if len(series) >= w:
+                        if tf_signal == "ma":
+                            ma_val = float(series.tail(w).mean())
+                            signals.append(1.0 if current_price >= ma_val else 0.0)
+                        else:  # return (AQR TSMOM momentum)
+                            past_price = float(series.iloc[-w])
+                            signals.append(1.0 if current_price >= past_price else 0.0)
+                    else:
+                        if len(series) > 1:
+                            if tf_signal == "ma":
+                                ma_val = float(series.mean())
+                                signals.append(1.0 if current_price >= ma_val else 0.0)
+                            else:
+                                past_price = float(series.iloc[0])
+                                signals.append(1.0 if current_price >= past_price else 0.0)
+                        else:
+                            signals.append(1.0)
+                if signals:
+                    score = float(np.mean(signals))
+                    mult = tf_scale_down + (1.0 - tf_scale_down) * score
+                    weights[index] *= mult
+        elif trend_filter_window is not None:
+            tf_window = int(trend_filter_window)
+            if tf_window > 1:
+                tf_type = str(context.params.get("trend_filter_type", "sma")).lower()
+                tf_scale_down = float(context.params.get("trend_filter_scale_down", 0.0))
+                for index, asset_id in enumerate(universe):
+                    series = price_frame[asset_id].dropna()
+                    if len(series) >= tf_window:
+                        current_price = float(series.iloc[-1])
+                        if tf_type == "ema":
+                            ma_val = float(series.ewm(span=tf_window, adjust=False).mean().iloc[-1])
+                        else:  # sma
+                            ma_val = float(series.tail(tf_window).mean())
+                        
+                        if trend_filter_mode == "continuous":
+                            # Custom heuristic linear SMA deviation score scaling: mult = clip(0.5 + 0.25 * z, 0.0, 1.0)
+                            rolling_std = float(series.tail(tf_window).std())
+                            if rolling_std > 1e-8:
+                                z = (current_price - ma_val) / rolling_std
+                                mult = float(np.clip(0.5 + 0.25 * z, 0.0, 1.0))
+                            else:
+                                mult = 1.0 if current_price >= ma_val else 0.0
+                            weights[index] *= mult
+                        else:
+                            if current_price < ma_val:
+                                # Below trend moving average: cut weight to scale_down (default 0.0)
+                                weights[index] *= tf_scale_down
+
         return TargetPortfolio(
             {asset_id: float(weights[index]) for index, asset_id in enumerate(universe)}
         )
