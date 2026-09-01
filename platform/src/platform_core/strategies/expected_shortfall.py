@@ -52,11 +52,54 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         )
 
         budgets = self._risk_budgets(context, universe)
-        weights = self._solve_expected_shortfall_risk_budget(
-            scenarios,
-            budgets,
-            confidence_level,
+
+        max_weights_cfg = context.params.get("max_weights")
+        min_weights_cfg = context.params.get("min_weights")
+        entropy_penalty = float(
+            context.params.get(
+                "entropy_penalty",
+                context.params.get(
+                    "hhi_penalty",
+                    context.params.get("hhi_penalty_gamma", 0.0),
+                ),
+            )
         )
+        solver_method = str(context.params.get("solver_method", "auto")).lower()
+
+        max_weights = None
+        if isinstance(max_weights_cfg, dict):
+            max_weights = np.asarray(
+                [float(max_weights_cfg.get(asset_id, 1.0)) for asset_id in universe],
+                dtype=float,
+            )
+        elif isinstance(max_weights_cfg, (list, tuple)):
+            max_weights = np.asarray(max_weights_cfg, dtype=float)
+
+        min_weights = None
+        if isinstance(min_weights_cfg, dict):
+            min_weights = np.asarray(
+                [float(min_weights_cfg.get(asset_id, 0.0)) for asset_id in universe],
+                dtype=float,
+            )
+        elif isinstance(min_weights_cfg, (list, tuple)):
+            min_weights = np.asarray(min_weights_cfg, dtype=float)
+
+        if max_weights is not None or min_weights is not None or entropy_penalty > 0.0:
+            weights = self._solve_constrained_expected_shortfall_risk_budget(
+                scenarios,
+                budgets,
+                confidence_level,
+                max_weights=max_weights,
+                min_weights=min_weights,
+                entropy_penalty=entropy_penalty,
+                solver_method=solver_method,
+            )
+        else:
+            weights = self._solve_expected_shortfall_risk_budget(
+                scenarios,
+                budgets,
+                confidence_level,
+            )
 
         volatility_target = context.params.get("volatility_target")
         if volatility_target is not None:
@@ -264,6 +307,188 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         if not np.all(np.isfinite(exposures)) or np.any(exposures <= 0.0) or total <= 0.0:
             raise RuntimeError("Expected Shortfall solver returned invalid exposures.")
         return exposures / total
+
+    @staticmethod
+    def _solve_constrained_expected_shortfall_risk_budget(
+        returns: np.ndarray,
+        budgets: np.ndarray,
+        confidence_level: float,
+        max_weights: np.ndarray | None = None,
+        min_weights: np.ndarray | None = None,
+        entropy_penalty: float = 0.0,
+        solver_method: str = "auto",
+    ) -> np.ndarray:
+        """Solve constrained and regularized Rockafellar-Uryasev ES risk-budgeting.
+
+        Implements Constrained Risk Budgeting following:
+        - Jean-Charles Richard & Thierry Roncalli (2019) 'Constrained Risk Budgeting
+          Portfolios: Theory, Algorithms, Applications & Puzzles', arXiv:1902.05710.
+        - Bera & Park (2008) 'Optimal Portfolio Diversification Using the Maximum
+          Entropy Principle' / HHI concentration penalty.
+        """
+        observations, assets = returns.shape
+        if observations < 2 or assets < 1 or not np.all(np.isfinite(returns)):
+            raise ValueError("Expected Shortfall requires a finite 2D return matrix.")
+        if budgets.shape != (assets,):
+            raise ValueError("Risk budget count must match the return matrix columns.")
+
+        min_w = (
+            np.full(assets, 1e-6, dtype=float)
+            if min_weights is None
+            else np.asarray(min_weights, dtype=float)
+        )
+        max_w = (
+            np.ones(assets, dtype=float)
+            if max_weights is None
+            else np.asarray(max_weights, dtype=float)
+        )
+
+        min_w = np.clip(min_w, 1e-8, 1.0)
+        max_w = np.clip(max_w, min_w, 1.0)
+
+        # Check feasibility of box constraints sum(min_w) <= 1 <= sum(max_w)
+        if float(np.sum(min_w)) > 1.0 + 1e-6:
+            raise ValueError(f"Sum of min_weights ({np.sum(min_w)}) exceeds 1.0.")
+        if float(np.sum(max_w)) < 1.0 - 1e-6:
+            raise ValueError(f"Sum of max_weights ({np.sum(max_w)}) is less than 1.0.")
+
+        if solver_method == "bisection":
+            return RiskParityExpectedShortfallFixedBudgetStrategy._solve_bisection_constrained_es(
+                returns, budgets, confidence_level, min_w, max_w, entropy_penalty
+            )
+
+        # Initial point: projected budgets onto box constraint and normalized
+        w0 = np.clip(budgets.copy(), min_w, max_w)
+        w0_sum = float(np.sum(w0))
+        if w0_sum > 0:
+            w0 /= w0_sum
+        else:
+            w0 = np.full(assets, 1.0 / assets)
+
+        bounds = [(float(min_w[i]), float(max_w[i])) for i in range(assets)]
+        constraints = [{"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)}]
+
+        def objective(w: np.ndarray) -> float:
+            es_val, es_grad = (
+                RiskParityExpectedShortfallFixedBudgetStrategy._empirical_es_and_gradient(
+                    returns, w, confidence_level
+                )
+            )
+            if es_val <= 1e-12:
+                return 1e6
+            rc = w * es_grad
+            # Normalized Euler risk contributions p_i = RC_i / ES(w)
+            p = rc / es_val
+            tracking_loss = float(np.sum((p - budgets) ** 2))
+            hhi_loss = float(entropy_penalty * np.sum(w ** 2))
+            return tracking_loss + hhi_loss
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Values in x were outside bounds during a minimize step",
+                category=RuntimeWarning,
+            )
+            solution = minimize(
+                objective,
+                w0,
+                method="SLSQP",
+                bounds=bounds,
+                constraints=constraints,
+                options={"ftol": 1e-12, "maxiter": 1000, "disp": False},
+            )
+
+        if not solution.success:
+            # Fallback to Bisection algorithm (Algorithm 1 / 7 from Richard & Roncalli 2019)
+            solution_x = (
+                RiskParityExpectedShortfallFixedBudgetStrategy._solve_bisection_constrained_es(
+                    returns, budgets, confidence_level, min_w, max_w, entropy_penalty
+                )
+            )
+        else:
+            solution_x = np.asarray(solution.x, dtype=float)
+
+        exposures = np.clip(solution_x, min_w, max_w)
+        total = float(exposures.sum())
+        if not np.all(np.isfinite(exposures)) or np.any(exposures <= 0.0) or total <= 0.0:
+            raise RuntimeError("Constrained Expected Shortfall solver returned invalid exposures.")
+        return exposures / total
+
+    @staticmethod
+    def _solve_bisection_constrained_es(
+        returns: np.ndarray,
+        budgets: np.ndarray,
+        confidence_level: float,
+        min_w: np.ndarray,
+        max_w: np.ndarray,
+        entropy_penalty: float = 0.0,
+    ) -> np.ndarray:
+        """Solve constrained RB via Richard & Roncalli (2019) Algorithm 1/7 Bisection."""
+        assets = len(budgets)
+        a_lam, b_lam = 1e-4, 1.0
+        bounds = [(float(min_w[i]), float(max_w[i])) for i in range(assets)]
+        x_cur = np.clip(budgets.copy(), min_w, max_w)
+
+        for _ in range(50):
+            lam = 0.5 * (a_lam + b_lam)
+
+            def obj(x: np.ndarray) -> float:
+                es_val, _ = (
+                    RiskParityExpectedShortfallFixedBudgetStrategy._empirical_es_and_gradient(
+                        returns, x, confidence_level
+                    )
+                )
+                barrier = float(lam * np.dot(budgets, np.log(np.maximum(x, 1e-12))))
+                hhi = float(entropy_penalty * np.sum(x ** 2))
+                return float(es_val - barrier + hhi)
+
+            def grad(x: np.ndarray) -> np.ndarray:
+                _, es_grad = (
+                    RiskParityExpectedShortfallFixedBudgetStrategy._empirical_es_and_gradient(
+                        returns, x, confidence_level
+                    )
+                )
+                return es_grad - lam * budgets / np.maximum(x, 1e-12) + 2.0 * entropy_penalty * x
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="Values in x were outside bounds during a minimize step",
+                    category=RuntimeWarning,
+                )
+                res = minimize(
+                    obj,
+                    x_cur,
+                    jac=grad,
+                    method="SLSQP",
+                    bounds=bounds,
+                    options={"ftol": 1e-12, "maxiter": 500, "disp": False},
+                )
+            x_cur = res.x
+            s = float(np.sum(x_cur))
+            if abs(s - 1.0) < 1e-6:
+                break
+            if s < 1.0:
+                a_lam = lam
+            else:
+                b_lam = lam
+
+        # Strict projection onto simplex intersected with box bounds
+        w = np.clip(x_cur, min_w, max_w)
+        w /= float(np.sum(w))
+        for _ in range(10):
+            exceed = w > max_w + 1e-8
+            if not np.any(exceed):
+                break
+            w = np.minimum(w, max_w)
+            excess = 1.0 - float(np.sum(w))
+            free = w < max_w - 1e-8
+            if np.any(free):
+                w[free] += excess * (budgets[free] / float(np.sum(budgets[free])))
+            else:
+                break
+
+        return w / float(np.sum(w))
 
     @staticmethod
     def _empirical_es_and_gradient(
