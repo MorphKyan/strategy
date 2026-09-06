@@ -142,7 +142,7 @@ class LocalCsvBarData:
             else:
                 normalized["limit_up"] = (previous_close * (1 + asset.price_limit_pct)).round(2)
                 normalized["limit_down"] = (previous_close * (1 - asset.price_limit_pct)).round(2)
-            if asset.asset_type == "index":
+            if asset.asset_type in {"index", "futures"}:
                 normalized["is_suspended"] = False
             else:
                 normalized["is_suspended"] = normalized["volume"].fillna(0.0) <= 0

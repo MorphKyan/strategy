@@ -52,7 +52,7 @@ def parse_args():
     parser.add_argument(
         "--config",
         type=str,
-        default="platform/configs/index_benchmark/domestic_baseline_es_index_benchmark_100k.yaml",
+        default="platform/configs/index_benchmark/index_es_120d_hist_100k.yaml",
         help="Path to reusable platform config file.",
     )
     parser.add_argument(
@@ -200,12 +200,29 @@ def sync_index_data(symbol: str, start_date: str | None = None, end_date: str | 
         if code in ["000300", "000015"]:
             df = ak.stock_zh_index_daily(symbol=f"sh{code}")
             date_col = next((c for c in df.columns if "date" in c.lower() or "日" in c), df.columns[0])
-            df["trade_date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
-            df["close"] = df["close"].astype(float)
-            out_df = df[["trade_date", "close"]].sort_values("trade_date")
+            open_col = next((c for c in df.columns if "open" in c.lower() or "开盘" in c), None)
+            high_col = next((c for c in df.columns if "high" in c.lower() or "最高" in c), None)
+            low_col = next((c for c in df.columns if "low" in c.lower() or "最低" in c), None)
+            close_col = next((c for c in df.columns if "close" in c.lower() or "收盘" in c), None)
+            vol_col = next((c for c in df.columns if "vol" in c.lower() or "成交量" in c), None)
+
+            out_df = pd.DataFrame()
+            out_df["trade_date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
+            close_s = pd.to_numeric(df[close_col], errors="coerce") if close_col else pd.to_numeric(df["close"], errors="coerce")
+            out_df["open"] = pd.to_numeric(df[open_col], errors="coerce") if open_col else close_s
+            out_df["high"] = pd.to_numeric(df[high_col], errors="coerce") if high_col else close_s
+            out_df["low"] = pd.to_numeric(df[low_col], errors="coerce") if low_col else close_s
+            out_df["close"] = close_s
+            out_df["volume"] = pd.to_numeric(df[vol_col], errors="coerce").fillna(0.0) if vol_col else 0.0
+            out_df["amount"] = 0.0
+            out_df["source"] = "sina_index"
+            out_df["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+            out_df = out_df.dropna(subset=["trade_date", "close"]).drop_duplicates("trade_date", keep="last").sort_values("trade_date")
             out_df = filter_date_bounds(out_df, "trade_date", start_date, end_date)
-            out_df.to_csv(out_path, index=False)
-            print(f"   SUCCESS: Saved {out_path.name} ({len(out_df)} rows, {out_df.iloc[0]['trade_date']} ~ {out_df.iloc[-1]['trade_date']})")
+            written = write_csv_stable(out_path, out_df, key_column="trade_date")
+            action = "Saved" if written else "Unchanged"
+            print(f"   SUCCESS: {action} {out_path.name} ({len(out_df)} rows, {out_df.iloc[0]['trade_date']} ~ {out_df.iloc[-1]['trade_date']})")
             return True
         elif code == "CBA21801":
             fetched = fetch_chinabond_index(code)
@@ -241,14 +258,29 @@ def sync_futures_main_data(symbol: str, start_date: str | None = None, end_date:
         df = ak.futures_main_sina(symbol=code)
         date_col = next((c for c in df.columns if "日" in c or "date" in c.lower()), df.columns[0])
         price_col = next((c for c in df.columns if "收盘" in c or "close" in c.lower()), df.columns[4])
+        open_col = next((c for c in df.columns if "开盘" in c or "open" in c.lower()), None)
+        high_col = next((c for c in df.columns if "最高" in c or "high" in c.lower()), None)
+        low_col = next((c for c in df.columns if "最低" in c or "low" in c.lower()), None)
+        vol_col = next((c for c in df.columns if "成交量" in c or "vol" in c.lower()), None)
 
-        df["trade_date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
-        df["close"] = df[price_col].astype(float)
-        out_df = df[["trade_date", "close"]].sort_values("trade_date")
+        out_df = pd.DataFrame()
+        out_df["trade_date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
+        close_s = pd.to_numeric(df[price_col], errors="coerce")
+        out_df["open"] = pd.to_numeric(df[open_col], errors="coerce") if open_col else close_s
+        out_df["high"] = pd.to_numeric(df[high_col], errors="coerce") if high_col else close_s
+        out_df["low"] = pd.to_numeric(df[low_col], errors="coerce") if low_col else close_s
+        out_df["close"] = close_s
+        out_df["volume"] = pd.to_numeric(df[vol_col], errors="coerce").fillna(0.0) if vol_col else 0.0
+        out_df["amount"] = 0.0
+        out_df["source"] = "sina_futures"
+        out_df["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+        out_df = out_df.dropna(subset=["trade_date", "close"]).drop_duplicates("trade_date", keep="last").sort_values("trade_date")
         out_df = filter_date_bounds(out_df, "trade_date", start_date, end_date)
 
-        out_df.to_csv(out_path, index=False)
-        print(f"   SUCCESS: Saved {out_path.name} ({len(out_df)} rows, {out_df.iloc[0]['trade_date']} ~ {out_df.iloc[-1]['trade_date']})")
+        written = write_csv_stable(out_path, out_df, key_column="trade_date")
+        action = "Saved" if written else "Unchanged"
+        print(f"   SUCCESS: {action} {out_path.name} ({len(out_df)} rows, {out_df.iloc[0]['trade_date']} ~ {out_df.iloc[-1]['trade_date']})")
         return True
     except Exception as e:
         print(f"   ERROR syncing futures {code}: {e}")
@@ -302,21 +334,44 @@ def main():
     if not universe:
         universe = [a.get("asset_id") for a in cfg.get("assets", []) if isinstance(a, dict)]
 
+    assets_map = {
+        str(a.get("asset_id")): a
+        for a in cfg.get("assets", [])
+        if isinstance(a, dict) and a.get("asset_id")
+    }
+
     print(f"=== Platform Data Sync Tool for {config_path.name} ===")
     print(f"Target Universe ({len(universe)} symbols): {universe}\n")
 
     failures: list[str] = []
     for symbol in universe:
-        if "CN_INDEX" in symbol or symbol.startswith("000") or symbol.startswith("CBA"):
+        asset_info = assets_map.get(symbol, {})
+        asset_type = str(asset_info.get("asset_type", "")).lower()
+
+        # Fallback to symbol string inference if asset_type is not declared in YAML assets
+        if not asset_type:
+            if "CN_INDEX" in symbol or symbol.startswith("000") or symbol.startswith("CBA"):
+                asset_type = "index"
+            elif "CN_FUTURES" in symbol or symbol.startswith(("M0", "TA0", "CU0")):
+                asset_type = "futures"
+            elif "CN_ETF" in symbol:
+                asset_type = "etf"
+
+        if asset_type == "index":
             if not sync_index_data(symbol, args.start_date, args.end_date):
                 failures.append(symbol)
-        elif "CN_FUTURES" in symbol or symbol.startswith("M0") or symbol.startswith("TA0"):
+        elif asset_type == "futures":
             if not sync_futures_main_data(symbol, args.start_date, args.end_date):
                 failures.append(symbol)
-        elif "CN_ETF" in symbol:
-            code = symbol.split(":")[-1].split(".")[0]
-            if code == "518880":
-                print(f"[{code}] Gold ETF daily bar exists in platform/data/{code}.csv")
+        elif asset_type == "etf":
+            code = str(asset_info.get("code") or symbol.split(":")[-1].split(".")[0])
+            out_csv = DATA_DIR / f"{code}.csv"
+            if out_csv.exists():
+                print(f"[{code}] ETF daily bar managed via standard platform store ({out_csv.name})")
+            else:
+                print(f"[{code}] Warning: ETF daily bar missing at {out_csv}. Run sync_platform_data.py --fetch.")
+        else:
+            print(f"[{symbol}] Unrecognized asset type: {asset_type or 'unknown'}; skipped.")
 
     if args.sync_pit_bonds:
         if not sync_pit_china_bond_ytm(args.start_date, args.end_date):
