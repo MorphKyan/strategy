@@ -145,3 +145,6 @@ data_manifest.json
 # so neither is tracked. The ingest script and the public ETF->index mapping are.
 /index_performance/
 /platform/data/index_valuation/
+
+# 本机专用 Claude 约定（代理等环境细节，不入库）
+/CLAUDE.local.md
