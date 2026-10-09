@@ -129,6 +129,15 @@ class Strategy:
             next_q = (next_date.month - 1) // 3
             return current_q != next_q and current_q in (0, 2)
         elif freq == "monthly":
+            params = context.params if isinstance(context.params, dict) else {}
+            anchor_day = params.get("rebalance_anchor_day")
+            if anchor_day is None and isinstance(context.runtime, dict):
+                anchor_day = context.runtime.get("rebalance_anchor_day")
+            if anchor_day is not None:
+                anchor = int(anchor_day)
+                if current.month != next_date.month:
+                    return True if anchor == 1 else (next_date.day >= anchor)
+                return current.day < anchor and next_date.day >= anchor
             return current.year != next_date.year or current.month != next_date.month
         else: # quarterly
             current_quarter = (current.month - 1) // 3
