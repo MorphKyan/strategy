@@ -9,11 +9,11 @@
   次日：用户照票下单（成交价/股数偏差落在阈值带内，下次调仓自然修正）
 
 产物目录 `results/live_portfolios/<portfolio_id>/`：
-  portfolio_state.json   组合状态（reconcile 覆盖；plan 只更新 pending_intents）
+  portfolio_state.json   组合状态（真实持仓对账、自动股息及调仓意图）
   real_nav.csv           每次 reconcile 追加一行真实净值（月度归因的数据源）
   tickets/ticket_<date>.csv / .txt   下单票（CSV 供程序读，TXT 人可照做）
 
-票面股数按配置的 `execution.execution_price_field` 估算，和回测执行器保持一致。
+票面股数统一按最新收盘价（close）估算；回测成交价仍由 execution_price_field 配置。
 次日实际成交价的偏差无需在意。与 SQLite 元数据库的集成留待主线 A4。
 """
 
@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import MarketDataStore
 from src.platform_core.engine import load_strategy_config
-from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
+from src.platform_core.live_dividends import apply_dividends, expected_income, remember_holdings
+from src.platform_core.execution import ExecutionConfig, ExecutionEngine
 from src.platform_core.models import (
     Asset,
     Order,
@@ -115,30 +116,11 @@ class LivePortfolio:
         self.market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
 
         live_config = config.get("live", {}) or {}
-        # 恒等式哨兵容差（元）。未卖出时 realized_pnl 恒为 0，超过该值即报警。
-        # 真实卖出后残差会固定在累计已实现盈亏水平，届时把本值调到略高于它即可。
+        # 已实现损益与成交流水、自动股息之间的核对容差（元）。
         self.realized_residual_tolerance = float(live_config.get("realized_residual_tolerance", 1.0))
 
-        execution_config = config.get("execution", {})
-        fee_config = execution_config.get("fee", {})
-        slippage_config = execution_config.get("slippage", {})
         self.execution = ExecutionEngine(
-            ExecutionConfig(
-                fee_profile=FeeProfile(rate=float(fee_config.get("rate", 0.0002)), min_fee=float(fee_config.get("min_fee", 0.0))),
-                price_field=execution_config.get("execution_price_field", "open"),
-                weight_tolerance=float(execution_config.get("weight_tolerance", 0.0005)),
-                unfilled_policy=execution_config.get("unfilled_policy", "retry_next_day"),
-                cash_buffer_pct=float(execution_config.get("cash_buffer_pct", 0.0)),
-                skip_below_lot=bool(execution_config.get("skip_below_lot", True)),
-                order_priority=execution_config.get("order_priority", "asset_id"),
-                slippage_bps=float(slippage_config.get("default_bps", execution_config.get("slippage_bps", 2.0))),
-                qdii_commodity_slippage_bps=float(
-                    slippage_config.get("qdii_commodity_bps", execution_config.get("qdii_commodity_slippage_bps", 6.0))
-                ),
-                slippage_by_asset_id=slippage_config.get("asset_bps"),
-                slippage_by_code=slippage_config.get("code_bps"),
-                round_mode=execution_config.get("round_mode", "round"),
-            )
+            ExecutionConfig.from_config(config.get("execution", {}), price_field="close")
         )
 
         self.output_root = Path(output_root or config.get("output", {}).get("live_dir", "results/live_portfolios"))
@@ -185,18 +167,30 @@ class LivePortfolio:
             resolved_cost = cost_basis if cost_basis is not None else prices.get(asset_id, 0.0)
             positions[asset_id] = Position(asset_id=asset_id, quantity=quantity, cost_basis=resolved_cost)
 
+        if previous is not None:
+            # 登记与除息同日的标的，权益也必须使用当日对账后的收盘持仓。
+            previous.live_accounting.setdefault("holdings", {})[date_str(asof)] = {
+                asset_id: pos.quantity for asset_id, pos in positions.items()
+            }
+            self._apply_dividends(previous, asof)
+
         state = PortfolioState(
             cash=float(cash),
             positions=positions,
             pending_intents={},  # 昨日的票现实已处理完毕
             cooldown_pool=dict(previous.cooldown_pool) if previous else {},
             strategy_state=dict(previous.strategy_state) if previous else {},
+            live_accounting=copy.deepcopy(previous.live_accounting) if previous else {},
+            dividend_receivables=copy.deepcopy(previous.dividend_receivables) if previous else [],
             last_date=asof,
         )
+        # 用户提供的现金已经包含截至当日的实际到账，不叠加自动到账。
+        state.live_accounting["cash_asof"] = date_str(asof)
+        remember_holdings(state, asof)
         self.portfolio_dir.mkdir(parents=True, exist_ok=True)
         self._write_state(state)
 
-        positions_value = sum(pos.quantity * prices.get(asset_id, 0.0) for asset_id, pos in positions.items())
+        positions_value = state.total_value(prices) - state.cash
         total_value = float(cash) + positions_value
         self._append_real_nav(asof, float(cash), positions_value, total_value, external_flow=float(external_flow))
         return ReconcileResult(self.portfolio_id, asof, float(cash), positions_value, total_value, self.state_path)
@@ -204,7 +198,7 @@ class LivePortfolio:
     # ---------------------------------------------------------------- plan
 
     def plan(self, asof_date: str | date) -> PlanResult:
-        """生成明日下单票。不改真实持仓：撮合只发生在 deepcopy 的状态上。"""
+        """自动结转到期股息后生成明日下单票；撮合只发生在状态副本上。"""
         state = self._load_state()
         if state is None:
             raise FileNotFoundError(f"{self.state_path} 不存在，请先 reconcile 导入真实持仓。")
@@ -215,6 +209,8 @@ class LivePortfolio:
         if not tradable:
             raise ValueError(f"{date_str(asof)} 之前没有任何行情数据。")
         plan_date = max(tradable)
+        self._apply_dividends(state, plan_date)
+        self._write_state(state)
         # 实盘 plan 时 plan_date 必然是数据末日，而 is_month_end() 等节奏判断把
         # "日历最后一天"视为月末/季末——不补日历的话月频策略会天天触发。
         # 用下一个工作日近似真实日历（极端情形：月末最后几个交易日全是节假日时，
@@ -237,7 +233,24 @@ class LivePortfolio:
             runtime=runtime,
         )
         strategy.initialize(context)
+        saved = state.strategy_state.get("_live_strategy_runtime", {})
+        identity = {"strategy_name": self.strategy_config["strategy_name"], "params": context.params}
+        if saved.get("identity") == identity:
+            # 同日重跑从当日计算前的状态重放，避免首次建仓票被覆盖成无操作。
+            key = "runtime_before" if saved.get("plan_date") == date_str(plan_date) else "runtime"
+            runtime.update(copy.deepcopy(saved[key]))
+        elif "opened" in runtime and any(pos.quantity > 1e-9 for pos in state.positions.values()):
+            # 旧账户没有 runtime 快照；真实持仓说明已经完成首次建仓。
+            runtime["opened"] = True
+        runtime_before = copy.deepcopy(runtime)
         target = strategy.generate_targets(context)
+        state.strategy_state["_live_strategy_runtime"] = {
+            "identity": identity,
+            "plan_date": date_str(plan_date),
+            "runtime_before": runtime_before,
+            "runtime": runtime,
+        }
+        self._write_state(state)
 
         self.tickets_dir.mkdir(parents=True, exist_ok=True)
         ticket_txt = self.tickets_dir / f"ticket_{date_str(plan_date)}.txt"
@@ -342,20 +355,20 @@ class LivePortfolio:
     def mark_to_market(self, asof_date: str | date) -> dict[str, Any]:
         """按 asof 日收盘对真实持仓估值，写入 real_nav.csv 并返回摘要。
 
-        持仓与现金只会被 reconcile 改变，因此"上次对齐的持仓 × 今日收盘"就是
-        今日真实净值（用户当日有交易但尚未 reconcile 时，次日对齐后自动修正）。
+        持仓由 reconcile 更新；股息按登记日权益自动计入应收及到账现金。
+        用户当日有交易但尚未对账时，持仓仍以上次对账为准。
         """
         state = self._load_state()
         if state is None:
             raise FileNotFoundError(f"{self.state_path} 不存在，请先 reconcile 导入真实持仓。")
         asof = parse_date(asof_date)
         data = self._load_data(asof)
+        self._apply_dividends(state, asof)
+        self._write_state(state)
         bars = data.bars_on(asof)
         prices = {asset_id: bar.close for asset_id, bar in bars.items()}
 
-        positions_value = sum(
-            position.quantity * prices.get(asset_id, 0.0) for asset_id, position in state.positions.items()
-        )
+        positions_value = state.total_value(prices) - state.cash
         total_value = state.cash + positions_value
         weights = {
             asset_id: (position.quantity * prices.get(asset_id, 0.0) / total_value if total_value > 0 else 0.0)
@@ -425,13 +438,9 @@ class LivePortfolio:
         total_pnl = total_value - net_invested if net_invested is not None else None
         realized_pnl = total_pnl - float_pnl if total_pnl is not None else None
 
-        # 恒等式哨兵：未发生卖出时 realized_pnl 必须为 0。非零意味着账本内部不自洽，
-        # 而 total_value 仍然正确——这类"总值对、拆分错"的故障不会被任何现有检查发现。
-        # 2026-07 实测踩过两次：①cost_basis 存了成交价而非实付(漏手续费)，残差 +3.80 潜伏三周；
-        # ②real_nav 首行基线用 07-10 收盘市值而非实际入金，残差 +20.15。
-        # 真实卖出后残差会变成累计已实现盈亏并保持该水平，届时按实际值调高容差即可。
+        expected_realized = expected_income(state, self.portfolio_dir / "execution_ledger.csv", asof)
         tolerance = self.realized_residual_tolerance
-        residual_alert = realized_pnl is not None and abs(realized_pnl) > tolerance
+        residual_alert = realized_pnl is not None and abs(realized_pnl - expected_realized) > tolerance
 
         return {
             "date": asof,
@@ -451,6 +460,7 @@ class LivePortfolio:
             "total_pnl": total_pnl,
             "float_pnl": float_pnl,
             "realized_pnl": realized_pnl,
+            "expected_realized_pnl": expected_realized,
             "realized_residual_alert": residual_alert,
             "realized_residual_tolerance": tolerance,
             "written": written,
@@ -503,8 +513,8 @@ class LivePortfolio:
                 if valuation.get("realized_residual_alert"):
                     tol = valuation.get("realized_residual_tolerance", 0.0)
                     lines.append(
-                        f"- ⚠️ **账本自检未通过**: 未发生卖出时「已实现」应为 0，当前 {realized:+,.2f} 元"
-                        f"（容差 {tol:,.2f}）。总值不受影响，但拆分口径有误——"
+                        f"- ⚠️ **账本自检未通过**: 已实现 {realized:+,.2f} 元与流水及自动股息计算值"
+                        f" {valuation.get('expected_realized_pnl', 0.0):+,.2f} 元不一致（容差 {tol:,.2f}）。请核对交易流水、分红；"
                         f"优先核对 ①holdings 的 cost_basis 是否为交割单实付÷数量（含手续费）"
                         f" ②real_nav 首行基线是否为实际入金而非当日收盘市值。"
                     )
@@ -588,12 +598,20 @@ class LivePortfolio:
         return "\n".join(lines)
 
     def _load_data(self, end: date) -> LocalCsvBarData:
-        return LocalCsvBarData(
+        data = LocalCsvBarData(
             data_dir=self.market_dir,
             assets=self.assets.values(),
             start_date=(self.config.get("backtest") or {}).get("start_date"),
             end_date=date_str(end),
         )
+        latest = {
+            asset_id: frame.index[-1] if not frame.empty else None
+            for asset_id, frame in data.frames.items()
+        }
+        if not latest or None in latest.values() or len(set(latest.values())) != 1:
+            detail = ", ".join(f"{asset_id}={day}" for asset_id, day in latest.items())
+            raise RuntimeError(f"行情未对齐，停止实盘处理；请同步所有标的后重试：{detail}")
+        return data
 
     def _read_holdings(self, holdings_csv: str | Path) -> list[tuple[str, float, float | None]]:
         path = Path(holdings_csv)
@@ -635,6 +653,12 @@ class LivePortfolio:
             return None
         payload = json.loads(self.state_path.read_text(encoding="utf-8"))
         return PortfolioState.from_dict(payload)
+
+    def _apply_dividends(self, state: PortfolioState, asof: date) -> None:
+        path = Path(self.config.get("live", {}).get("dividends_path") or
+                    Path(__file__).resolve().parents[2] / "data" / "platform_dividends.csv")
+        apply_dividends(state, asof, path, self.code_to_asset_id,
+                        self.portfolio_dir / "execution_ledger.csv")
 
     def _write_state(self, state: PortfolioState) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)

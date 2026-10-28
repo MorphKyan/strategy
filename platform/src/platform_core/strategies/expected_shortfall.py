@@ -9,6 +9,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from src.platform_core.models import TargetPortfolio
+from src.platform_core.interest_rates import SignalInterestRate, monthly_fast_slow_signal
 from src.platform_core.strategy import RiskParityStrategy, StrategyContext
 
 
@@ -17,6 +18,11 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
 
     name = "risk_parity_expected_shortfall_fixed_budget"
     version = "0.1.0"
+
+    def initialize(self, context: StrategyContext) -> None:
+        super().initialize(context)
+        if str(context.params.get("trend_filter_mode", "binary")).lower() == "fast_slow":
+            self._signal_interest_rate = SignalInterestRate(context.params.get("trend_filter_risk_free"))
 
     def _inverse_vol_target(
         self,
@@ -117,7 +123,26 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         trend_filter_windows = context.params.get("trend_filter_windows")
         trend_filter_mode = str(context.params.get("trend_filter_mode", "binary")).lower()
 
-        if trend_filter_mode in ("aqr_multi_horizon", "aqr_momentum", "aqr"):
+        if trend_filter_mode == "fast_slow":
+            rate = getattr(self, "_signal_interest_rate", None)
+            if rate is None:
+                rate = SignalInterestRate(context.params.get("trend_filter_risk_free"))
+                self._signal_interest_rate = rate
+            signal_assets = context.params.get("trend_filter_assets", universe)
+            unknown = set(signal_assets) - set(universe)
+            if unknown:
+                raise ValueError(f"trend_filter_assets outside universe: {sorted(unknown)}")
+            for index, asset_id in enumerate(universe):
+                if asset_id not in signal_assets:
+                    continue
+                signal = monthly_fast_slow_signal(
+                    price_frame[asset_id], context.date, rate, getattr(context.data, "calendar", ())
+                )
+                # During the 13-month signal warmup, retain this sleeve in cash.
+                weights[index] *= 0.0 if signal is None else {
+                    "bull": 1.0, "correction": 0.75, "rebound": 0.5, "bear": 0.25
+                }[signal[0]]
+        elif trend_filter_mode in ("aqr_multi_horizon", "aqr_momentum", "aqr"):
             if trend_filter_windows is not None:
                 windows = [int(w) for w in trend_filter_windows if int(w) > 1]
             elif trend_filter_window is not None:

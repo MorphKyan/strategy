@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from itertools import count
+from typing import Any
 
 from src.platform_core.models import Asset, Bar, Order, PendingIntent, PortfolioState, TargetPortfolio, Trade
 
@@ -33,6 +34,30 @@ class ExecutionConfig:
     slippage_by_code: dict[str, float] | None = None
     participation_impact: dict[str, float | bool] | None = None
     round_mode: str = "round"
+    weight_tolerance_by_asset_id: dict[str, float] | None = None
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any], *, price_field: str | None = None) -> "ExecutionConfig":
+        fee = config.get("fee", {})
+        slippage = config.get("slippage", {})
+        return cls(
+            fee_profile=FeeProfile(rate=float(fee.get("rate", 0.0002)), min_fee=float(fee.get("min_fee", 0.0))),
+            price_field=price_field or config.get("execution_price_field", "open"),
+            weight_tolerance=float(config.get("weight_tolerance", 0.0005)),
+            unfilled_policy=config.get("unfilled_policy", "retry_next_day"),
+            cash_buffer_pct=float(config.get("cash_buffer_pct", 0.0)),
+            skip_below_lot=bool(config.get("skip_below_lot", True)),
+            order_priority=config.get("order_priority", "asset_id"),
+            slippage_bps=float(slippage.get("default_bps", config.get("slippage_bps", 2.0))),
+            qdii_commodity_slippage_bps=float(
+                slippage.get("qdii_commodity_bps", config.get("qdii_commodity_slippage_bps", 6.0))
+            ),
+            slippage_by_asset_id=slippage.get("asset_bps"),
+            slippage_by_code=slippage.get("code_bps"),
+            participation_impact=slippage.get("participation_impact"),
+            round_mode=config.get("round_mode", "round"),
+            weight_tolerance_by_asset_id=config.get("weight_tolerance_by_asset_id"),
+        )
 
 
 class ExecutionEngine:
@@ -97,7 +122,10 @@ class ExecutionEngine:
             target_weight = effective_weights.get(asset_id, 0.0)
             target_value = target_weight * state_value
             diff_value = target_value - current_value
-            if abs(diff_value / state_value) <= self.config.weight_tolerance:
+            tolerance = float((self.config.weight_tolerance_by_asset_id or {}).get(
+                asset_id, self.config.weight_tolerance
+            ))
+            if abs(diff_value / state_value) <= tolerance:
                 state.pending_intents.pop(asset_id, None)
                 continue
 
@@ -205,7 +233,7 @@ class ExecutionEngine:
             post_prices = {item_id: self._price_for_bar(item_bar) for item_id, item_bar in bars.items()}
             post_value = state.total_value(post_prices)
             post_weight = position.quantity * valuation_price / post_value if post_value > 0 else 0.0
-            if abs(post_weight - target_weight) <= self.config.weight_tolerance:
+            if abs(post_weight - target_weight) <= tolerance:
                 state.pending_intents.pop(asset_id, None)
             else:
                 self._handle_unfilled(state, asset_id, target_weight, current_date, "partial_fill", order.signal_date)

@@ -42,6 +42,9 @@
 - 分红/拆分事件表是**只增不删的账本**（`corporate_actions.merge_event_table`）：上游返回缺失或键冲突时保留本地已验证事件并打警告；新拆分事件必须先通过价格交叉验证（拆后首日价 ≈ 拆前价 ÷ 比例，±15%）才会入表——曾拦下上游把 510500 两条已验证拆分替换成错误 1:0.01 的事故。
 - 实盘镜像组合闭环（`platform/src/platform_core/live.py` + `notify.py` + `scripts/run_live_cycle.py`）：`reconcile` 导入真实持仓+现金覆盖组合状态并记录真实净值（mark-to-real，误差每日清零不累积）；`plan` 用真实权重+最新数据算目标，对执行引擎做 dry-run（整手取整/现金上限/费用与回测同口径）产出人可照做的"明日下单票"（`tickets/ticket_<date>.csv/.txt`），绝不模拟成交；`cycle` 一键编排 sync→reconcile→plan→每日估值→notify（非交易日自动跳过），推送支持 Server酱/SMTP（环境变量 `RQ_SERVERCHAN_KEY` 或 `RQ_SMTP_*` 零配置启用，失败不中断主流程）。每个交易日按收盘价对真实持仓 mark-to-market 并追加进 `real_nav.csv`（真实净值日频序列，供月度归因与组合列表页使用）；推送分两条——markdown 组合日报（总值/日变动/现金/各资产权重/阈值带状态）交易日必发，触发调仓时下单票作为独立第二条。产物在 `results/live_portfolios/<id>/`。`cycle --shadow <sim_id>` 可让影子模拟组合每交易日增量跟跑（`SimPortfolio.load()` 从持久化状态恢复）。
 - 实盘月度归因（`platform/src/platform_core/attribution.py` + `scripts/report_live_attribution.py`）：对齐真实 `real_nav.csv` 与影子组合净值，输出区间收益差、年化 tracking error 与粗拆（现金拖累差 + 执行/结构残差），**只记录不改持仓**；收益观测不足 5 个判"样本不足仅存档"。报告写入 `reports/live/`（含真实账户金额，已 gitignore 不入库）。
+- 实盘策略运行状态保存在 `portfolio_state.json` 的 `strategy_state._live_strategy_runtime`，每天重启与持仓对账后继续恢复；旧账户没有快照时，已有真实持仓视为已完成首次建仓。同日重跑从当日计算前的状态重放；策略名称或参数变化时重新初始化运行状态。
+- 下单票统一使用最新 `close` 估算股数并保留配置的费用、滑点；回测与模拟的成交价格仍取 `execution.execution_price_field`（默认 `open`）。三者通过 `ExecutionConfig.from_config()` 共用执行配置构造，包括参与率冲击和分资产容差。
+- 实盘对账、出票、估值及同步后的环路均检查所有配置标的在截至日的最新行情日期。日期不一致或任一标的没有有效行情时，在写入账户、净值或票据前报错；有明确当日行情行的停牌标的保留原有拒单处理。原有 7 天新鲜度检查继续生效。
 - 本地只读 Streamlit 看板（`platform/src/platform_dashboard/`）：概览、回测分析（净值/收益率双模式 + 近N月区间归零、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、滚动波动/Sharpe、训练 vs 冻结样本对照、含现金层的持仓面积图、订单与交易表）、回测对比（2–5 个回测在所选区间首日对齐归一 + 指标对照表）、策略配置浏览。
 
 ## 内置策略范围

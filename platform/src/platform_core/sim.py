@@ -12,7 +12,7 @@ from src.platform_core.corporate_actions import apply_due_splits, load_splits, r
 from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import MarketDataStore
 from src.platform_core.engine import load_checkpoint, load_strategy_config
-from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
+from src.platform_core.execution import ExecutionConfig, ExecutionEngine
 from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
 from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.strategy import StrategyContext, get_strategy_class
@@ -44,27 +44,7 @@ class SimPortfolio:
         self.data_fetch = bool(data_config.get("fetch", False))
         self.market_dir = data_config.get("market_store_dir") or data_config.get("data_dir", "data")
 
-        execution_config = config.get("execution", {})
-        fee_config = execution_config.get("fee", {})
-        slippage_config = execution_config.get("slippage", {})
-        self.execution = ExecutionEngine(
-            ExecutionConfig(
-                fee_profile=FeeProfile(rate=float(fee_config.get("rate", 0.0002)), min_fee=float(fee_config.get("min_fee", 0.0))),
-                price_field=execution_config.get("execution_price_field", "open"),
-                weight_tolerance=float(execution_config.get("weight_tolerance", 0.0005)),
-                unfilled_policy=execution_config.get("unfilled_policy", "retry_next_day"),
-                cash_buffer_pct=float(execution_config.get("cash_buffer_pct", 0.0)),
-                skip_below_lot=bool(execution_config.get("skip_below_lot", True)),
-                order_priority=execution_config.get("order_priority", "asset_id"),
-                slippage_bps=float(slippage_config.get("default_bps", execution_config.get("slippage_bps", 2.0))),
-                qdii_commodity_slippage_bps=float(
-                    slippage_config.get("qdii_commodity_bps", execution_config.get("qdii_commodity_slippage_bps", 6.0))
-                ),
-                slippage_by_asset_id=slippage_config.get("asset_bps"),
-                slippage_by_code=slippage_config.get("code_bps"),
-                round_mode=execution_config.get("round_mode", "round"),
-            )
-        )
+        self.execution = ExecutionEngine(ExecutionConfig.from_config(config.get("execution", {})))
         self.code_to_asset_id = {asset.code: asset_id for asset_id, asset in self.assets.items()}
         self.dividends = self._load_dividends()
         self.splits = load_splits(self.config)

@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import csv
+import copy
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from src.platform_core import notify as notify_module
+from src.platform_core.engine import PlatformBacktestEngine
 from src.platform_core.live import LivePortfolio, PlanResult
-from src.platform_core.models import parse_date
+from src.platform_core.models import PortfolioState, TargetPortfolio, parse_date
 from src.platform_core.notify import resolve_channels, send_notification
+from src.platform_core.sim import SimPortfolio
+from src.platform_core.storage import InMemoryStore
+from src.platform_core.strategies.expected_shortfall import RiskParityExpectedShortfallFixedBudgetStrategy
+from src.platform_core.strategy import StrategyContext
 
 
 def _write_market_data(
@@ -56,6 +63,87 @@ def _make_portfolio(tmp_path: Path) -> LivePortfolio:
     data_dir = tmp_path / "data"
     _write_market_data(data_dir)
     return LivePortfolio("live_test", _live_config(data_dir), output_root=tmp_path / "live")
+
+
+def _with_dividend(portfolio: LivePortfolio, tmp_path: Path) -> None:
+    path = tmp_path / "dividends.csv"
+    path.write_text("code,record_date,ex_date,payment_date,dividend_per_share\n"
+                    "AAA,2024-01-29,2024-01-30,2024-01-31,0.1\n", encoding="utf-8")
+    portfolio.config["live"] = {"dividends_path": str(path)}
+
+
+def test_live_dividend_accrual_payment_and_repeat(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    _with_dividend(portfolio, tmp_path)
+    _write_market_data(tmp_path / "data", closes={"AAA": {"2024-01-30": 9.9, "2024-01-31": 9.9}})
+    holdings = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7000, asof_date="2024-01-29")
+    ex = portfolio.mark_to_market("2024-01-30")
+    assert ex["cash"] == 7000
+    assert ex["total_value"] == pytest.approx(10000)
+    assert ex["realized_pnl"] == pytest.approx(30)
+    assert not ex["realized_residual_alert"]
+    # 重启后到账，重跑不重复加现金。
+    portfolio = LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live")
+    for _ in range(2):
+        payment = portfolio.mark_to_market("2024-01-31")
+        assert payment["cash"] == 7030
+        assert payment["total_value"] == pytest.approx(10000)
+        assert not portfolio._load_state().dividend_receivables
+
+
+def test_live_dividend_catches_up_and_plan_uses_cash(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    _with_dividend(portfolio, tmp_path)
+    holdings = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7000, asof_date="2024-01-29")
+    portfolio.plan("2024-01-31")
+    assert portfolio._load_state().cash == 7030
+    assert portfolio.mark_to_market("2024-01-31")["cash"] == 7030
+
+
+def test_live_dividend_record_holdings_survive_sale_and_reconcile(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    _with_dividend(portfolio, tmp_path)
+    holdings = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7000, asof_date="2024-01-29")
+    # 登记后卖光仍有权益；真实现金对账不抹掉应收。
+    empty = _write_holdings(tmp_path / "empty.csv", [])
+    portfolio.reconcile(empty, cash=9970, asof_date="2024-01-30")
+    assert portfolio.mark_to_market("2024-01-30")["total_value"] == pytest.approx(10000)
+    assert portfolio.mark_to_market("2024-01-31")["cash"] == 10000
+    portfolio.reconcile(empty, cash=10000, asof_date="2024-01-31")
+    assert portfolio.mark_to_market("2024-01-31")["cash"] == 10000
+
+
+def test_live_dividend_existing_cash_snapshot_not_credited_again(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    _with_dividend(portfolio, tmp_path)
+    holdings = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7030, asof_date="2024-01-31")
+    assert portfolio.mark_to_market("2024-01-31")["cash"] == 7030
+
+
+def test_live_dividend_buyer_after_record_has_no_entitlement(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    _with_dividend(portfolio, tmp_path)
+    empty = _write_holdings(tmp_path / "empty.csv", [])
+    portfolio.reconcile(empty, cash=10000, asof_date="2024-01-29")
+    holdings = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7000, asof_date="2024-01-30")
+    assert portfolio.mark_to_market("2024-01-31")["cash"] == 7000
+
+
+def test_live_dividend_same_day_record_uses_reconciled_holdings(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    _with_dividend(portfolio, tmp_path)
+    path = Path(portfolio.config["live"]["dividends_path"])
+    path.write_text(path.read_text().replace("2024-01-29,2024-01-30", "2024-01-30,2024-01-30"))
+    empty = _write_holdings(tmp_path / "empty.csv", [])
+    portfolio.reconcile(empty, cash=10000, asof_date="2024-01-29")
+    holdings = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7000, asof_date="2024-01-30")
+    assert portfolio.mark_to_market("2024-01-31")["cash"] == 7030
 
 
 def test_reconcile_overwrites_state_and_appends_real_nav(tmp_path: Path):
@@ -116,7 +204,7 @@ def test_plan_renders_lot_rounded_ticket_without_touching_real_state(tmp_path: P
     assert state["pending_intents"]["B"]["target_weight"] == pytest.approx(0.5)
 
 
-def test_plan_uses_configured_execution_price_field(tmp_path: Path):
+def test_plan_uses_close_even_when_backtest_uses_open(tmp_path: Path):
     data_dir = tmp_path / "data"
     _write_market_data(
         data_dir,
@@ -133,8 +221,156 @@ def test_plan_uses_configured_execution_price_field(tmp_path: Path):
 
     with result.ticket_csv.open(newline="", encoding="utf-8") as handle:
         rows = {row["asset_id"]: row for row in csv.DictReader(handle)}
-    assert float(rows["A"]["est_price"]) == pytest.approx(8.0)
-    assert float(rows["B"]["est_price"]) == pytest.approx(9.0)
+    assert float(rows["A"]["est_price"]) == pytest.approx(10.0)
+    assert float(rows["B"]["est_price"]) == pytest.approx(10.0)
+    assert float(rows["A"]["quantity"]) == 200
+    assert float(rows["B"]["quantity"]) == 500
+    assert "基于 2024-01-31 收盘估算" in result.text
+    assert config["execution"]["execution_price_field"] == "open"
+
+
+def test_execution_config_shared_by_backtest_sim_and_live(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    config = portfolio.config
+    config["execution"] = {
+        "execution_price_field": "open", "fee": {"rate": 0.001, "min_fee": 5},
+        "weight_tolerance": 0.02, "weight_tolerance_by_asset_id": {"A": 0.01},
+        "cash_buffer_pct": 0.03, "skip_below_lot": False, "order_priority": "target_gap_desc",
+        "unfilled_policy": "cancel", "round_mode": "floor", "slippage_bps": 99,
+        "slippage": {
+            "default_bps": 3, "qdii_commodity_bps": 8,
+            "asset_bps": {"A": 4}, "code_bps": {"BBB": 7},
+            "participation_impact": {"enabled": True, "impact_bps_per_1pct": 10},
+        },
+    }
+    store = InMemoryStore()
+    try:
+        backtest = PlatformBacktestEngine(config, store, output_dir=tmp_path / "backtests")
+        sim = SimPortfolio("sim", config, store, PortfolioState(cash=10000), tmp_path / "checkpoint",
+                           output_root=tmp_path / "sim")
+        live = LivePortfolio("live_test", config, output_root=tmp_path / "live")
+        execution = backtest.execution.config
+        assert sim.execution.config == execution
+        assert live.execution.config == replace(execution, price_field="close")
+        assert execution.price_field == "open"
+        assert execution.slippage_bps == 3
+        assert execution.participation_impact == config["execution"]["slippage"]["participation_impact"]
+        assert execution.weight_tolerance_by_asset_id == {"A": 0.01}
+        assert execution.fee_profile.calculate(100) == 5
+    finally:
+        store.close()
+
+
+def _es_portfolio(tmp_path: Path, monkeypatch) -> LivePortfolio:
+    portfolio = _make_portfolio(tmp_path)
+    portfolio.config["strategy"] = {
+        "strategy_name": RiskParityExpectedShortfallFixedBudgetStrategy.name,
+        "params": {"universe": ["A", "B"], "init_calc_days": 0,
+                   "rebalance_frequency": "monthly", "rebalance_threshold": 0.05},
+    }
+    # 隔离调度与状态恢复；ES 数值求解由 test_expected_shortfall_strategy.py 覆盖。
+    monkeypatch.setattr(RiskParityExpectedShortfallFixedBudgetStrategy, "_inverse_vol_target",
+                        lambda self, context, universe: TargetPortfolio({"A": 0.5, "B": 0.5}))
+    return LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live")
+
+
+def test_live_restarts_match_continuous_strategy_and_repeat_initial_ticket(tmp_path: Path, monkeypatch):
+    portfolio = _es_portfolio(tmp_path, monkeypatch)
+    portfolio.reconcile(_write_holdings(tmp_path / "empty.csv", []), cash=10000, asof_date="2024-01-29")
+    data = portfolio._load_data(parse_date("2024-01-31"))
+    data.calendar.append(parse_date("2024-02-01"))
+    context = StrategyContext(
+        date=parse_date("2024-01-29"), assets=portfolio.assets, bars={},
+        state=copy.deepcopy(portfolio._load_state()), data=data,
+        params=portfolio.strategy_config["params"],
+    )
+    strategy = RiskParityExpectedShortfallFixedBudgetStrategy()
+    strategy.initialize(context)
+    observed = []
+    for day in ("2024-01-29", "2024-01-30", "2024-01-31"):
+        context.date = parse_date(day)
+        context.bars = data.bars_on(context.date)
+        expected = strategy.generate_targets(context)
+        portfolio = LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live")
+        result = portfolio.plan(day)
+        observed.append(result.has_target)
+        assert result.has_target == (expected is not None)
+        if expected is not None:
+            assert {key: intent.target_weight for key, intent in portfolio._load_state().pending_intents.items()} == expected.weights
+        first_ticket = result.ticket_txt.read_bytes()
+        repeated = LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live").plan(day)
+        assert repeated.has_target == result.has_target
+        assert repeated.ticket_txt.read_bytes() == first_ticket
+        assert portfolio._load_state().strategy_state["_live_strategy_runtime"]["runtime"]["opened"]
+    assert observed == [True, False, True]
+
+
+def test_live_legacy_holdings_bootstrap_and_reconcile_preserve_runtime(tmp_path: Path, monkeypatch):
+    portfolio = _es_portfolio(tmp_path, monkeypatch)
+    holdings = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7000, asof_date="2024-01-29")
+    assert not portfolio.plan("2024-01-29").has_target
+    saved = portfolio._load_state().strategy_state["_live_strategy_runtime"]
+    portfolio.reconcile(holdings, cash=7000, asof_date="2024-01-30")
+    assert portfolio._load_state().strategy_state["_live_strategy_runtime"] == saved
+    assert not LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live").plan("2024-01-30").has_target
+
+
+def test_live_config_change_does_not_restore_old_frequency(tmp_path: Path, monkeypatch):
+    portfolio = _es_portfolio(tmp_path, monkeypatch)
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", ["AAA,300,10"]), cash=7000, asof_date="2024-01-29")
+    assert not portfolio.plan("2024-01-29").has_target
+    portfolio.config["strategy"]["params"]["rebalance_frequency"] = "daily"
+    restarted = LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live")
+    assert restarted.plan("2024-01-30").has_target
+
+
+@pytest.mark.parametrize("command", ["plan", "cycle", "reconcile", "mark_to_market"])
+@pytest.mark.parametrize("empty", [False, True])
+def test_live_rejects_unaligned_data_before_writing(tmp_path: Path, command: str, empty: bool):
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=7000, asof_date="2024-01-30")
+    state_before, nav_before = portfolio.state_path.read_bytes(), portfolio.real_nav_path.read_bytes()
+    path = tmp_path / "data" / "BBB.csv"
+    lines = path.read_text().splitlines()
+    path.write_text("\n".join(lines[:1] if empty else lines[:-1]), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="行情未对齐.*B="):
+        if command == "reconcile":
+            portfolio.reconcile(holdings, cash=123, asof_date="2024-01-31")
+        else:
+            getattr(portfolio, command)("2024-01-31")
+    assert portfolio.state_path.read_bytes() == state_before
+    assert portfolio.real_nav_path.read_bytes() == nav_before
+    assert not portfolio.tickets_dir.exists()
+
+
+def test_cycle_rechecks_alignment_after_sync(tmp_path: Path, monkeypatch):
+    portfolio = _make_portfolio(tmp_path)
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", ["AAA,300,10"]), cash=7000, asof_date="2024-01-30")
+    synced = []
+
+    def incomplete_sync(end):
+        synced.append(end)
+        path = tmp_path / "data" / "BBB.csv"
+        path.write_text("\n".join(path.read_text().splitlines()[:-1]), encoding="utf-8")
+
+    monkeypatch.setattr(portfolio, "_sync_data", incomplete_sync)
+    with pytest.raises(RuntimeError, match="行情未对齐"):
+        portfolio.cycle("2024-01-31", do_sync=True,
+                        notifier=lambda *args: pytest.fail("行情未对齐时不得推送下单票"))
+    assert synced == [parse_date("2024-01-31")]
+
+
+def test_live_accepts_explicit_suspension_bar(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    path = tmp_path / "data" / "BBB.csv"
+    path.write_text(path.read_text().replace("1000,10000", "0,0"), encoding="utf-8")
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", []), cash=10000, asof_date="2024-01-30")
+    result = portfolio.plan("2024-01-31")
+    with result.ticket_csv.open(newline="", encoding="utf-8") as handle:
+        rows = {row["asset_id"]: row for row in csv.DictReader(handle)}
+    assert "REJECTED" in rows["B"]["note"]
 
 
 def test_plan_without_target_writes_no_op_ticket(tmp_path: Path):

@@ -13,7 +13,7 @@ import yaml
 from src.platform_core.corporate_actions import apply_due_splits, load_splits, resolve_split_effective_dates
 from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import MarketDataStore
-from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeeProfile
+from src.platform_core.execution import ExecutionConfig, ExecutionEngine
 from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
 from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.strategy import StrategyContext, get_strategy_class
@@ -64,30 +64,7 @@ class PlatformBacktestEngine:
         )
 
         execution_config = config.get("execution", {})
-        fee_config = execution_config.get("fee", {})
-        slippage_config = execution_config.get("slippage", {})
-        self.execution = ExecutionEngine(
-            ExecutionConfig(
-                fee_profile=FeeProfile(
-                    rate=float(fee_config.get("rate", 0.0002)),
-                    min_fee=float(fee_config.get("min_fee", 0.0)),
-                ),
-                price_field=execution_config.get("execution_price_field", "open"),
-                weight_tolerance=float(execution_config.get("weight_tolerance", 0.0005)),
-                unfilled_policy=execution_config.get("unfilled_policy", "retry_next_day"),
-                cash_buffer_pct=float(execution_config.get("cash_buffer_pct", 0.0)),
-                skip_below_lot=bool(execution_config.get("skip_below_lot", True)),
-                order_priority=execution_config.get("order_priority", "asset_id"),
-                slippage_bps=float(slippage_config.get("default_bps", execution_config.get("slippage_bps", 2.0))),
-                qdii_commodity_slippage_bps=float(
-                    slippage_config.get("qdii_commodity_bps", execution_config.get("qdii_commodity_slippage_bps", 6.0))
-                ),
-                slippage_by_asset_id=slippage_config.get("asset_bps"),
-                slippage_by_code=slippage_config.get("code_bps"),
-                participation_impact=slippage_config.get("participation_impact"),
-                round_mode=execution_config.get("round_mode", "round"),
-            )
-        )
+        self.execution = ExecutionEngine(ExecutionConfig.from_config(execution_config))
         self.slippage_scenario = execution_config.get("slippage_scenario", "custom")
         run_name = config.get("platform", {}).get("run_name", "platform_backtest")
         self.run_id = f"{run_name}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"

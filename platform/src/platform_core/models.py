@@ -100,6 +100,7 @@ class PortfolioState:
     strategy_state: dict[str, Any] = field(default_factory=dict)
     last_date: date | None = None
     dividend_receivables: list[dict[str, Any]] = field(default_factory=list)  # list of dict: {asset_id, payment_date, amount}
+    live_accounting: dict[str, Any] = field(default_factory=dict)
 
     def position(self, asset_id: str) -> Position:
         if asset_id not in self.positions:
@@ -150,6 +151,7 @@ class PortfolioState:
             },
             "cooldown_pool": dict(self.cooldown_pool),
             "strategy_state": self.strategy_state,
+            "live_accounting": self.live_accounting,
             "last_date": date_str(self.last_date),
             "dividend_receivables": [
                 {
@@ -179,6 +181,7 @@ class PortfolioState:
             },
             cooldown_pool={asset_id: int(days) for asset_id, days in payload.get("cooldown_pool", {}).items()},
             strategy_state=payload.get("strategy_state", {}),
+            live_accounting=payload.get("live_accounting", {}),
             last_date=parse_date(payload["last_date"]) if payload.get("last_date") else None,
             dividend_receivables=[
                 {
