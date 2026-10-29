@@ -2,6 +2,8 @@
 # 实盘账户沿用原portfolio id；实际历史已按确认成交重建，见账户目录execution_ledger.csv。
 platform:
   run_name: es_252d_fhs_stepdown_trend_200k_v2_563020_511130
+notify:
+  daily_charts: true
 data:
   data_dir: data
 assets:

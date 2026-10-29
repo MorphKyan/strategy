@@ -82,8 +82,21 @@ def resolve_holdings_path(raw: str) -> Path:
     return (ROOT / raw).resolve() if not Path(raw).is_absolute() else Path(raw)
 
 
-def notify_and_report(title: str, text: str, config: dict) -> bool:
-    ok = send_notification(title, text, config.get("notify"))
+def notify_and_report(title: str, text: str, config: dict, portfolio: LivePortfolio | None = None) -> bool:
+    mail = {}
+    if portfolio is not None and (config.get("notify") or {}).get("daily_charts") and title.startswith("组合日报 "):
+        day = title.split()[1]
+        title = f"组合日报 {day}"
+        try:
+            from src.platform_core.live_email import build_daily_email
+            body, images, annual = build_daily_email(config, portfolio.portfolio_dir, day, text)
+            mail = {"html_body": body, "inline_images": images}
+            text = f"成立以来年化收益 {annual}（252个交易日复利折算）\n\n{text}"
+        except Exception as exc:  # noqa: BLE001 - 绘图故障不能阻断文字日报与订单提醒。
+            # 缺少真实历史时保留正文，不能把未知归因画成零或阻断订单提醒。
+            print(f"日报图表生成失败（{type(exc).__name__}），回退文字日报。")
+            text += "\n\n图表暂不可用：历史数据核对或绘图失败，请检查运行日志与账户台账。"
+    ok = send_notification(title, text, config.get("notify"), **mail)
     print("推送成功" if ok else "推送失败或未配置渠道（票已落盘，见上方路径）")
     return ok
 
@@ -175,7 +188,7 @@ def main() -> int:
 
     # cycle
     holdings = resolve_holdings_path(args.holdings) if args.holdings else None
-    notifier = (lambda title, text: notify_and_report(title, text, config)) if args.notify else None
+    notifier = (lambda title, text: notify_and_report(title, text, config, portfolio)) if args.notify else None
     result = portfolio.cycle(
         asof_date=args.asof_date,
         holdings_csv=holdings,

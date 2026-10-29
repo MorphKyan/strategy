@@ -35,6 +35,7 @@ import smtplib
 import urllib.parse
 import urllib.request
 from email.header import Header
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
@@ -70,7 +71,8 @@ def resolve_channels(notify_config: dict[str, Any] | None) -> list[dict[str, Any
     return channels
 
 
-def send_notification(title: str, text: str, notify_config: dict[str, Any] | None = None) -> bool:
+def send_notification(title: str, text: str, notify_config: dict[str, Any] | None = None, *,
+                      html_body: str | None = None, inline_images: dict[str, bytes] | None = None) -> bool:
     """向所有已配置渠道推送；任一渠道成功即返回 True。失败打日志，绝不抛异常。"""
     try:
         channels = resolve_channels(notify_config)
@@ -88,7 +90,10 @@ def send_notification(title: str, text: str, notify_config: dict[str, Any] | Non
             if channel_type == "serverchan":
                 ok = _send_serverchan(channel, title, text)
             elif channel_type == "smtp":
-                ok = _send_smtp(channel, title, text)
+                if html_body is None:
+                    ok = _send_smtp(channel, title, text)
+                else:
+                    ok = _send_smtp(channel, title, text, html_body=html_body, inline_images=inline_images)
             else:
                 logger.warning("未知通知渠道类型: %r", channel_type)
                 ok = False
@@ -232,7 +237,8 @@ def markdown_to_html(text: str) -> str:
 # --------------------------------------------------------------------- 渠道
 
 
-def _send_smtp(channel: dict[str, Any], title: str, text: str) -> bool:
+def _send_smtp(channel: dict[str, Any], title: str, text: str, *,
+               html_body: str | None = None, inline_images: dict[str, bytes] | None = None) -> bool:
     host = channel.get("host", "")
     username = channel.get("username", "")
     recipients = list(channel.get("to") or [])
@@ -247,7 +253,18 @@ def _send_smtp(channel: dict[str, Any], title: str, text: str) -> bool:
     # 不支持 HTML 的客户端仍能看到原 markdown（本身可读）。
     message = MIMEMultipart("alternative")
     message.attach(MIMEText(text, "plain", "utf-8"))
-    message.attach(MIMEText(markdown_to_html(text), "html", "utf-8"))
+    html_part = MIMEText(html_body if html_body is not None else markdown_to_html(text), "html", "utf-8")
+    if inline_images:
+        related = MIMEMultipart("related")
+        related.attach(html_part)
+        for cid, content in inline_images.items():
+            part = MIMEImage(content, _subtype="png")
+            part.add_header("Content-ID", f"<{cid}>")
+            part.add_header("Content-Disposition", "inline", filename=f"{cid}.png")
+            related.attach(part)
+        message.attach(related)
+    else:
+        message.attach(html_part)
     message["Subject"] = Header(title, "utf-8")
     message["From"] = username
     message["To"] = ", ".join(recipients)
