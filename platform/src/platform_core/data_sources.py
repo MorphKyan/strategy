@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -74,11 +73,3 @@ class FinshareDataSource:
     def fetch_bars(self, code: str, start: str | None = None, end: str | None = None, adjust: str | None = None) -> pd.DataFrame:
         frame = self.fs.get_historical_data(code, start=start, end=end, adjust=adjust)
         return _to_frame(frame)
-
-    def fetch_financial_indicators(self, code: str, ann_date: str | None = None) -> pd.DataFrame:
-        frame = self.fs.get_financial_indicator(code, ann_date=ann_date)
-        return _to_frame(frame)
-
-
-def today_iso() -> str:
-    return date.today().isoformat()

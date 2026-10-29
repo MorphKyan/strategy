@@ -12,7 +12,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from src.platform_core.etf_premium import EtfPremiumStore, reset_store_cache
+from src.platform_core.etf_premium import EtfPremiumStore
 from src.platform_core.models import Asset, Bar, PortfolioState, Position
 from src.platform_core.strategies.premium_gated_satellite import PremiumGatedSatelliteStrategy
 from src.platform_core.strategy import BUILTIN_STRATEGIES, StrategyContext
@@ -36,7 +36,6 @@ def premium_data(tmp_path):
         tmp_path / "etf_nav" / "513100.csv", index=False
     )
     pd.DataFrame({"trade_date": dates, "close": close}).to_csv(tmp_path / "513100.csv", index=False)
-    reset_store_cache()
     return tmp_path, list(dates)
 
 
@@ -46,10 +45,8 @@ def premium_data(tmp_path):
 def test_premium_pairs_same_day_price_and_nav(premium_data):
     data_dir, dates = premium_data
     store = EtfPremiumStore(data_dir)
-    # lag=0 时 asof=D5(索引5) 应读到当日 10% 溢价
-    result = store.premium_at(SAT, dates[5], publication_lag_days=0)
-    assert result.observed_date == dates[5]
-    assert result.premium == pytest.approx(0.10)
+    series = store.load_premium_series("513100")
+    assert series.loc[dates[5], "premium"] == pytest.approx(0.10)
 
 
 def test_publication_lag_blocks_lookahead(premium_data):
@@ -80,8 +77,22 @@ def test_returns_none_when_history_shorter_than_lag(premium_data):
     assert store.premium_at(SAT, dates[1], publication_lag_days=5) is None
 
 
+@pytest.mark.parametrize("lag", [-1, 0, 1])
+def test_publication_lag_cannot_be_disabled(premium_data, lag):
+    data_dir, dates = premium_data
+    with pytest.raises(ValueError, match="发布滞后"):
+        EtfPremiumStore(data_dir).premium_at(SAT, dates[-1], publication_lag_days=lag)
+
+
+@pytest.mark.parametrize("nav", [0, -1, float("nan"), float("inf")])
+def test_invalid_nav_fails_before_building_premium(premium_data, nav):
+    data_dir, dates = premium_data
+    pd.DataFrame({"trade_date": dates, "unit_nav": nav}).to_csv(data_dir / "etf_nav/513100.csv", index=False)
+    with pytest.raises(ValueError, match="有限正数"):
+        EtfPremiumStore(data_dir).premium_at(SAT, dates[-1])
+
+
 def test_missing_nav_file_raises(tmp_path):
-    reset_store_cache()
     store = EtfPremiumStore(tmp_path)
     with pytest.raises(FileNotFoundError):
         store.premium_at(SAT, date(2024, 6, 3))
@@ -145,7 +156,9 @@ def test_gate_open_holds_satellite(premium_data):
     """溢价 0% ≤ 2% → 闸门开，卫星 30%、核心各 17.5%。"""
     data_dir, dates = premium_data
     ctx = _context(data_dir, dates[4], {a: 0.0 for a in CORE + [SAT]}, cash=1_000_000.0)
-    target = PremiumGatedSatelliteStrategy().generate_targets(ctx)
+    strategy = PremiumGatedSatelliteStrategy()
+    strategy.initialize(ctx)
+    target = strategy.generate_targets(ctx)
     assert target.weights[SAT] == pytest.approx(0.30)
     for asset_id in CORE:
         assert target.weights[asset_id] == pytest.approx(0.175)
@@ -155,7 +168,9 @@ def test_gate_closed_routes_weight_back_to_core(premium_data):
     """溢价 10% > 2% → 闸门关，卫星权重为 0，核心各 25%（组内比例不变）。"""
     data_dir, dates = premium_data
     ctx = _context(data_dir, dates[7], {a: 0.0 for a in CORE + [SAT]}, cash=1_000_000.0)
-    target = PremiumGatedSatelliteStrategy().generate_targets(ctx)
+    strategy = PremiumGatedSatelliteStrategy()
+    strategy.initialize(ctx)
+    target = strategy.generate_targets(ctx)
     assert SAT not in target.weights
     for asset_id in CORE:
         assert target.weights[asset_id] == pytest.approx(0.25)
@@ -168,16 +183,19 @@ def test_gate_closure_triggers_liquidation_of_held_satellite(premium_data):
     positions = {asset_id: 175_000.0 for asset_id in CORE}
     positions[SAT] = 300_000.0
     ctx = _context(data_dir, dates[7], positions, cash=0.0)
-    target = PremiumGatedSatelliteStrategy().generate_targets(ctx)
+    strategy = PremiumGatedSatelliteStrategy()
+    strategy.initialize(ctx)
+    target = strategy.generate_targets(ctx)
     assert target is not None, "闸门关闭却未触发再平衡，卫星会一直留在仓里"
     assert SAT not in target.weights
 
 
 def test_missing_nav_closes_gate(tmp_path):
     """没有净值数据时闸门默认关闭——没有信号就不下注。"""
-    reset_store_cache()
     ctx = _context(tmp_path, date(2024, 6, 10), {a: 0.0 for a in CORE + [SAT]}, cash=1_000_000.0)
-    target = PremiumGatedSatelliteStrategy().generate_targets(ctx)
+    strategy = PremiumGatedSatelliteStrategy()
+    strategy.initialize(ctx)
+    target = strategy.generate_targets(ctx)
     assert SAT not in target.weights
 
 
@@ -198,6 +216,7 @@ def test_gate_state_is_remembered_between_evaluations(premium_data):
     ctx = _context(data_dir, dates[4], {a: 0.0 for a in CORE + [SAT]}, cash=1_000_000.0)
     ctx.runtime = runtime
     ctx.data = _DataNoMonthEnd(data_dir)
+    strategy.initialize(ctx)
     assert strategy.generate_targets(ctx).weights[SAT] == pytest.approx(0.30)
 
     # 第二次：溢价已跳到 10%，但非重估日 → 沿用"开"
@@ -214,5 +233,21 @@ def test_daily_gate_eval_reacts_immediately(premium_data):
         data_dir, dates[7], {a: 0.0 for a in CORE + [SAT]}, cash=1_000_000.0,
         params_override={"gate_eval": "daily"},
     )
-    target = PremiumGatedSatelliteStrategy().generate_targets(ctx)
+    strategy = PremiumGatedSatelliteStrategy()
+    strategy.initialize(ctx)
+    target = strategy.generate_targets(ctx)
     assert SAT not in target.weights
+
+
+def test_new_strategy_run_reads_updated_premium_snapshot(premium_data):
+    data_dir, dates = premium_data
+    ctx = _context(data_dir, dates[4], {}, cash=1_000_000)
+    first = PremiumGatedSatelliteStrategy()
+    first.initialize(ctx)
+    assert SAT in first.generate_targets(ctx).weights
+
+    pd.DataFrame({"trade_date": dates, "close": 1.1}).to_csv(data_dir / "513100.csv", index=False)
+    ctx = _context(data_dir, dates[4], {}, cash=1_000_000)
+    second = PremiumGatedSatelliteStrategy()
+    second.initialize(ctx)
+    assert SAT not in second.generate_targets(ctx).weights

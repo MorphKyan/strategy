@@ -18,6 +18,7 @@ from src.platform_core.sync_universe import (
     merge_assets,
     parse_asset_spec,
 )
+from src.platform_core.corporate_actions import merge_event_table, validate_split_against_prices
 
 
 def parse_dividend(text: Any) -> float:
@@ -149,7 +150,6 @@ def _merge_event_records(
     split_records: list[dict[str, Any]],
     data_dir: Path,
 ) -> None:
-    from src.platform_core.corporate_actions import merge_event_table, validate_split_against_prices
     from src.platform_core.data_store import write_csv_stable
 
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -158,14 +158,7 @@ def _merge_event_records(
     if not dividend_frame.empty:
         output_path = data_dir / "platform_dividends.csv"
         existing = pd.read_csv(output_path, dtype=str).fillna("") if output_path.exists() else None
-        if existing is None:
-            merged = dividend_frame.iloc[0:0].copy()
-            notes: list[str] = []
-            additions = dividend_frame.astype(str).fillna("").to_dict("records")
-        else:
-            merged, notes, additions = _merge_scoped_events(
-                existing, dividend_frame, ["code", "ex_date"], merge_event_table
-            )
+        merged, notes, additions = _merge_scoped_events(existing, dividend_frame, ["code", "ex_date"])
         for note in notes:
             print(f"  [dividends] {note}")
         if additions:
@@ -181,14 +174,7 @@ def _merge_event_records(
     if not split_frame.empty:
         output_path = data_dir / "platform_splits.csv"
         existing = pd.read_csv(output_path, dtype=str).fillna("") if output_path.exists() else None
-        if existing is None:
-            merged = split_frame.iloc[0:0].copy()
-            notes = []
-            additions = split_frame.astype(str).fillna("").to_dict("records")
-        else:
-            merged, notes, additions = _merge_scoped_events(
-                existing, split_frame, ["code", "split_date"], merge_event_table
-            )
+        merged, notes, additions = _merge_scoped_events(existing, split_frame, ["code", "split_date"])
         for note in notes:
             print(f"  [splits] {note}")
         accepted = []
@@ -210,22 +196,18 @@ def _merge_event_records(
 
 
 def _merge_scoped_events(
-    existing: pd.DataFrame,
+    existing: pd.DataFrame | None,
     fetched: pd.DataFrame,
     key_columns: list[str],
-    merge_event_table: Any,
 ) -> tuple[pd.DataFrame, list[str], list[dict[str, Any]]]:
     """Compare only fetched symbols while retaining every unrelated ledger row."""
+    if existing is None:
+        return merge_event_table(None, fetched, key_columns)
     fetched_codes = set(fetched["code"].astype(str))
     existing_codes = existing["code"].astype(str)
     untouched = existing[~existing_codes.isin(fetched_codes)]
     scoped = existing[existing_codes.isin(fetched_codes)]
-    if scoped.empty:
-        merged_scoped = existing.iloc[0:0].copy()
-        notes: list[str] = []
-        additions = fetched.astype(str).fillna("").to_dict("records")
-    else:
-        merged_scoped, notes, additions = merge_event_table(scoped, fetched, key_columns)
+    merged_scoped, notes, additions = merge_event_table(scoped, fetched, key_columns)
     merged = pd.concat([untouched, merged_scoped], ignore_index=True)
     return merged, notes, additions
 

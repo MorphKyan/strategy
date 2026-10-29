@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from math import isfinite
 from pathlib import Path
 
 import pandas as pd
@@ -42,20 +43,15 @@ def sync_corporate_action_hfq_factor(code: str, data_dir: str | Path) -> str:
 
     existing_df: pd.DataFrame | None = None
     if factor_path.exists():
-        try:
-            raw_existing = pd.read_csv(factor_path)
-            if "trade_date" in raw_existing.columns and "hfq_factor" in raw_existing.columns:
-                raw_existing["trade_date_dt"] = pd.to_datetime(raw_existing["trade_date"], errors="coerce")
-                raw_existing = (
-                    raw_existing.dropna(subset=["trade_date_dt"])
-                    .drop_duplicates("trade_date_dt", keep="last")
-                    .sort_values("trade_date_dt")
-                    .reset_index(drop=True)
-                )
-                if not raw_existing.empty:
-                    existing_df = raw_existing
-        except Exception:
-            existing_df = None
+        raw_existing = pd.read_csv(factor_path)
+        if not {"trade_date", "hfq_factor"}.issubset(raw_existing.columns) or raw_existing.empty:
+            raise ValueError(f"Invalid existing HFQ factor file; original preserved: {factor_path}")
+        raw_existing["trade_date_dt"] = pd.to_datetime(raw_existing["trade_date"], errors="raise")
+        raw_existing["hfq_factor"] = pd.to_numeric(raw_existing["hfq_factor"], errors="raise")
+        if (raw_existing["trade_date_dt"].isna().any() or raw_existing["trade_date_dt"].duplicated().any()
+                or not raw_existing["hfq_factor"].map(lambda value: isfinite(value) and value > 0).all()):
+            raise ValueError(f"Invalid existing HFQ factor observations; original preserved: {factor_path}")
+        existing_df = raw_existing.sort_values("trade_date_dt").reset_index(drop=True)
 
     dividend_records: list[dict] = []
     dividend_path = root / "platform_dividends.csv"
@@ -118,7 +114,6 @@ def sync_corporate_action_hfq_factor(code: str, data_dir: str | Path) -> str:
 
         # Format historical segment
         existing_df["trade_date"] = existing_df["trade_date_dt"].dt.strftime("%Y-%m-%d")
-        existing_df["hfq_factor"] = pd.to_numeric(existing_df["hfq_factor"], errors="coerce")
         if "source" not in existing_df.columns:
             existing_df["source"] = LEGACY_FACTOR_SOURCE
         else:

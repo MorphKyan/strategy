@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -23,7 +24,7 @@ from scripts.analyze_es_robustness import (  # noqa: E402
     es_risk_contributions,
     solve_weights,
 )
-from src.platform_core.metrics import build_platform_metrics  # noqa: E402
+from src.platform_core.metrics import read_csv_or_empty  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,21 +33,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sensitivity-report-root", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--minimum-active-observations", type=int, default=126)
+    parser.add_argument("--start-date", help="Optional lower bound for sensitivity starts; no implicit cutoff.")
+    parser.add_argument("--diagnostics-csv", type=Path, help="Optional rebalance diagnostics to compare proxy and method weights.")
     return parser.parse_args()
 
 
 def run_identity(path: Path) -> tuple[str, int, str, str]:
     config = yaml.safe_load((path / "config_snapshot.yaml").read_text(encoding="utf-8"))
     params = config["strategy"]["params"]
-    proxy = "index_cba21801" if any("CBA21801" in item for item in params["universe"]) else "etf_511090"
+    codes = {item.split(":")[-1].split(".")[0] for item in params["universe"]}
+    if "CBA21801" in codes:
+        proxy = "index_cba21801"
+    elif "511090" in codes:
+        proxy = "etf_511090"
+    else:
+        raise ValueError("Robustness comparison requires the 511090 or CBA21801 bond proxy.")
     return proxy, int(params["rolling_window"]), str(params.get("es_method", "historical")), str(
         json.loads((path / "manifest.json").read_text(encoding="utf-8"))["execution_model"]["slippage_scenario"]
     )
 
 
-def execution_risk_rows(path: Path, data_dir: Path) -> list[dict[str, object]]:
+def execution_risk_rows(path: Path) -> list[dict[str, object]]:
+    trades = read_csv_or_empty(path / "trades.csv")
+    positions = read_csv_or_empty(path / "positions.csv")
+    if trades.empty or positions.empty:
+        return []
     config = yaml.safe_load((path / "config_snapshot.yaml").read_text(encoding="utf-8"))
-    prices, universe, budgets = config_prices(config, data_dir)
+    prices, universe, budgets = config_prices(config)
     params = config["strategy"]["params"]
     window = int(params["rolling_window"])
     method = str(params.get("es_method", "historical"))
@@ -54,11 +67,7 @@ def execution_risk_rows(path: Path, data_dir: Path) -> list[dict[str, object]]:
     decay = float(params.get("fhs_decay", 0.94))
     proxy, _, _, scenario = run_identity(path)
     returns = prices.pct_change().dropna()
-    trades = pd.read_csv(path / "trades.csv")
-    positions = pd.read_csv(path / "positions.csv")
     nav = pd.read_csv(path / "nav.csv").set_index("date")
-    if trades.empty or positions.empty:
-        return []
     trades["date"] = pd.to_datetime(trades["date"])
     trades["signal_date"] = pd.to_datetime(trades["signal_date"])
     positions["date"] = pd.to_datetime(positions["date"])
@@ -85,6 +94,7 @@ def execution_risk_rows(path: Path, data_dir: Path) -> list[dict[str, object]]:
         nav_row = nav.loc[date_key]
         row: dict[str, object] = {
             "run_id": path.name,
+            "theoretical_basis": "current_data_and_unconstrained_ES_code",
             "proxy": proxy,
             "window": window,
             "method": method,
@@ -93,9 +103,9 @@ def execution_risk_rows(path: Path, data_dir: Path) -> list[dict[str, object]]:
             "signal_date": signal_date.strftime("%Y-%m-%d"),
             "cash_weight": float(nav_row["cash"] / nav_row["total_value"]),
             "actual_to_theoretical_weight_l1": float(np.abs(actual_relative - theoretical).sum()),
-            "actual_budget_l1_error": float(np.nansum(np.abs(contributions - budgets))),
-            "actual_budget_max_abs_error": float(np.nanmax(np.abs(contributions - budgets))),
-            "theoretical_budget_l1_error": float(np.nansum(np.abs(theoretical_contributions - budgets))),
+            "actual_budget_l1_error": float(np.abs(contributions - budgets).sum()),
+            "actual_budget_max_abs_error": float(np.abs(contributions - budgets).max()),
+            "theoretical_budget_l1_error": float(np.abs(theoretical_contributions - budgets).sum()),
         }
         for index, asset_id in enumerate(universe):
             row[f"actual_weight::{asset_id}"] = float(actual_relative[index])
@@ -105,26 +115,34 @@ def execution_risk_rows(path: Path, data_dir: Path) -> list[dict[str, object]]:
     return rows
 
 
-def summarize_sensitivities(report_root: Path, minimum_active: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+def summarize_sensitivities(report_root: Path, minimum_active: int, start_date: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     all_rows: list[pd.DataFrame] = []
     for manifest_path in sorted(report_root.rglob("manifest.json")):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        summary_path = Path(manifest["summary_csv"])
-        if not summary_path.exists():
+        if "summary_csv" not in manifest:
             continue
+        summary_path = manifest_path.parent / "sensitivity_summary.csv"
+        if not summary_path.exists():
+            summary_path = Path(manifest["summary_csv"])
         frame = pd.read_csv(summary_path)
-        config_name = Path(manifest["config"]).stem
+        config_name = Path(str(manifest["config"]).replace("\\", "/")).stem
+        identity = re.fullmatch(r"es_robustness_(etf_511090|index_cba21801)_w(\d+)_(historical|filtered)", config_name)
+        if identity is None:
+            raise ValueError(f"Unrecognized robustness config: {config_name}")
         frame["config_name"] = config_name
-        frame["proxy"] = "index_cba21801" if "index_cba21801" in config_name else "etf_511090"
-        frame["window"] = pd.to_numeric(config_name.split("_w", 1)[1].split("_", 1)[0])
-        frame["method"] = "filtered" if config_name.endswith("filtered") else "historical"
+        frame["proxy"] = identity[1]
+        frame["window"] = int(identity[2])
+        frame["method"] = identity[3]
         all_rows.append(frame)
+    if not all_rows:
+        raise ValueError(f"No sensitivity summaries found: {report_root}")
     raw = pd.concat(all_rows, ignore_index=True)
     raw["start_date"] = pd.to_datetime(raw["start_date"])
     matched = raw.loc[
-        (raw["start_date"] >= pd.Timestamp("2023-06-13"))
-        & (pd.to_numeric(raw["active_observations"], errors="coerce") >= minimum_active)
+        pd.to_numeric(raw["active_observations"], errors="coerce") >= minimum_active
     ].copy()
+    if start_date is not None:
+        matched = matched.loc[matched["start_date"] >= pd.Timestamp(start_date)]
     groups = ["proxy", "window", "method", "slippage_scenario"]
     summary = matched.groupby(groups).agg(
         valid_start_count=("start_date", "count"),
@@ -164,7 +182,7 @@ def summarize_weight_comparisons(diagnostics: pd.DataFrame) -> tuple[pd.DataFram
         index=["window", "method", "date", "canonical_asset"],
         columns="proxy",
         values="weight",
-    ).dropna()
+    ).reindex(columns=["etf_511090", "index_cba21801"]).dropna()
     proxy_pivot["absolute_difference"] = (
         proxy_pivot["etf_511090"] - proxy_pivot["index_cba21801"]
     ).abs()
@@ -176,7 +194,7 @@ def summarize_weight_comparisons(diagnostics: pd.DataFrame) -> tuple[pd.DataFram
         index=["proxy", "window", "date", "canonical_asset"],
         columns="method",
         values="weight",
-    ).dropna()
+    ).reindex(columns=["filtered", "historical"]).dropna()
     method_pivot["absolute_difference"] = (
         method_pivot["filtered"] - method_pivot["historical"]
     ).abs()
@@ -188,6 +206,8 @@ def summarize_weight_comparisons(diagnostics: pd.DataFrame) -> tuple[pd.DataFram
 
 def main() -> int:
     args = parse_args()
+    if args.minimum_active_observations < 2:
+        raise ValueError("minimum-active-observations must be at least 2.")
     backtest_root = Path(args.backtest_root)
     report_root = Path(args.sensitivity_report_root)
     output_dir = Path(args.output_dir)
@@ -197,8 +217,7 @@ def main() -> int:
         report_root = PLATFORM_ROOT / report_root
     if not output_dir.is_absolute():
         output_dir = PLATFORM_ROOT / output_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
-    data_dir = PLATFORM_ROOT / "data"
+    output_dir.mkdir(parents=True, exist_ok=False)
 
     performance_rows: list[dict[str, object]] = []
     risk_rows: list[dict[str, object]] = []
@@ -206,14 +225,22 @@ def main() -> int:
         if not path.is_dir() or not (path / "manifest.json").exists():
             continue
         proxy, window, method, scenario = run_identity(path)
-        metrics = build_platform_metrics(path)
+        metrics_path = path / "metrics.json"
+        metrics = (json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.exists()
+                   else json.loads((path / "manifest.json").read_text(encoding="utf-8"))["metrics"])
         performance_rows.append(
             {"run_id": path.name, "proxy": proxy, "window": window, "method": method, "scenario": scenario, **metrics}
         )
-        risk_rows.extend(execution_risk_rows(path, data_dir))
+        risk_rows.extend(execution_risk_rows(path))
 
+    if not performance_rows:
+        raise ValueError(f"No backtest artifacts found: {backtest_root}")
     performance = pd.DataFrame(performance_rows)
-    execution_risk = pd.DataFrame(risk_rows)
+    execution_risk = pd.DataFrame(risk_rows, columns=None if risk_rows else [
+        "proxy", "window", "method", "scenario", "trade_date", "cash_weight",
+        "actual_to_theoretical_weight_l1", "actual_budget_l1_error", "actual_budget_max_abs_error",
+        "theoretical_budget_l1_error",
+    ])
     performance.to_csv(output_dir / "backtest_performance.csv", index=False)
     execution_risk.to_csv(output_dir / "execution_risk_budget_diagnostics.csv", index=False)
     execution_summary = execution_risk.groupby(["proxy", "window", "method", "scenario"]).agg(
@@ -228,14 +255,13 @@ def main() -> int:
     execution_summary.to_csv(output_dir / "execution_risk_budget_summary.csv", index=False)
 
     sensitivity_raw, sensitivity_summary = summarize_sensitivities(
-        report_root, args.minimum_active_observations
+        report_root, args.minimum_active_observations, args.start_date
     )
     sensitivity_raw.to_csv(output_dir / "sensitivity_all_starts.csv", index=False)
     sensitivity_summary.to_csv(output_dir / "sensitivity_matched_summary.csv", index=False)
 
-    diagnostics_path = output_dir.parent / "rebalance_diagnostics.csv"
-    if diagnostics_path.exists():
-        diagnostics = pd.read_csv(diagnostics_path)
+    if args.diagnostics_csv is not None:
+        diagnostics = pd.read_csv(args.diagnostics_csv)
         proxy_weights, method_weights = summarize_weight_comparisons(diagnostics)
         proxy_weights.to_csv(output_dir / "index_vs_etf_weight_difference.csv", index=False)
         method_weights.to_csv(output_dir / "filtered_vs_historical_weight_difference.csv", index=False)

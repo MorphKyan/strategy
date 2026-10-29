@@ -116,3 +116,23 @@ def test_extends_existing_factor_compounding_new_dividend(tmp_path: Path):
     assert factor["source"].tolist() == ["legacy_research", "corporate_actions", "corporate_actions"]
     assert "extended" in note
     assert "1 new events" in note
+
+
+@pytest.mark.parametrize("original", [
+    "trade_date,legacy_factor\n2025-12-01,9.9\n",
+    "trade_date,hfq_factor\nnot-a-date,9.9\n",
+    "trade_date,hfq_factor\n2025-12-01,9.9\n2025-12-01,2\n",
+    "trade_date,hfq_factor\n2025-12-01,inf\n",
+    "trade_date,hfq_factor\n2025-12-01,0\n",
+])
+def test_invalid_existing_factor_is_never_rebuilt_over_historical_file(tmp_path, original):
+    pd.DataFrame({"trade_date": ["2025-12-01", "2025-12-02"], "close": [10, 9]}).to_csv(
+        tmp_path / "A.csv", index=False)
+    pd.DataFrame({"code": ["A"], "ex_date": ["2025-12-02"], "dividend_per_share": [1]}).to_csv(
+        tmp_path / "platform_dividends.csv", index=False)
+    path = tmp_path / "A_hfq_factor.csv"
+    path.write_text(original)
+    before = path.read_bytes()
+    with pytest.raises(ValueError):
+        sync_corporate_action_hfq_factor("A", tmp_path)
+    assert path.read_bytes() == before

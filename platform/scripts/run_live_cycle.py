@@ -4,7 +4,7 @@
 
   # ① 收盘后导入真实持仓（券商 App 抄下来存成两列 CSV：code,quantity[,cost_basis]）
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py reconcile ^
-      --config configs\\baseline_r1_domestic_rolling.yaml --holdings my_holdings.csv --cash 12345.67
+      --config configs\\domestic_rolling_bond_10y.yaml --holdings my_holdings.csv --cash 12345.67
 
   # ①b 当日有本金出入时必须申报 --external-flow（申购为正、赎回为负）：
   #    份额化核算按当日单位净值增发/注销份额，单位净值曲线连续，收益率不被资金出入污染。
@@ -19,13 +19,13 @@
 
   # ② 生成明日下单票（打印到终端，同时落盘 tickets/ticket_<date>.csv/.txt）
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py plan ^
-      --config configs\\baseline_r1_domestic_rolling.yaml [--notify]
+      --config configs\\domestic_rolling_bond_10y.yaml [--notify]
 
   # ③ 一键环路（适合 Windows 任务计划每个工作日收盘后调用）：
   #    sync 行情 → （提供 --holdings 时）reconcile → plan → （--notify 时）推送
   #    非交易日/数据未更新到当日时自动跳过，不会重复出票
   .\\env\\Scripts\\python.exe platform\\scripts\\run_live_cycle.py cycle ^
-      --config configs\\baseline_r1_domestic_rolling.yaml --sync --notify
+      --config configs\\domestic_rolling_bond_10y.yaml --sync --notify
 
 推送渠道零配置：设环境变量 RQ_SERVERCHAN_KEY（Server酱/微信）或
 RQ_SMTP_HOST/RQ_SMTP_USERNAME/RQ_SMTP_PASSWORD/RQ_SMTP_TO（邮件）即自动启用，
@@ -71,14 +71,9 @@ from src.platform_core.live import LivePortfolio
 from src.platform_core.notify import send_notification
 
 
-def load_config(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
-
-
 def build_portfolio(args: argparse.Namespace) -> tuple[LivePortfolio, dict]:
     config_path = (ROOT / args.config).resolve() if not Path(args.config).is_absolute() else Path(args.config)
-    config = load_config(config_path)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     portfolio_id = args.portfolio or f"live_{config_path.stem}"
     return LivePortfolio(portfolio_id, config, output_root=args.output_root), config
 

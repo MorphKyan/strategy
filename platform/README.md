@@ -6,7 +6,7 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 
 - `scripts/run_platform_backtest.py`: platform backtest entrypoint.
 - `scripts/run_platform_experiment.py`: standardized experiment runner with candidate/baseline comparison.
-- `scripts/run_sim_portfolio.py`: create or advance a simulated portfolio from a checkpoint.
+- `scripts/run_sim_portfolio.py`: create a simulated portfolio from a checkpoint; an existing `--portfolio-id` resumes saved state without requiring the initial checkpoint.
 - `scripts/sync_platform_data.py`: sync platform market and fundamental data.
 - `scripts/run_sensitivity.py`: start-date sensitivity analysis.
 - `scripts/run_dashboard.py`: launch the local read-only browser dashboard (port defaults to 8501, override with the `PORT` environment variable).
@@ -44,30 +44,29 @@ Run from the repository root:
 Use `.\env\Scripts\python.exe` for venv/uv layouts, or substitute `.\env\python.exe` when the local environment exposes Python there.
 
 ```powershell
-.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
-.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_ewma.yaml --start-date 2019-02-28 --end-date 2025-06-30
-.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
-.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\domestic_rolling_bond_10y.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\domestic_ewma_bond_10y.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\domestic_rolling_bond_10y.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\domestic_rolling_bond_10y.yaml --end-date 2025-06-30
 .\env\Scripts\python.exe platform\scripts\validate_hfq_data.py --codes 510300 518880 511260
-.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
-.\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
+.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\domestic_rolling_bond_10y.yaml
+.\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\domestic_rolling_bond_10y.yaml --checkpoint <checkpoint.json> --asof-date 2026-05-30
 .\env\Scripts\python.exe platform\scripts\run_dashboard.py
-.\env\Scripts\python.exe platform\scripts\run_live_cycle.py reconcile --config configs\baseline_r1_domestic_rolling.yaml --holdings <holdings.csv> --cash <float>
-.\env\Scripts\python.exe platform\scripts\run_live_cycle.py plan --config configs\baseline_r1_domestic_rolling.yaml
-.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\baseline_r1_domestic_rolling.yaml --sync --notify
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py reconcile --config configs\domestic_rolling_bond_10y.yaml --holdings <holdings.csv> --cash <float>
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py plan --config configs\domestic_rolling_bond_10y.yaml
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\domestic_rolling_bond_10y.yaml --sync --notify
 ```
 
-The platform scripts change their working directory to `platform/`, so relative paths such as `configs/baseline_r1_domestic_rolling.yaml`, `data/`, and `results/platform/` are platform-local.
+The platform scripts change their working directory to `platform/`, so relative paths such as `configs/domestic_rolling_bond_10y.yaml`, `data/`, and `results/platform/` are platform-local.
 
 All generated markdown reports should be written in Chinese. Keep exact config paths, commands, CSV column names, and metric keys unchanged when they are used as machine-readable identifiers.
 
-## Research Validation Rules
+## 研究验证规则
 
-- `2025-07-01` and later data is the fixed final test sample. Research, parameter selection, ETF basket selection, candidate filtering, and recommendation writing must use only data up to `2025-06-30`.
-- Before a platform strategy or ETF basket can be submitted as a research result, run start-date sensitivity on the training/research sample. Generate one `start_date` every 2 calendar months from the earliest common available trading date through the training end date, with the backtest end date capped at `2025-06-30`.
-- The sensitivity report must show whether Sharpe, annualized return, max drawdown, turnover, trade count, rejected order count, and candidate-vs-baseline ranking remain stable across start dates.
-- After the candidate strategy, parameters, ETF basket, rebalance rules, and acceptance thresholds are frozen, run the final test stage on `2025-07-01` and later data. Do not modify the candidate after seeing final test results.
-- A candidate may be recommended for merge only if it passes training-sample comparisons, start-date sensitivity, and final test-sample validation. Otherwise mark it as Failed or research-only.
+- 用户定向研究使用用户指定的窗口；回测、实验和敏感性命令默认 `standard`，运行 `default + stress` 两个场景。
+- 起点敏感性默认每两个自然月生成一个起点；`--step` 只用于明确指定的交易日步长诊断，`--start-date` 和 `--end-date` 限定运行窗口。
+- 自主选题与候选验收遵循根目录 `.agents/skills/run-autonomous-quant-research/SKILL.md`；`--slippage-scenario all` 显式运行三个执行场景。定向研究不自动套用自主研究样本划分或验收阈值。
+- 对比报告展示实际指标及验证范围，候选结论依据所选研究流程、成本场景与敏感性证据判断。
 
 ## Implemented Capabilities
 
@@ -85,7 +84,7 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 - Research-grade metrics: annualized return, volatility, max drawdown, Sharpe, turnover, trade/order counts, rejection counts, pending-intent pressure, and cash drag.
 - CSV-only visualization module for NAV/drawdown, position weights, cash/pending-intent effects, and rejected-order reasons.
 - Local Streamlit dashboard with four pages: overview, run analysis (net-value/return display with trailing-window rebasing, benchmark overlay and excess-return curve, monthly return heatmap, yearly returns, rolling volatility/Sharpe, training vs frozen-sample table, positions with cash layer, orders and trades), run comparison (2-5 runs re-normalized at the selected window start), and strategy configs.
-- Start-date sensitivity analysis for research submissions should use one start date every 2 calendar months with the sample capped at `2025-06-30`; ad hoc diagnostic runs may use other step sizes when clearly labeled.
+- 起点敏感性使用每两个自然月一个起点；样本窗口由本次研究模式和运行参数决定，诊断可显式指定交易日步长。
 - HFQ validation against the old research data chain.
 
 ## Archive Structure
@@ -100,6 +99,8 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 
 Raw run directories contain execution-level artifacts. Report directories contain decision-level summaries, metrics, config copies, and pointers back to raw paths.
 The Streamlit dashboard loads only fixed-config backtests by default. Its global sidebar option can additionally load temporary backtests. Training, final-test, experiment, sensitivity, generated-config, partial-window, and ad hoc runs must never be written to the fixed-config directory.
+
+Direct runs record `artifact_provenance` in their manifest. A run enters `results/backtests/` only when its source matches a fixed config and its actual window matches the full common history. Older runs without this proof remain available through the temporary-backtest option; historical files are not moved or rewritten.
 
 ## Platform Docs
 

@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-import csv
+import copy
 import json
-import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from src.platform_core.corporate_actions import apply_due_splits, load_splits, resolve_split_effective_dates
+from src.platform_core.corporate_actions import (
+    apply_due_dividends, apply_due_splits, load_corporate_actions, resolve_split_effective_dates,
+)
 from src.platform_core.data import LocalCsvBarData
-from src.platform_core.data_store import MarketDataStore
+from src.platform_core.data_store import MarketDataStore, assets_from_config
 from src.platform_core.engine import load_checkpoint, load_strategy_config
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine
-from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
-from src.platform_core.storage import SQLiteStore, InMemoryStore
+from src.platform_core.models import PortfolioState, date_str, parse_date
+from src.platform_core.storage import SQLiteStore, InMemoryStore, write_csv_rows, write_json
 from src.platform_core.strategy import StrategyContext, get_strategy_class
 
 
@@ -33,12 +34,13 @@ class SimPortfolio:
         self.store = store
         self.state = state
         self.source_checkpoint = Path(source_checkpoint)
-        self.assets = self._load_assets(config.get("assets", []))
+        self.assets = {asset.asset_id: asset for asset in assets_from_config(config.get("assets", []))}
+        self.state.validate_assets(self.assets)
         self.strategy_config = load_strategy_config(config.get("strategy"))
         self.output_root = Path(output_root or config.get("output", {}).get("sim_dir", "results/sim_portfolios"))
         self.portfolio_dir = self.output_root / self.portfolio_id
         self.state_path = self.portfolio_dir / "portfolio_state.json"
-        self.portfolio_dir.mkdir(parents=True, exist_ok=True)
+        self.committed_run_ids: list[str] = []
 
         data_config = config.get("data", {})
         self.data_fetch = bool(data_config.get("fetch", False))
@@ -46,25 +48,8 @@ class SimPortfolio:
 
         self.execution = ExecutionEngine(ExecutionConfig.from_config(config.get("execution", {})))
         self.code_to_asset_id = {asset.code: asset_id for asset_id, asset in self.assets.items()}
-        self.dividends = self._load_dividends()
-        self.splits = load_splits(self.config)
-
-    def _load_dividends(self) -> list[dict[str, Any]]:
-        platform_dir = Path(__file__).resolve().parent.parent.parent
-        path = platform_dir / "data" / "platform_dividends.csv"
-        if not path.exists():
-            return []
-        dividends = []
-        with path.open("r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                dividends.append({
-                    "code": row["code"].strip(),
-                    "ex_date": parse_date(row["ex_date"].strip()),
-                    "payment_date": parse_date(row["payment_date"].strip()),
-                    "dividend_per_share": float(row["dividend_per_share"].strip()),
-                })
-        return dividends
+        self.dividends = load_corporate_actions(self.config, "dividends")
+        self.splits = load_corporate_actions(self.config, "splits")
 
     @classmethod
     def load(
@@ -83,8 +68,12 @@ class SimPortfolio:
         state_path = root / portfolio_id / "portfolio_state.json"
         if not state_path.exists():
             raise FileNotFoundError(f"模拟组合状态不存在: {state_path}（先用 create_from_checkpoint 建立）")
-        state = PortfolioState.from_dict(json.loads(state_path.read_text(encoding="utf-8")))
-        return cls(portfolio_id, config, store, state, source_checkpoint=state_path, output_root=output_root)
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+        state = PortfolioState.from_dict(payload)
+        origin = state.strategy_state.get("_sim_source_checkpoint", str(state_path))
+        portfolio = cls(portfolio_id, config, store, state, source_checkpoint=origin, output_root=output_root)
+        portfolio.committed_run_ids = payload.get("committed_run_ids", [])
+        return portfolio
 
     @classmethod
     def create_from_checkpoint(
@@ -97,14 +86,18 @@ class SimPortfolio:
     ) -> "SimPortfolio":
         checkpoint = Path(checkpoint_path)
         state = load_checkpoint(checkpoint)
-        resolved_id = portfolio_id or f"sim_{checkpoint.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        state.strategy_state["_sim_source_checkpoint"] = str(checkpoint)
+        resolved_id = portfolio_id or f"sim_{checkpoint.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         portfolio = cls(resolved_id, config, store, state, checkpoint, output_root)
-        portfolio._write_state(portfolio.state_path)
+        portfolio.portfolio_dir.mkdir(parents=True, exist_ok=False)
+        write_json(portfolio.state_path, portfolio.state.to_dict())
         store.create_sim_portfolio(resolved_id, checkpoint, portfolio.state_path, config)
         return portfolio
 
     def advance(self, asof_date: str) -> SimAdvanceResult:
         target_date = parse_date(asof_date)
+        state = copy.deepcopy(self.state)
+        state.strategy_state.setdefault("_sim_source_checkpoint", str(self.source_checkpoint))
         self._sync_data_if_requested(target_date)
         data = LocalCsvBarData(
             data_dir=self.market_dir,
@@ -112,9 +105,11 @@ class SimPortfolio:
             start_date=(self.config.get("backtest") or {}).get("start_date"),
             end_date=date_str(target_date),
         )
+        processing_dates = list(data.calendar)
+        data.extend_calendar()
 
-        run_dir = self.portfolio_dir / "runs" / f"{date_str(target_date)}_{datetime.now().strftime('%H%M%S')}"
-        run_dir.mkdir(parents=True, exist_ok=True)
+        run_dir = self.portfolio_dir / "runs" / f"{date_str(target_date)}_{datetime.now().strftime('%H%M%S_%f')}"
+        run_dir.mkdir(parents=True, exist_ok=False)
 
         order_rows: list[dict[str, Any]] = []
         trade_rows: list[dict[str, Any]] = []
@@ -122,51 +117,30 @@ class SimPortfolio:
         active_strategy = None
         active_strategy_runtime: dict[str, Any] = {}
         active_strategy_version_id: int | None = None
+        identity = {"strategy_name": self.strategy_config["strategy_name"],
+                    "params": self.strategy_config.get("params", {})}
 
         resolve_split_effective_dates(self.splits, self.code_to_asset_id, data)
 
-        for current_date in data.calendar:
-            if self.state.last_date and current_date <= self.state.last_date:
+        for current_date in processing_dates:
+            if state.last_date and current_date <= state.last_date:
                 continue
             if current_date > target_date:
                 continue
 
             # 1. Process Splits（在 split_date 后首个真实交易日生效，见 corporate_actions）
-            apply_due_splits(self.splits, self.state, self.code_to_asset_id, current_date)
+            apply_due_splits(self.splits, state, self.code_to_asset_id, current_date)
 
-            # 2. Process Ex-Dividends
-            for div in self.dividends:
-                if div["ex_date"] == current_date:
-                    asset_id = self.code_to_asset_id.get(div["code"])
-                    if asset_id and asset_id in self.state.positions:
-                        pos = self.state.positions[asset_id]
-                        if pos.quantity > 0:
-                            amount = pos.quantity * div["dividend_per_share"]
-                            self.state.dividend_receivables.append({
-                                "asset_id": asset_id,
-                                "payment_date": div["payment_date"],
-                                "amount": amount,
-                            })
-
-            # 3. Process Cash Payouts
-            remaining_receivables = []
-            for item in self.state.dividend_receivables:
-                if item["payment_date"] <= current_date:
-                    self.state.cash += item["amount"]
-                else:
-                    remaining_receivables.append(item)
-            self.state.dividend_receivables = remaining_receivables
+            apply_due_dividends(self.dividends, state, self.code_to_asset_id, current_date)
 
             bars = data.bars_on(current_date)
             if active_strategy is None:
                 if self.strategy_config.get("cancel_pending_on_start", False):
-                    self.state.pending_intents.clear()
+                    state.pending_intents.clear()
                 strategy_cls = get_strategy_class(self.strategy_config["strategy_name"])
-                version_id = self.strategy_config.get("strategy_version_id")
-                if version_id is None:
-                    version_id = self.store.ensure_builtin_version(strategy_cls, self.strategy_config.get("params", {}))
-                    self.strategy_config["strategy_version_id"] = version_id
-                self.store.get_strategy_version(int(version_id))
+                version_id = self.store.ensure_builtin_version(strategy_cls, self.strategy_config.get("params", {}))
+                self.strategy_config["strategy_version_id"] = version_id
+                identity["source_hash"] = self.store.get_strategy_version(version_id)["source_hash"]
                 self.store.add_portfolio_reference(int(version_id), self.portfolio_id)
                 active_strategy = strategy_cls()
                 active_strategy_runtime = {}
@@ -175,26 +149,33 @@ class SimPortfolio:
                         date=current_date,
                         assets=self.assets,
                         bars=bars,
-                        state=self.state,
+                        state=state,
                         data=data,
                         params=self.strategy_config.get("params", {}),
                         runtime=active_strategy_runtime,
                     )
                 )
+                saved = state.strategy_state.get("_strategy_runtime", {})
+                if saved.get("identity") == identity:
+                    active_strategy_runtime.update(saved["runtime"])
+                elif "opened" in active_strategy_runtime and any(
+                    position.quantity > 1e-9 for position in state.positions.values()
+                ):
+                    active_strategy_runtime["opened"] = True
                 active_strategy_version_id = int(version_id)
 
-            self.state.decrement_cooldowns()
-            pending_target = self._target_from_pending(current_date)
+            state.decrement_cooldowns()
+            pending_target = state.pending_target(current_date)
             if pending_target is not None:
                 orders, trades = self.execution.apply_target(
                     current_date=current_date,
-                    state=self.state,
+                    state=state,
                     assets=self.assets,
                     bars=bars,
                     target=pending_target,
                     cooldown_days=int(active_strategy_runtime.get("cooldown_days", 0)),
                     close_absent_positions=False,
-                    signal_dates=self._signal_dates_from_pending(current_date),
+                    signal_dates=state.pending_signal_dates(current_date),
                 )
                 order_rows.extend(order.to_row() for order in orders)
                 trade_rows.extend(trade.to_row() for trade in trades)
@@ -205,45 +186,51 @@ class SimPortfolio:
                     date=current_date,
                     assets=self.assets,
                     bars=bars,
-                    state=self.state,
+                    state=state,
                     data=data,
                     params=self.strategy_config.get("params", {}),
                     runtime=active_strategy_runtime,
                 )
             )
             if target is not None:
-                self._replace_pending(target, current_date)
+                unknown = set(target.weights) - set(self.assets)
+                if unknown:
+                    raise ValueError(f"Target portfolio contains unknown assets: {sorted(unknown)}")
+                state.replace_pending(target, current_date)
+
+            state.strategy_state["_strategy_runtime"] = {"identity": identity, "runtime": active_strategy_runtime}
 
             prices = {asset_id: bar.close for asset_id, bar in bars.items()}
-            total_value = self.state.total_value(prices)
+            total_value = state.total_value(prices)
             nav_rows.append(
                 {
                     "date": date_str(current_date),
                     "total_value": total_value,
-                    "cash": self.state.cash,
-                    "pending_intent_count": len(self.state.pending_intents),
+                    "cash": state.cash,
+                    "pending_intent_count": len(state.pending_intents),
                     "strategy_version_id": active_strategy_version_id,
                 }
             )
-            self.state.last_date = current_date
+            state.last_date = current_date
 
-        self._write_csv(run_dir / "suggested_orders.csv", order_rows)
-        self._write_csv(run_dir / "trades.csv", trade_rows)
-        self._write_csv(run_dir / "nav.csv", nav_rows)
-        self._write_state(run_dir / "portfolio_state.json")
-        self._write_state(self.state_path)
+        write_json(run_dir / "manifest.json", {"requires_state_commit": True})
+        write_csv_rows(run_dir / "suggested_orders.csv", order_rows)
+        write_csv_rows(run_dir / "trades.csv", trade_rows)
+        write_csv_rows(run_dir / "nav.csv", nav_rows)
+        write_json(run_dir / "portfolio_state.json", state.to_dict())
         metrics = {
             "portfolio_id": self.portfolio_id,
             "asof_date": date_str(target_date),
             "processed_days": len(nav_rows),
             "trade_count": len(trade_rows),
-            "pending_intent_count": len(self.state.pending_intents),
-            "last_date": date_str(self.state.last_date),
+            "pending_intent_count": len(state.pending_intents),
+            "last_date": date_str(state.last_date),
         }
-        self._write_json(
+        write_json(
             run_dir / "manifest.json",
             {
                 "portfolio_id": self.portfolio_id,
+                "requires_state_commit": True,
                 "source_checkpoint": str(self.source_checkpoint),
                 "generated_at": datetime.now().isoformat(timespec="seconds"),
                 "execution_model": {
@@ -253,18 +240,14 @@ class SimPortfolio:
                 "metrics": metrics,
             },
         )
+        committed_run_ids = [*self.committed_run_ids, run_dir.name]
+        write_json(self.state_path, state.to_dict() | {"committed_run_ids": committed_run_ids})
+        self.state.__dict__.update(state.__dict__)
+        self.committed_run_ids = committed_run_ids
         self.store.record_sim_run(self.portfolio_id, date_str(target_date), run_dir)
         self.store.add_sim_event(self.portfolio_id, "advance", metrics)
         self.store.create_sim_portfolio(self.portfolio_id, self.source_checkpoint, self.state_path, self.config)
         return SimAdvanceResult(self.portfolio_id, run_dir, self.state_path, metrics)
-
-    def export_state(self, output_dir: str | Path) -> Path:
-        target = Path(output_dir)
-        target.mkdir(parents=True, exist_ok=True)
-        self._write_state(target / "portfolio_state.json")
-        if self.state_path.exists():
-            shutil.copy2(self.state_path, target / "portfolio_state.json")
-        return target
 
     def _sync_data_if_requested(self, target_date) -> None:
         if self.data_fetch:
@@ -275,71 +258,3 @@ class SimPortfolio:
                 end=date_str(target_date),
                 fetch=True,
             )
-
-    def _load_assets(self, payload: list[dict[str, Any]]) -> dict[str, Asset]:
-        assets: dict[str, Asset] = {}
-        for item in payload:
-            asset = Asset(
-                asset_id=item["asset_id"],
-                code=str(item["code"]),
-                name=item.get("name", item["code"]),
-                asset_type=item.get("asset_type", "etf"),
-                exchange=item.get("exchange", "CN"),
-                currency=item.get("currency", "CNY"),
-                lot_size=int(item.get("lot_size", 100)),
-                price_limit_pct=item.get("price_limit_pct", 0.10),
-            )
-            assets[asset.asset_id] = asset
-        return assets
-
-    def _target_from_pending(self, current_date) -> TargetPortfolio | None:
-        due = {
-            asset_id: intent.target_weight
-            for asset_id, intent in self.state.pending_intents.items()
-            if intent.created_date < current_date
-        }
-        if not due:
-            return None
-        return TargetPortfolio(due)
-
-    def _signal_dates_from_pending(self, current_date) -> dict[str, Any]:
-        return {
-            asset_id: intent.signal_date or intent.created_date
-            for asset_id, intent in self.state.pending_intents.items()
-            if intent.created_date < current_date
-        }
-
-    def _replace_pending(self, target: TargetPortfolio, current_date) -> None:
-        target_weights = dict(target.weights)
-        for asset_id, position in self.state.positions.items():
-            if position.quantity > 1e-9 and asset_id not in target_weights:
-                target_weights[asset_id] = 0.0
-        self.state.pending_intents = {
-            asset_id: PendingIntent(
-                asset_id=asset_id,
-                target_weight=weight,
-                created_date=current_date,
-                signal_date=current_date,
-            )
-            for asset_id, weight in target_weights.items()
-        }
-
-    def _write_state(self, path: Path) -> None:
-        self._write_json(path, self.state.to_dict())
-
-    @staticmethod
-    def _write_json(path: Path, payload: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2)
-
-    @staticmethod
-    def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if not rows:
-            path.write_text("", encoding="utf-8")
-            return
-        with path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
-            writer.writeheader()
-            writer.writerows(rows)

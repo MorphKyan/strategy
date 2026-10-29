@@ -24,6 +24,16 @@ def safe_float(value: Any) -> float | None:
     return number
 
 
+def _annualized_growth(values: pd.Series) -> float | None:
+    intervals = len(values) - 1
+    if intervals < 1 or values.iloc[0] <= 0 or values.iloc[-1] < 0:
+        return None
+    try:
+        return safe_float((float(values.iloc[-1]) / float(values.iloc[0])) ** (252 / intervals) - 1)
+    except OverflowError:
+        return None
+
+
 def read_csv_or_empty(path: str | Path) -> pd.DataFrame:
     path = Path(path)
     if not path.exists() or path.stat().st_size == 0:
@@ -91,7 +101,7 @@ def _empty_metrics(
     }
 
 
-def _compute_period_metrics(
+def compute_period_metrics(
     nav: pd.DataFrame,
     trades: pd.DataFrame,
     orders: pd.DataFrame,
@@ -112,16 +122,14 @@ def _compute_period_metrics(
     days = len(net_value)
     years = days / 252 if days else 0
     total_return = net_value.iloc[-1] / net_value.iloc[0] - 1 if days and net_value.iloc[0] else None
-    annualized_return = (
-        (net_value.iloc[-1] / net_value.iloc[0]) ** (252 / max(len(net_value), 1)) - 1
-        if len(net_value) > 0 and net_value.iloc[0]
-        else 0.0
-    )
+    annualized_return = _annualized_growth(net_value)
     annualized_volatility = daily_returns.std() * math.sqrt(252) if len(daily_returns) > 1 else 0.0
     rolling_peak = net_value.cummax()
     drawdown = net_value / rolling_peak - 1
     max_drawdown = drawdown.min() if not drawdown.empty else 0.0
-    sharpe_ratio = annualized_return / annualized_volatility if annualized_volatility else 0.0
+    sharpe_ratio = None
+    if annualized_return is not None:
+        sharpe_ratio = annualized_return / annualized_volatility if annualized_volatility else 0.0
 
     average_total_value = None
     if "total_value" in nav.columns:
@@ -200,10 +208,12 @@ def _compute_period_metrics(
             trade_dates = pd.to_datetime(trades[trade_date_col], errors="coerce").dropna()
             if not trade_dates.empty:
                 first_active_date = trade_dates.min()
-    elif not positions.empty and {"date", "quantity"}.issubset(positions.columns):
+    if not positions.empty and {"date", "quantity"}.issubset(positions.columns):
         pos_qty = positions[pd.to_numeric(positions["quantity"], errors="coerce").fillna(0) > 0]
         if not pos_qty.empty:
-            first_active_date = pd.to_datetime(pos_qty["date"], errors="coerce").min()
+            first_position_date = pd.to_datetime(pos_qty["date"], errors="coerce").min()
+            if first_active_date is None or first_position_date < first_active_date:
+                first_active_date = first_position_date
 
     if first_active_date is not None and not pd.isna(first_active_date):
         active_nav = nav[nav["date"] >= first_active_date]
@@ -216,15 +226,14 @@ def _compute_period_metrics(
     annualized_return_active = annualized_return
     active_sharpe = sharpe_ratio
     if active_days > 0:
-        active_net_value = pd.to_numeric(active_nav["net_value"], errors="coerce").dropna()
-        if not active_net_value.empty and active_net_value.iloc[0] > 0:
-            active_total_return = active_net_value.iloc[-1] / active_net_value.iloc[0] - 1.0
-            if active_days >= 5:
-                annualized_return_active = (1.0 + active_total_return) ** (252.0 / active_days) - 1.0
-            else:
-                annualized_return_active = active_total_return
-            active_daily_ret = active_net_value.pct_change().dropna()
-            active_vol = active_daily_ret.std() * math.sqrt(252) if len(active_daily_ret) > 1 else 0.0
+        # 建仓前一日是首个投资收益（含建仓成本）的比较基准，不计入投资日数。
+        anchor = nav[nav["date"] < first_active_date].tail(1)
+        active_net_value = pd.to_numeric(pd.concat([anchor, active_nav])["net_value"], errors="coerce").dropna()
+        annualized_return_active = _annualized_growth(active_net_value)
+        active_daily_ret = active_net_value.pct_change().dropna()
+        active_vol = active_daily_ret.std() * math.sqrt(252) if len(active_daily_ret) > 1 else 0.0
+        active_sharpe = None
+        if annualized_return_active is not None:
             active_sharpe = annualized_return_active / active_vol if active_vol else 0.0
 
     return {
@@ -301,15 +310,15 @@ def build_platform_metrics(result_dir: str | Path, start_date: Any = None) -> di
         "slippage_scenario": execution_model.get("slippage_scenario", "unknown"),
     }
 
-    full_metrics = _compute_period_metrics(nav, trades, orders, skipped_orders, positions)
-    training_metrics = _compute_period_metrics(
+    full_metrics = compute_period_metrics(nav, trades, orders, skipped_orders, positions)
+    training_metrics = compute_period_metrics(
         _filter_by_date(nav, end_date=TRAINING_END_DATE),
         _filter_by_date(trades, end_date=TRAINING_END_DATE),
         _filter_by_date(orders, end_date=TRAINING_END_DATE),
         _filter_by_date(skipped_orders, end_date=TRAINING_END_DATE),
         _filter_by_date(positions, end_date=TRAINING_END_DATE),
     )
-    oos_metrics = _compute_period_metrics(
+    oos_metrics = compute_period_metrics(
         _filter_by_date(nav, start_date=OOS_START_DATE),
         _filter_by_date(trades, start_date=OOS_START_DATE),
         _filter_by_date(orders, start_date=OOS_START_DATE),
@@ -359,10 +368,3 @@ def comparison_metrics(candidate: dict[str, Any], baseline: dict[str, Any] | Non
         "annualized_fee_drag",
     ]
     return {f"{key}_delta": delta(candidate, baseline, key) for key in keys}
-
-
-def write_metrics_json(path: str | Path, payload: dict[str, Any]) -> None:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, ensure_ascii=False, indent=2)

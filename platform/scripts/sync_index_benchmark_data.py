@@ -15,10 +15,9 @@ Supported Data Types:
 from __future__ import annotations
 import argparse
 import sys
-from datetime import datetime
+from math import isfinite
 from pathlib import Path
 import pandas as pd
-import numpy as np
 import requests
 import yaml
 
@@ -31,11 +30,10 @@ if str(PLATFORM_ROOT) not in sys.path:
     sys.path.insert(0, str(PLATFORM_ROOT))
 
 import akshare as ak
-from src.platform_core.data_store import MARKET_COLUMNS, write_csv_stable
+from src.platform_core.data_store import MARKET_COLUMNS, merge_observations, normalize_market_frame, write_csv_stable
 
 DATA_DIR = ROOT / "platform" / "data"
 FUNDAMENTAL_DIR = DATA_DIR / "fundamental_macro"
-FUNDAMENTAL_DIR.mkdir(parents=True, exist_ok=True)
 
 CHINABOND_INDEX_ENDPOINT = (
     "https://yield.chinabond.com.cn/cbweb-mn/indices/singleIndexQueryResult"
@@ -69,7 +67,7 @@ def parse_args():
     )
     parser.add_argument(
         "--sync-pit-bonds",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
         help="Sync ChinaBond 30Y/10Y Treasury YTM Point-in-Time dataset.",
     )
@@ -135,24 +133,14 @@ def fetch_chinabond_index(code: str, timeout: int = 30) -> pd.DataFrame:
         .dt.strftime("%Y-%m-%d")
     )
     frame["close"] = pd.to_numeric(frame["close"], errors="coerce")
-    frame = frame.dropna(subset=["trade_date", "close"])
-    frame = frame.loc[frame["close"] > 0].copy()
-    frame = frame.sort_values("trade_date").drop_duplicates("trade_date", keep="last")
-    if frame.empty:
-        raise ValueError(f"ChinaBond returned no valid positive index levels for {code}.")
+    if frame[["trade_date", "close"]].isna().any().any() or frame["trade_date"].duplicated().any():
+        raise ValueError(f"ChinaBond returned missing, invalid or duplicate observations for {code}.")
 
-    frame["open"] = frame["close"]
-    frame["high"] = frame["close"]
-    frame["low"] = frame["close"]
-    frame["volume"] = 0.0
-    frame["amount"] = 0.0
-    frame["adjust_factor"] = 1.0
-    frame["source"] = "chinabond_official"
-    frame["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    return frame[MARKET_COLUMNS].reset_index(drop=True)
+    return normalize_market_frame(frame, "chinabond_official")[0].reset_index(drop=True)
 
 
-def _merge_bounded_history(
+
+def merge_chinabond_history(
     out_path: Path,
     fetched: pd.DataFrame,
     start_date: str | None,
@@ -171,7 +159,10 @@ def _merge_bounded_history(
     existing["trade_date"] = pd.to_datetime(
         existing["trade_date"], errors="coerce"
     ).dt.strftime("%Y-%m-%d")
-    existing = existing.dropna(subset=["trade_date"])
+    if existing["trade_date"].isna().any() or existing["trade_date"].duplicated().any():
+        raise ValueError("Existing ChinaBond file has missing or duplicate dates; history was preserved.")
+    if pd.to_datetime(fetched["trade_date"]).max() < pd.to_datetime(existing["trade_date"]).max():
+        raise RuntimeError("Refusing an older ChinaBond snapshot; existing history was preserved.")
     missing_columns = [column for column in MARKET_COLUMNS if column not in existing.columns]
     if missing_columns:
         raise ValueError(
@@ -199,44 +190,16 @@ def sync_index_data(symbol: str, start_date: str | None = None, end_date: str | 
     try:
         if code in ["000300", "000015"]:
             df = ak.stock_zh_index_daily(symbol=f"sh{code}")
-            date_col = next((c for c in df.columns if "date" in c.lower() or "日" in c), df.columns[0])
-            open_col = next((c for c in df.columns if "open" in c.lower() or "开盘" in c), None)
-            high_col = next((c for c in df.columns if "high" in c.lower() or "最高" in c), None)
-            low_col = next((c for c in df.columns if "low" in c.lower() or "最低" in c), None)
-            close_col = next((c for c in df.columns if "close" in c.lower() or "收盘" in c), None)
-            vol_col = next((c for c in df.columns if "vol" in c.lower() or "成交量" in c), None)
-
-            out_df = pd.DataFrame()
-            out_df["trade_date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
-            close_s = pd.to_numeric(df[close_col], errors="coerce") if close_col else pd.to_numeric(df["close"], errors="coerce")
-            out_df["open"] = pd.to_numeric(df[open_col], errors="coerce") if open_col else close_s
-            out_df["high"] = pd.to_numeric(df[high_col], errors="coerce") if high_col else close_s
-            out_df["low"] = pd.to_numeric(df[low_col], errors="coerce") if low_col else close_s
-            out_df["close"] = close_s
-            out_df["volume"] = pd.to_numeric(df[vol_col], errors="coerce").fillna(0.0) if vol_col else 0.0
-            out_df["amount"] = 0.0
-            out_df["source"] = "sina_index"
-            out_df["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-            out_df = out_df.dropna(subset=["trade_date", "close"]).drop_duplicates("trade_date", keep="last").sort_values("trade_date")
-            out_df = filter_date_bounds(out_df, "trade_date", start_date, end_date)
+            normalized, _ = normalize_market_frame(df, "sina_index")
+            bounded = filter_date_bounds(normalized, "trade_date", start_date, end_date)
+            out_df = merge_observations(out_path, bounded)
             written = write_csv_stable(out_path, out_df, key_column="trade_date")
             action = "Saved" if written else "Unchanged"
             print(f"   SUCCESS: {action} {out_path.name} ({len(out_df)} rows, {out_df.iloc[0]['trade_date']} ~ {out_df.iloc[-1]['trade_date']})")
             return True
         elif code == "CBA21801":
             fetched = fetch_chinabond_index(code)
-            old_latest = None
-            if out_path.exists():
-                old = pd.read_csv(out_path, usecols=["trade_date"])
-                old_latest = pd.to_datetime(old["trade_date"], errors="coerce").max()
-            fetched_latest = pd.to_datetime(fetched["trade_date"], errors="coerce").max()
-            if old_latest is not None and pd.notna(old_latest) and fetched_latest < old_latest:
-                raise RuntimeError(
-                    f"Refusing to replace {code} history with an older snapshot "
-                    f"({fetched_latest.date()} < {old_latest.date()})."
-                )
-            out_df = _merge_bounded_history(out_path, fetched, start_date, end_date)
+            out_df = merge_chinabond_history(out_path, fetched, start_date, end_date)
             written = write_csv_stable(out_path, out_df, key_column="trade_date")
             action = "Saved" if written else "Unchanged"
             print(
@@ -256,28 +219,9 @@ def sync_futures_main_data(symbol: str, start_date: str | None = None, end_date:
 
     try:
         df = ak.futures_main_sina(symbol=code)
-        date_col = next((c for c in df.columns if "日" in c or "date" in c.lower()), df.columns[0])
-        price_col = next((c for c in df.columns if "收盘" in c or "close" in c.lower()), df.columns[4])
-        open_col = next((c for c in df.columns if "开盘" in c or "open" in c.lower()), None)
-        high_col = next((c for c in df.columns if "最高" in c or "high" in c.lower()), None)
-        low_col = next((c for c in df.columns if "最低" in c or "low" in c.lower()), None)
-        vol_col = next((c for c in df.columns if "成交量" in c or "vol" in c.lower()), None)
-
-        out_df = pd.DataFrame()
-        out_df["trade_date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
-        close_s = pd.to_numeric(df[price_col], errors="coerce")
-        out_df["open"] = pd.to_numeric(df[open_col], errors="coerce") if open_col else close_s
-        out_df["high"] = pd.to_numeric(df[high_col], errors="coerce") if high_col else close_s
-        out_df["low"] = pd.to_numeric(df[low_col], errors="coerce") if low_col else close_s
-        out_df["close"] = close_s
-        out_df["volume"] = pd.to_numeric(df[vol_col], errors="coerce").fillna(0.0) if vol_col else 0.0
-        out_df["amount"] = 0.0
-        out_df["source"] = "sina_futures"
-        out_df["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-        out_df = out_df.dropna(subset=["trade_date", "close"]).drop_duplicates("trade_date", keep="last").sort_values("trade_date")
-        out_df = filter_date_bounds(out_df, "trade_date", start_date, end_date)
-
+        normalized, _ = normalize_market_frame(df, "sina_futures")
+        bounded = filter_date_bounds(normalized, "trade_date", start_date, end_date)
+        out_df = merge_observations(out_path, bounded)
         written = write_csv_stable(out_path, out_df, key_column="trade_date")
         action = "Saved" if written else "Unchanged"
         print(f"   SUCCESS: {action} {out_path.name} ({len(out_df)} rows, {out_df.iloc[0]['trade_date']} ~ {out_df.iloc[-1]['trade_date']})")
@@ -311,7 +255,11 @@ def sync_pit_china_bond_ytm(start_date: str | None = None, end_date: str | None 
         }).dropna()
 
         df_out = filter_date_bounds(df_out, "date", start_date, end_date)
-        df_out.to_csv(out_path, index=False)
+        if not df_out[["bond_ytm_30y", "bond_ytm_10y"]].map(isfinite).all().all():
+            raise ValueError("Bond yields must be finite; existing history was preserved.")
+        df_out = merge_observations(out_path, df_out, date_column="date")
+        FUNDAMENTAL_DIR.mkdir(parents=True, exist_ok=True)
+        write_csv_stable(out_path, df_out, key_column="date")
         print(f"   SUCCESS: Saved {out_path.name} ({len(df_out)} rows, {df_out.iloc[0]['date']} ~ {df_out.iloc[-1]['date']})")
         return True
     except Exception as e:
@@ -369,9 +317,11 @@ def main():
             if out_csv.exists():
                 print(f"[{code}] ETF daily bar managed via standard platform store ({out_csv.name})")
             else:
-                print(f"[{code}] Warning: ETF daily bar missing at {out_csv}. Run sync_platform_data.py --fetch.")
+                print(f"[{code}] ERROR: ETF daily bar missing at {out_csv}. Run sync_platform_data.py --fetch.")
+                failures.append(symbol)
         else:
-            print(f"[{symbol}] Unrecognized asset type: {asset_type or 'unknown'}; skipped.")
+            print(f"[{symbol}] Unrecognized asset type: {asset_type or 'unknown'}.")
+            failures.append(symbol)
 
     if args.sync_pit_bonds:
         if not sync_pit_china_bond_ytm(args.start_date, args.end_date):

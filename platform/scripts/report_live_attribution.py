@@ -65,7 +65,8 @@ def main() -> int:
     report_dir = Path(args.report_root)
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / f"{month}_{args.live_id}_attribution.md"
-    report_path.write_text(report + "\n", encoding="utf-8")
+    with report_path.open("x", encoding="utf-8") as handle:
+        handle.write(report + "\n")
 
     print(report)
     print()

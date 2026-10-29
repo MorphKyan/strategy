@@ -74,15 +74,10 @@ def load_raw_valuation(source_dir: Path) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def normalize_index_code(code: str) -> str:
-    """Wind 里 h30184.CSI 是小写、其余大写；统一为大写代码 + 大写后缀。"""
-    return str(code).strip().upper()
-
-
 def ingest(source_dir: Path, data_dir: Path, output_dir: Path) -> pd.DataFrame:
     calendar = load_trading_calendar(data_dir)
     raw = load_raw_valuation(source_dir)
-    raw["index_code"] = raw["S_INFO_WINDCODE"].map(normalize_index_code)
+    raw["index_code"] = raw["S_INFO_WINDCODE"].str.strip().str.upper()
     raw = raw.rename(columns=COLUMN_MAP)
     raw["trade_date"] = pd.to_datetime(raw["trade_date"].astype(str), format="%Y%m%d", errors="coerce")
     raw = raw.dropna(subset=["trade_date", "index_code"])

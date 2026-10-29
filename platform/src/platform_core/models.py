@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from math import isfinite
 from typing import Any
 
 
@@ -30,6 +31,18 @@ class Asset:
     lot_size: int = 100
     price_limit_pct: float | None = 0.10
 
+    def __post_init__(self) -> None:
+        lot = float(self.lot_size)
+        if not isfinite(lot) or not lot.is_integer() or lot <= 0:
+            raise ValueError("Asset lot_size must be a positive integer.")
+        object.__setattr__(self, "lot_size", int(lot))
+        if not self.asset_id or not self.code:
+            raise ValueError("Asset requires a nonempty asset_id and code.")
+        if self.price_limit_pct is not None and not (
+            isfinite(self.price_limit_pct) and 0 <= self.price_limit_pct <= 1
+        ):
+            raise ValueError("Asset price_limit_pct must be between 0 and 1, or None.")
+
 
 @dataclass(frozen=True)
 class Bar:
@@ -52,10 +65,6 @@ class Position:
     asset_id: str
     quantity: float = 0.0
     cost_basis: float = 0.0
-
-    def market_value(self, price: float) -> float:
-        return self.quantity * price
-
 
 @dataclass
 class PendingIntent:
@@ -102,6 +111,27 @@ class PortfolioState:
     dividend_receivables: list[dict[str, Any]] = field(default_factory=list)  # list of dict: {asset_id, payment_date, amount}
     live_accounting: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if not isfinite(self.cash):
+            raise ValueError("Portfolio cash must be finite.")
+        for asset_id, position in self.positions.items():
+            if position.asset_id != asset_id:
+                raise ValueError(f"Position asset_id does not match its key: {asset_id}")
+            if any(not isfinite(value) or value < 0 for value in (position.quantity, position.cost_basis)):
+                raise ValueError(f"Position quantity and cost must be finite and nonnegative: {asset_id}")
+        for asset_id, intent in self.pending_intents.items():
+            if intent.asset_id != asset_id:
+                raise ValueError(f"Pending intent asset_id does not match its key: {asset_id}")
+        TargetPortfolio({asset_id: intent.target_weight for asset_id, intent in self.pending_intents.items()})
+        if any(not isfinite(float(item["amount"])) or float(item["amount"]) < 0 for item in self.dividend_receivables):
+            raise ValueError("Dividend receivables must be finite and nonnegative.")
+
+    def validate_assets(self, asset_ids: Any) -> None:
+        held = {asset_id for asset_id, position in self.positions.items() if position.quantity > 0}
+        unknown = (held | set(self.pending_intents)) - set(asset_ids)
+        if unknown:
+            raise ValueError(f"Portfolio contains assets missing from config: {sorted(unknown)}")
+
     def position(self, asset_id: str) -> Position:
         if asset_id not in self.positions:
             self.positions[asset_id] = Position(asset_id=asset_id)
@@ -110,7 +140,12 @@ class PortfolioState:
     def total_value(self, prices: dict[str, float]) -> float:
         value = self.cash
         for asset_id, position in self.positions.items():
-            value += position.quantity * prices.get(asset_id, 0.0)
+            if not position.quantity:
+                continue
+            price = prices.get(asset_id)
+            if price is None or not isfinite(price) or price <= 0:
+                raise ValueError(f"Cannot value held asset without a finite positive price: {asset_id}")
+            value += position.quantity * price
         for item in self.dividend_receivables:
             value += float(item.get("amount", 0.0))
         return value
@@ -133,6 +168,25 @@ class PortfolioState:
                 expired.append(asset_id)
         for asset_id in expired:
             del self.cooldown_pool[asset_id]
+
+    def pending_target(self, current_date: date) -> TargetPortfolio | None:
+        due = {asset_id: intent.target_weight for asset_id, intent in self.pending_intents.items()
+               if intent.created_date < current_date}
+        return TargetPortfolio(due) if due else None
+
+    def pending_signal_dates(self, current_date: date) -> dict[str, date]:
+        return {asset_id: intent.signal_date or intent.created_date
+                for asset_id, intent in self.pending_intents.items() if intent.created_date < current_date}
+
+    def replace_pending(self, target: TargetPortfolio, current_date: date) -> None:
+        weights = dict(target.weights)
+        for asset_id, position in self.positions.items():
+            if position.quantity > 1e-9:
+                weights.setdefault(asset_id, 0.0)
+        self.pending_intents = {
+            asset_id: PendingIntent(asset_id, weight, current_date, signal_date=current_date)
+            for asset_id, weight in weights.items()
+        }
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -203,6 +257,8 @@ class TargetPortfolio:
         for asset_id, weight in self.weights.items():
             if not asset_id:
                 raise ValueError("TargetPortfolio asset_id cannot be empty.")
+            if not isfinite(weight):
+                raise ValueError(f"Target weight must be finite: {asset_id}={weight}")
             if weight < -1e-12:
                 raise ValueError(f"Negative target weight is not allowed: {asset_id}={weight}")
             total += weight

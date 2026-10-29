@@ -19,7 +19,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
@@ -40,7 +39,7 @@ class PercentileResult:
 
 
 class IndexValuationStore:
-    """按需加载 + 进程内缓存的指数估值仓库。
+    """按需加载并在本次运行实例内缓存的指数估值仓库。
 
     一个策略回测会对同一指数反复取分位（每月一次 × 数年），因此按指数代码缓存整条
     序列，切片在内存里做。数据量很小（16 指数 × ~3300 行）。
@@ -155,19 +154,3 @@ class IndexValuationStore:
             if result is not None and result.observations >= min_observations:
                 out[asset_id] = result
         return out
-
-
-_STORE_CACHE: dict[str, IndexValuationStore] = {}
-
-
-def get_store(data_dir: str | Path) -> IndexValuationStore:
-    """按 data_dir 复用 store 实例，避免每个回测日重复读盘。"""
-    key = str(Path(data_dir).resolve())
-    if key not in _STORE_CACHE:
-        _STORE_CACHE[key] = IndexValuationStore(key)
-    return _STORE_CACHE[key]
-
-
-def reset_store_cache() -> None:
-    """测试用：清空进程内缓存。"""
-    _STORE_CACHE.clear()

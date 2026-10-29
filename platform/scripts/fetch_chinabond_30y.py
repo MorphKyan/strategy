@@ -20,12 +20,9 @@
 import argparse
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
-import requests
-
+ORIG_CWD = Path.cwd()
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -36,11 +33,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from src.platform_core.data_store import write_csv_stable  # noqa: E402
 
-CHINABOND_API_URL = (
-    "https://yield.chinabond.com.cn/cbweb-mn/indices/singleIndexQueryResult"
-    "?indexid=8a8b2cef77b239980177b485d20a6379&qxlxt=00&zslxt=CFZS&ltcslx=&zslxt1=&lx=1&locale="
-)
-SOURCE_NAME = "chinabond_official"
+from scripts.sync_index_benchmark_data import fetch_chinabond_index, merge_chinabond_history  # noqa: E402
 
 
 def resolve_path(path_str: str, root_dir: Path, orig_cwd: Path) -> Path:
@@ -54,46 +47,8 @@ def resolve_path(path_str: str, root_dir: Path, orig_cwd: Path) -> Path:
     return root_dir / p
 
 
-def fetch_chinabond_30y_index(timeout: int = 15) -> pd.DataFrame:
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "X-Requested-With": "XMLHttpRequest",
-    }
-
-    session = requests.Session()
-    session.trust_env = False
-
-    resp = session.post(CHINABOND_API_URL, headers=headers, timeout=timeout)
-    resp.raise_for_status()
-
-    payload = resp.json()
-    raw_dict = payload.get("CFZS_00", {})
-    if not raw_dict:
-        raise ValueError("中债 API 未返回有效 CFZS_00 指数字典数据")
-
-    records = []
-    for ts_ms, val in raw_dict.items():
-        dt_str = datetime.fromtimestamp(int(ts_ms) / 1000.0).strftime("%Y-%m-%d")
-        records.append({"trade_date": dt_str, "close": float(val)})
-
-    df = pd.DataFrame(records).sort_values("trade_date").reset_index(drop=True)
-
-    # 填充平台行情规范列
-    df["open"] = df["close"]
-    df["high"] = df["close"]
-    df["low"] = df["close"]
-    df["volume"] = 0.0
-    df["amount"] = 0.0
-    df["adjust_factor"] = 1.0
-    df["source"] = SOURCE_NAME
-    df["updated_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-    cols = ["trade_date", "open", "high", "low", "close", "volume", "amount", "adjust_factor", "source", "updated_at"]
-    return df[cols]
-
-
 def main() -> int:
-    orig_cwd = Path(os.environ.get("INIT_CWD", Path.cwd()))
+    orig_cwd = Path(os.environ.get("INIT_CWD", ORIG_CWD))
     parser = argparse.ArgumentParser(description="按需抓取中债 30 年期国债财富指数数据并落盘。")
     parser.add_argument("--data-dir", default="data", help="数据输出目录，默认为 data。")
     parser.add_argument("--output-filename", default="CBA21801.csv", help="输出文件名，默认为 CBA21801.csv。")
@@ -105,14 +60,15 @@ def main() -> int:
     output_file = data_dir / args.output_filename
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"正在从中债官网抓取 30 年期国债财富指数数据...")
+    print("正在从中债官网抓取 30 年期国债财富指数数据...")
     try:
-        df = fetch_chinabond_30y_index(timeout=args.timeout)
+        fetched = fetch_chinabond_index("CBA21801", timeout=args.timeout)
+        df = merge_chinabond_history(output_file, fetched, None, None)
+        written = write_csv_stable(output_file, df, key_column="trade_date")
     except Exception as e:
         print(f"错误: 抓取中债 30 年期国债财富指数失败: {e}", file=sys.stderr)
         return 1
 
-    written = write_csv_stable(output_file, df, key_column="trade_date")
     start_date = df["trade_date"].min()
     end_date = df["trade_date"].max()
     count = len(df)

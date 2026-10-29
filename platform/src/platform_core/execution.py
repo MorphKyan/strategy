@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from itertools import count
+from math import isfinite
 from typing import Any
 
 from src.platform_core.models import Asset, Bar, Order, PendingIntent, PortfolioState, TargetPortfolio, Trade
@@ -12,6 +13,10 @@ from src.platform_core.models import Asset, Bar, Order, PendingIntent, Portfolio
 class FeeProfile:
     rate: float = 0.0002
     min_fee: float = 0.0
+
+    def __post_init__(self) -> None:
+        if not all(isfinite(value) and value >= 0 for value in (self.rate, self.min_fee)):
+            raise ValueError("Fee rate and minimum fee must be finite and non-negative.")
 
     def calculate(self, trade_value: float) -> float:
         if trade_value <= 0:
@@ -35,6 +40,31 @@ class ExecutionConfig:
     participation_impact: dict[str, float | bool] | None = None
     round_mode: str = "round"
     weight_tolerance_by_asset_id: dict[str, float] | None = None
+
+    def __post_init__(self) -> None:
+        for field_name, choices in {
+            "price_field": {"open", "high", "low", "close"},
+            "round_mode": {"floor", "round", "ceil"},
+            "order_priority": {"asset_id", "price_desc", "target_gap_desc"},
+            "unfilled_policy": {"retry_next_day", "cancel", "mark_failed"},
+        }.items():
+            if getattr(self, field_name) not in choices:
+                raise ValueError(f"Invalid execution {field_name}: {getattr(self, field_name)}")
+        tolerances = [self.weight_tolerance, self.cash_buffer_pct, *(self.weight_tolerance_by_asset_id or {}).values()]
+        if any(not isfinite(float(value)) or not 0 <= float(value) <= 1 for value in tolerances):
+            raise ValueError("Execution tolerances and cash buffer must be finite and between 0 and 1.")
+        slippage = [self.slippage_bps, self.qdii_commodity_slippage_bps,
+                    *(self.slippage_by_asset_id or {}).values(), *(self.slippage_by_code or {}).values()]
+        if any(not isfinite(float(value)) or float(value) < 0 for value in slippage):
+            raise ValueError("Execution slippage must be finite and nonnegative.")
+        impact = self.participation_impact or {}
+        for key in ("free_participation_rate", "impact_bps_per_1pct", "max_impact_bps", "missing_amount_extra_bps"):
+            value = float(impact.get(key, 0))
+            if not isfinite(value) or value < 0:
+                raise ValueError(f"Invalid participation impact {key}.")
+        extra_bps = max(float(impact.get("max_impact_bps", 100)), float(impact.get("missing_amount_extra_bps", 20))) if impact.get("enabled") else 0
+        if max(map(float, slippage)) + extra_bps >= 10000:
+            raise ValueError("Execution slippage must leave a positive sell price.")
 
     @classmethod
     def from_config(cls, config: dict[str, Any], *, price_field: str | None = None) -> "ExecutionConfig":
@@ -230,8 +260,7 @@ class ExecutionEngine:
             )
             trades.append(trade)
 
-            post_prices = {item_id: self._price_for_bar(item_bar) for item_id, item_bar in bars.items()}
-            post_value = state.total_value(post_prices)
+            post_value = state.total_value(prices)
             post_weight = position.quantity * valuation_price / post_value if post_value > 0 else 0.0
             if abs(post_weight - target_weight) <= tolerance:
                 state.pending_intents.pop(asset_id, None)
@@ -242,7 +271,10 @@ class ExecutionEngine:
 
     def _price_for_bar(self, bar: Bar) -> float:
         field = self.config.price_field
-        return float(getattr(bar, field))
+        price = float(bar.close if bar.is_suspended else getattr(bar, field))
+        if not isfinite(price) or price <= 0:
+            raise ValueError(f"Invalid execution price for {bar.asset_id} on {bar.date}: {price}")
+        return price
 
     def _execution_price(
         self,
@@ -360,7 +392,7 @@ class ExecutionEngine:
 
     def _round_quantity(self, quantity: float, lot_size: int) -> float:
         lot = max(1, int(lot_size))
-        round_mode = getattr(self.config, "round_mode", "round")
+        round_mode = self.config.round_mode
         if round_mode == "ceil":
             import math
             return float(math.ceil(quantity / lot) * lot)
@@ -373,12 +405,9 @@ class ExecutionEngine:
         if quantity <= 0:
             return 0.0
         lot = max(1, int(lot_size))
-        max_qty = int((cash / (price * (1 + self.config.fee_profile.rate))) // lot) * lot
-        while max_qty > 0:
-            value = max_qty * price
-            if value + self.config.fee_profile.calculate(value) <= cash + 1e-9:
-                break
-            max_qty -= lot
+        fee = self.config.fee_profile
+        affordable_value = max(0.0, min(cash / (1 + fee.rate), cash - fee.min_fee))
+        max_qty = int((affordable_value / price) // lot) * lot
         return float(min(quantity, max_qty))
 
     @staticmethod

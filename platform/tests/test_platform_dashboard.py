@@ -110,6 +110,7 @@ def test_discover_runs_and_read_tables(tmp_path: Path) -> None:
         json.dumps(
             {
                 "run_id": "sample_run",
+                "artifact_provenance": {"classification": "fixed_full_history"},
                 "generated_at": "2026-07-05T10:00:00",
                 "metrics": {"total_return": 0.1},
             }
@@ -213,7 +214,7 @@ def test_discovery_does_not_generate_missing_metrics(tmp_path: Path) -> None:
         {"date": "2025-01-02", "net_value": 1.1},
     ]).to_csv(run_dir / "nav.csv", index=False)
 
-    runs = discover_runs(tmp_path)
+    runs = discover_runs(tmp_path, include_temporary=True)
     assert runs[0].metrics == {}
     assert not (run_dir / "metrics.json").exists()
     assert read_run_metrics(run_dir)["total_return"] == pytest.approx(0.1)
@@ -224,6 +225,15 @@ def test_discover_runs_ignores_non_backtest_manifests(tmp_path: Path) -> None:
     report_dir.mkdir(parents=True)
     (report_dir / "manifest.json").write_text("{}", encoding="utf-8")
     assert discover_runs(tmp_path) == []
+
+
+def test_legacy_run_without_provenance_requires_temporary_option(tmp_path: Path) -> None:
+    run_dir = tmp_path / "results/backtests/legacy_run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "manifest.json").write_text(json.dumps({"run_id": "legacy_run"}))
+    pd.DataFrame([{"date": "2025-01-01", "net_value": 1.0}]).to_csv(run_dir / "nav.csv", index=False)
+    assert discover_runs(tmp_path) == []
+    assert [run.run_id for run in discover_runs(tmp_path, include_temporary=True)] == ["legacy_run"]
 
 
 def test_discover_runs_skips_sensitivity_raw_and_cache(tmp_path: Path) -> None:
@@ -250,7 +260,8 @@ def test_discover_runs_loads_temporary_root_only_when_enabled(tmp_path: Path) ->
     ):
         run_dir.mkdir(parents=True)
         (run_dir / "manifest.json").write_text(
-            json.dumps({"run_id": run_id, "generated_at": "2026-07-05T10:00:00"}),
+            json.dumps({"run_id": run_id, "generated_at": "2026-07-05T10:00:00",
+                        "artifact_provenance": {"classification": "fixed_full_history" if run_id == "fixed_run" else "temporary"}}),
             encoding="utf-8",
         )
         pd.DataFrame([{"date": "2025-01-01", "net_value": 1.0}]).to_csv(run_dir / "nav.csv", index=False)
@@ -394,6 +405,19 @@ def test_rebalance_events_aggregates_filled_orders() -> None:
     assert events["trade_value"].iloc[0] == pytest.approx(150)
 
 
+def test_rebalance_events_accepts_orders_without_trade_value():
+    events = rebalance_events(pd.DataFrame({"date": ["2025-01-03"], "status": ["FILLED"]}))
+    assert events["trade_value"].tolist() == [0]
+    assert events["order_count"].tolist() == [1]
+
+
+def test_downsampling_preserves_flat_series_endpoints():
+    frame = pd.DataFrame({"net_value": 1.0}, index=pd.date_range("2025-01-01", periods=100))
+    sampled = downsample_timeseries(frame, max_points=10)
+    assert sampled.index[0] == frame.index[0]
+    assert sampled.index[-1] == frame.index[-1]
+
+
 def test_portfolio_risk_analysis_and_downsampling() -> None:
     histories = {
         "A": pd.DataFrame({"trade_date": pd.date_range("2025-01-01", periods=300), "close": range(100, 400)}),
@@ -487,6 +511,15 @@ def test_read_portfolio_nav_prefers_unit_nav_and_keeps_total(tmp_path: Path) -> 
     assert list(nav["net_value"]) == pytest.approx([1.0, 1.0])  # 申购 500 不产生假收益
     assert list(nav["total_value"]) == pytest.approx([1000.0, 1500.0])
     assert trailing_returns(nav)["成立以来"] == pytest.approx(0.0)
+
+
+def test_one_missing_unit_nav_does_not_switch_entire_history_to_account_amount(tmp_path):
+    pd.DataFrame({"date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+                  "total_value": [1000, 2000, 2000], "unit_nav": [1, None, 1]}).to_csv(tmp_path / "real_nav.csv", index=False)
+    nav = read_portfolio_nav(tmp_path, "live")
+    assert nav["net_value"].tolist() == [1, 1]
+    assert trailing_returns(nav)["成立以来"] == 0
+    assert "1 行" in nav.attrs["quality_note"]
 
 
 def test_latest_ticket_prefers_newest_and_tolerates_missing_csv(tmp_path: Path) -> None:

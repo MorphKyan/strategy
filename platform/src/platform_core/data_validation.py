@@ -20,11 +20,11 @@ def load_research_hfq_series(research_data_dir: str | Path, code: str) -> pd.Ser
         raise FileNotFoundError(f"Research HFQ factor file not found: {factor_path}")
     price = pd.read_csv(price_path, parse_dates=["trade_date"])
     factor = pd.read_csv(factor_path, parse_dates=["trade_date"])
-    merged = pd.merge(
-        price[["trade_date", "close_price"]],
-        factor[["trade_date", "hfq_factor"]],
+    merged = pd.merge_asof(
+        price[["trade_date", "close_price"]].sort_values("trade_date"),
+        factor[["trade_date", "hfq_factor"]].sort_values("trade_date"),
         on="trade_date",
-        how="left",
+        direction="backward",
     )
     merged["hfq_factor"] = merged["hfq_factor"].ffill().fillna(1.0)
     merged["research_hfq_close"] = pd.to_numeric(merged["close_price"], errors="coerce") * pd.to_numeric(
@@ -92,7 +92,7 @@ def compare_hfq_data(
 
 def write_hfq_validation(output_dir: str | Path, detail: pd.DataFrame, summary: dict[str, Any]) -> None:
     output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=False)
     detail.to_csv(output_dir / "hfq_detail.csv", index=False)
     (output_dir / "hfq_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = [

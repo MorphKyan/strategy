@@ -21,6 +21,7 @@ tracking error 并做粗拆，作为月度体检记录。
 from __future__ import annotations
 
 import csv
+import json
 import math
 from datetime import date, timedelta
 from pathlib import Path
@@ -45,7 +46,7 @@ def load_real_nav(live_dir: str | Path) -> list[dict[str, Any]]:
             {
                 "date": row["date"],
                 "total_value": float(row["total_value"]),
-                "nav_value": float(row["unit_nav"]) if row.get("unit_nav") else float(row["total_value"]),
+                "nav_value": float(row["unit_nav"]) if "unit_nav" in row else float(row["total_value"]),
                 "cash": float(row["cash"]),
             }
             for row in csv.DictReader(handle)
@@ -58,13 +59,27 @@ def load_shadow_nav(sim_dir: str | Path) -> list[dict[str, Any]]:
     runs_dir = Path(sim_dir) / "runs"
     if not runs_dir.exists():
         raise FileNotFoundError(f"影子组合 runs 目录不存在: {runs_dir}")
+    state_path = Path(sim_dir) / "portfolio_state.json"
+    committed_through = None
+    committed_runs = set()
+    if state_path.exists():
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        committed_through = date_str(state.get("last_date")) or ""
+        committed_runs = set(state.get("committed_run_ids", []))
     by_date: dict[str, dict[str, Any]] = {}
     for run_dir in sorted(runs_dir.iterdir()):
         nav_path = run_dir / "nav.csv"
         if not nav_path.exists() or nav_path.stat().st_size == 0:
             continue
+        manifest_path = run_dir / "manifest.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if manifest.get("requires_state_commit") and run_dir.name not in committed_runs:
+                continue
         with nav_path.open("r", encoding="utf-8-sig", newline="") as handle:
             for row in csv.DictReader(handle):
+                if committed_through is not None and row["date"] > committed_through:
+                    continue
                 by_date[row["date"]] = {
                     "date": row["date"],
                     "total_value": float(row["total_value"]),
@@ -119,6 +134,8 @@ def build_live_attribution(
 
     real_series = [real_by_date[d].get("nav_value", real_by_date[d]["total_value"]) for d in aligned_dates]
     shadow_series = [shadow_by_date[d]["total_value"] for d in aligned_dates]
+    if any(not math.isfinite(value) or value <= 0 for value in real_series + shadow_series):
+        raise ValueError("归因收益需要有限正净值；请核对单位净值和影子模型台账。")
     real_returns = [b / a - 1.0 for a, b in zip(real_series, real_series[1:])]
     shadow_returns = [b / a - 1.0 for a, b in zip(shadow_series, shadow_series[1:])]
     diffs = [r - m for r, m in zip(real_returns, shadow_returns)]
@@ -151,8 +168,8 @@ def build_live_attribution(
             "mean_shadow_cash_weight": mean_shadow_cash,
             "cash_drag_component": cash_drag_component,
             "execution_residual": residual,
-            "real_total_start": real_series[0],
-            "real_total_end": real_series[-1],
+            "real_total_start": real_by_date[aligned_dates[0]]["total_value"],
+            "real_total_end": real_by_date[aligned_dates[-1]]["total_value"],
         }
     )
     return result

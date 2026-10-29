@@ -24,21 +24,22 @@ import csv
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
+from math import isfinite
 from pathlib import Path
 from typing import Any, Callable
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 from src.platform_core.data import LocalCsvBarData
-from src.platform_core.data_store import MarketDataStore
+from src.platform_core.data_store import MarketDataStore, assets_from_config, write_csv_stable
 from src.platform_core.engine import load_strategy_config
-from src.platform_core.live_dividends import apply_dividends, expected_income, remember_holdings
+from src.platform_core.live_dividends import apply_dividends, expected_income
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine
 from src.platform_core.models import (
-    Asset,
     Order,
-    PendingIntent,
     PortfolioState,
     Position,
     TargetPortfolio,
@@ -46,13 +47,7 @@ from src.platform_core.models import (
     parse_date,
 )
 from src.platform_core.strategy import StrategyContext, get_strategy_class
-
-
-def _next_weekday(day: date) -> date:
-    candidate = day + timedelta(days=1)
-    while candidate.weekday() >= 5:
-        candidate += timedelta(days=1)
-    return candidate
+from src.platform_core.storage import stable_hash, strategy_source, write_json
 
 
 @dataclass
@@ -74,6 +69,7 @@ class PlanResult:
     ticket_csv: Path | None
     ticket_txt: Path
     text: str
+    monitor_text: str = ""
 
 
 @dataclass
@@ -107,7 +103,7 @@ class LivePortfolio:
     def __init__(self, portfolio_id: str, config: dict[str, Any], output_root: str | Path | None = None):
         self.portfolio_id = portfolio_id
         self.config = config
-        self.assets = self._load_assets(config.get("assets", []))
+        self.assets = {asset.asset_id: asset for asset in assets_from_config(config.get("assets", []))}
         self.code_to_asset_id = {asset.code: asset_id for asset_id, asset in self.assets.items()}
         self.strategy_config = load_strategy_config(config.get("strategy"))
 
@@ -149,6 +145,8 @@ class LivePortfolio:
         程序无法可靠区分，因此申赎必须由用户显式申报，缺省 0。
         """
         asof = parse_date(asof_date)
+        if not isfinite(float(cash)) or not isfinite(float(external_flow)):
+            raise ValueError("现金与外部资金流必须为有限数。")
         holdings = self._read_holdings(holdings_csv)
 
         data = self._load_data(asof)
@@ -186,9 +184,11 @@ class LivePortfolio:
         )
         # 用户提供的现金已经包含截至当日的实际到账，不叠加自动到账。
         state.live_accounting["cash_asof"] = date_str(asof)
-        remember_holdings(state, asof)
+        state.live_accounting.setdefault("holdings", {})[date_str(asof)] = {
+            asset_id: pos.quantity for asset_id, pos in positions.items()
+        }
         self.portfolio_dir.mkdir(parents=True, exist_ok=True)
-        self._write_state(state)
+        write_json(self.state_path, state.to_dict())
 
         positions_value = state.total_value(prices) - state.cash
         total_value = float(cash) + positions_value
@@ -209,14 +209,15 @@ class LivePortfolio:
         if not tradable:
             raise ValueError(f"{date_str(asof)} 之前没有任何行情数据。")
         plan_date = max(tradable)
+        latest_state_date = max(
+            date_str(state.last_date) or "",
+            state.live_accounting.get("processed_through", ""),
+            state.strategy_state.get("_live_strategy_runtime", {}).get("plan_date", ""),
+        )
+        if date_str(plan_date) < latest_state_date:
+            raise ValueError(f"不能使用当前账户状态生成历史下单票：{plan_date} < {latest_state_date}")
         self._apply_dividends(state, plan_date)
-        self._write_state(state)
-        # 实盘 plan 时 plan_date 必然是数据末日，而 is_month_end() 等节奏判断把
-        # "日历最后一天"视为月末/季末——不补日历的话月频策略会天天触发。
-        # 用下一个工作日近似真实日历（极端情形：月末最后几个交易日全是节假日时，
-        # 当月的月末触发会顺延到下次偏离超阈值或下一个月末，可接受）。
-        if plan_date == data.calendar[-1]:
-            data.calendar.append(_next_weekday(plan_date))
+        data.extend_calendar()
         bars = data.bars_on(plan_date)
         prices = {asset_id: bar.close for asset_id, bar in bars.items()}
 
@@ -234,7 +235,8 @@ class LivePortfolio:
         )
         strategy.initialize(context)
         saved = state.strategy_state.get("_live_strategy_runtime", {})
-        identity = {"strategy_name": self.strategy_config["strategy_name"], "params": context.params}
+        identity = {"strategy_name": self.strategy_config["strategy_name"], "params": context.params,
+                    "source_hash": stable_hash(strategy_source(strategy_cls))}
         if saved.get("identity") == identity:
             # 同日重跑从当日计算前的状态重放，避免首次建仓票被覆盖成无操作。
             key = "runtime_before" if saved.get("plan_date") == date_str(plan_date) else "runtime"
@@ -244,35 +246,28 @@ class LivePortfolio:
             runtime["opened"] = True
         runtime_before = copy.deepcopy(runtime)
         target = strategy.generate_targets(context)
+        monitor_text = self._render_target_monitor(context, prices)
         state.strategy_state["_live_strategy_runtime"] = {
             "identity": identity,
             "plan_date": date_str(plan_date),
             "runtime_before": runtime_before,
             "runtime": runtime,
         }
-        self._write_state(state)
-
         self.tickets_dir.mkdir(parents=True, exist_ok=True)
         ticket_txt = self.tickets_dir / f"ticket_{date_str(plan_date)}.txt"
+        ticket_csv = ticket_txt.with_suffix(".csv")
 
         if target is None:
-            text = f"【无操作】{date_str(plan_date)} 组合权重在阈值带内，今日无需交易。"
+            reason = "组合权重在阈值带内" if context.theoretical_target is not None else "本次未生成目标（未到检查日或样本不足）"
+            text = f"【无操作】{date_str(plan_date)} {reason}，今日无需交易。\n\n{monitor_text}"
+            ticket_csv.unlink(missing_ok=True)
+            write_json(self.state_path, state.to_dict())
             ticket_txt.write_text(text + "\n", encoding="utf-8")
-            return PlanResult(self.portfolio_id, plan_date, False, 0, None, ticket_txt, text)
-
-        # 未出现在目标里的既有持仓视为清仓目标（与 sim 的 _replace_pending 口径一致）
-        target_weights = dict(target.weights)
-        for asset_id, position in state.positions.items():
-            if position.quantity > 1e-9 and asset_id not in target_weights:
-                target_weights[asset_id] = 0.0
+            return PlanResult(self.portfolio_id, plan_date, False, 0, None, ticket_txt, text, monitor_text)
 
         # 把目标记入 pending_intents 便于核对/看板展示；真实持仓与现金不动
-        state.pending_intents = {
-            asset_id: PendingIntent(asset_id=asset_id, target_weight=weight, created_date=plan_date, signal_date=plan_date)
-            for asset_id, weight in target_weights.items()
-        }
-        self._write_state(state)
-
+        state.replace_pending(target, plan_date)
+        target_weights = {asset_id: intent.target_weight for asset_id, intent in state.pending_intents.items()}
         weights_before = state.weights(prices)
         dry_state = copy.deepcopy(state)
         orders, trades = self.execution.apply_target(
@@ -287,7 +282,6 @@ class LivePortfolio:
         fee_by_order = {trade.order_id: trade.fee for trade in trades}
         total_value = state.total_value(prices)
 
-        ticket_csv = self.tickets_dir / f"ticket_{date_str(plan_date)}.csv"
         rows = [
             self._ticket_row(order, weights_before, target_weights, fee_by_order)
             for order in orders
@@ -295,9 +289,11 @@ class LivePortfolio:
         ]
         self._write_ticket_csv(ticket_csv, rows)
         text = self._render_ticket_text(plan_date, rows, total_value, state.cash)
+        text += "\n\n" + monitor_text
         ticket_txt.write_text(text + "\n", encoding="utf-8")
+        write_json(self.state_path, state.to_dict())
         actionable = [row for row in rows if row["note"] == ""]
-        return PlanResult(self.portfolio_id, plan_date, True, len(actionable), ticket_csv, ticket_txt, text)
+        return PlanResult(self.portfolio_id, plan_date, True, len(actionable), ticket_csv, ticket_txt, text, monitor_text)
 
     # ---------------------------------------------------------------- cycle
 
@@ -362,9 +358,20 @@ class LivePortfolio:
         if state is None:
             raise FileNotFoundError(f"{self.state_path} 不存在，请先 reconcile 导入真实持仓。")
         asof = parse_date(asof_date)
+        rows = self._read_real_nav_rows()
+        frozen = any(row["date"] > date_str(asof) for row in rows) or date_str(asof) < max(
+            date_str(state.last_date) or "", state.live_accounting.get("processed_through", "")
+        )
+        rows = [row for row in rows if row["date"] <= date_str(asof)]
+        current_row = next((row for row in rows if row["date"] == date_str(asof)), None)
+        if frozen and current_row is None:
+            raise ValueError(f"没有 {asof} 的历史净值快照，不能用当前持仓回填历史。")
         data = self._load_data(asof)
-        self._apply_dividends(state, asof)
-        self._write_state(state)
+        if not frozen:
+            self._apply_dividends(state, asof)
+        expected_realized = expected_income(state, self.portfolio_dir / "execution_ledger.csv", asof)
+        if not frozen:
+            write_json(self.state_path, state.to_dict())
         bars = data.bars_on(asof)
         prices = {asset_id: bar.close for asset_id, bar in bars.items()}
 
@@ -389,17 +396,15 @@ class LivePortfolio:
                 "pnl": position.quantity * (bar.close - prev_bar.close),
             }
 
-        rows = self._read_real_nav_rows()
         earlier = [row for row in rows if row["date"] < date_str(asof)]
         previous_total = float(earlier[-1]["total_value"]) if earlier else None
-        has_newer = any(row["date"] > date_str(asof) for row in rows)
         same = [row for row in rows if row["date"] == date_str(asof)]
         same_day_total = float(same[-1]["total_value"]) if same else None
 
         # 历史行冻结：real_nav 是真实净值台账，一旦出现更新日期的估值，旧日期
         # 不允许被重估值改写（曾发生：数据处于研究中间状态时 --force 重跑，把
         # 已记录的历史行改成了错误值）。需要修正历史请用 reconcile（用户真值）。
-        written = not has_newer
+        written = not frozen
         if written:
             if same_day_total is not None and same_day_total > 0 and abs(total_value / same_day_total - 1.0) > 0.001:
                 logger.warning(
@@ -408,7 +413,11 @@ class LivePortfolio:
                 )
             rows = self._append_real_nav(asof, state.cash, positions_value, total_value)
         else:
-            logger.warning("real_nav 已存在晚于 %s 的估值行，跳过历史回写（修正历史请用 reconcile）", date_str(asof))
+            state.cash = float(current_row["cash"])
+            positions_value = float(current_row["positions_value"])
+            total_value = float(current_row["total_value"])
+            weights, asset_changes = {}, {}
+            logger.warning("已有晚于 %s 的账户或净值状态，返回已保存的历史估值。", date_str(asof))
 
         # ---- 份额口径派生（申赎不污染收益率；旧格式档案无 unit_nav 时各字段为 None，
         #      展示层回退 total_value 口径——下一次写盘链会自动回填）
@@ -418,7 +427,6 @@ class LivePortfolio:
             return None
 
         current_row = next((row for row in rows if row["date"] == date_str(asof)), None)
-        chain_earlier = [row for row in rows if row["date"] < date_str(asof)]
         first_row = rows[0] if rows else None
         external_flow = float(current_row.get("external_flow") or 0.0) if current_row else 0.0
         net_invested = None
@@ -434,13 +442,14 @@ class LivePortfolio:
             position.quantity * (prices[asset_id] - position.cost_basis)
             for asset_id, position in state.positions.items()
             if asset_id in prices
-        )
+        ) if written else None
         total_pnl = total_value - net_invested if net_invested is not None else None
-        realized_pnl = total_pnl - float_pnl if total_pnl is not None else None
+        realized_pnl = total_pnl - float_pnl if total_pnl is not None and float_pnl is not None else None
 
-        expected_realized = expected_income(state, self.portfolio_dir / "execution_ledger.csv", asof)
         tolerance = self.realized_residual_tolerance
-        residual_alert = realized_pnl is not None and abs(realized_pnl - expected_realized) > tolerance
+        residual_alert = realized_pnl is not None and (
+            expected_realized is None or abs(realized_pnl - expected_realized) > tolerance
+        )
 
         return {
             "date": asof,
@@ -453,7 +462,7 @@ class LivePortfolio:
             "inception_date": first_row["date"] if first_row else None,
             "inception_total": float(first_row["total_value"]) if first_row else None,
             "unit_nav": _unit_nav_of(current_row),
-            "previous_unit_nav": _unit_nav_of(chain_earlier[-1] if chain_earlier else None),
+            "previous_unit_nav": _unit_nav_of(earlier[-1] if earlier else None),
             "inception_unit_nav": _unit_nav_of(first_row),
             "external_flow": external_flow,
             "net_invested": net_invested,
@@ -512,9 +521,11 @@ class LivePortfolio:
                 lines.append(f"- **盈亏拆分**: 已实现 {realized:+,.2f} 元 + 浮动 {float_pnl:+,.2f} 元")
                 if valuation.get("realized_residual_alert"):
                     tol = valuation.get("realized_residual_tolerance", 0.0)
+                    expected = valuation.get("expected_realized_pnl")
+                    reference = f"{expected:+,.2f} 元" if expected is not None else "未知（流水缺少持仓成本）"
                     lines.append(
                         f"- ⚠️ **账本自检未通过**: 已实现 {realized:+,.2f} 元与流水及自动股息计算值"
-                        f" {valuation.get('expected_realized_pnl', 0.0):+,.2f} 元不一致（容差 {tol:,.2f}）。请核对交易流水、分红；"
+                        f" {reference} 未通过核对（容差 {tol:,.2f}）。请核对交易流水、分红；"
                         f"优先核对 ①holdings 的 cost_basis 是否为交割单实付÷数量（含手续费）"
                         f" ②real_nav 首行基线是否为实际入金而非当日收盘市值。"
                     )
@@ -536,8 +547,45 @@ class LivePortfolio:
         if plan_result.has_target and plan_result.order_count > 0:
             lines.append("⚠️ **今日触发调仓**，下单票见另一条推送。")
         else:
-            lines.append("今日无需调仓：全部偏离在阈值带内。")
+            lines.append("今日无需调仓：没有可执行订单，详见当日票据。")
+        if plan_result.monitor_text:
+            lines.extend(["", plan_result.monitor_text])
         return title, "\n".join(lines)
+
+    def _render_target_monitor(self, context: StrategyContext, prices: dict[str, float]) -> str:
+        """只用真实买卖流水确认上次成交，出票和对账不作为成交证据。"""
+        last_trade = None
+        ledger_path = self.portfolio_dir / "execution_ledger.csv"
+        if ledger_path.exists():
+            with ledger_path.open(encoding="utf-8-sig", newline="") as handle:
+                for row in csv.DictReader(handle):
+                    if row["event"] not in {"BUY", "SELL"} or row["code"] not in self.code_to_asset_id:
+                        continue
+                    day = parse_date(row["date"])
+                    quantity = float(row["quantity"])
+                    if not isfinite(quantity) or quantity < 0:
+                        raise ValueError("成交流水数量必须为非负有限数。")
+                    if quantity > 0 and day <= context.date and (last_trade is None or day > last_trade):
+                        last_trade = day
+        lines = ["**策略目标监控**", f"- 目标计算日：{date_str(context.date)}",
+                 f"- 上次调仓（有成交）：{date_str(last_trade) if last_trade else '未知（无有效买卖流水）'}",
+                 f"- 持仓对账日：{date_str(context.state.last_date) or '未知'}"]
+        target = context.theoretical_target
+        if target is None:
+            lines.append("- 本次未生成目标：未到检查日或历史样本不足。")
+            return "\n".join(lines)
+        current = context.state.weights(prices)
+        lines.extend(["", "| 资产 | 当前权重 | 目标权重 | 差额（百分点） |",
+                      "| --- | ---: | ---: | ---: |"])
+        for asset_id, asset in self.assets.items():
+            before, after = current.get(asset_id, 0.0), target.weights.get(asset_id, 0.0)
+            lines.append(f"| {asset.code} {asset.name} | {before:.2%} | {after:.2%} | {(after-before)*100:+.2f} |")
+        total = context.state.total_value(prices)
+        cash_before = context.state.cash / total if total > 0 else 0.0
+        cash_after = 1.0 - sum(target.weights.values())
+        lines.append(f"| 现金 | {cash_before:.2%} | {cash_after:.2%} | {(cash_after-cash_before)*100:+.2f} |")
+        lines.append("目标为当日策略计算值；订单另受偏差阈值、整手、现金和交易限制约束。")
+        return "\n".join(lines)
 
     def _sync_data(self, end: date) -> None:
         market_store = MarketDataStore(self.market_dir)
@@ -618,6 +666,7 @@ class LivePortfolio:
         if not path.exists():
             raise FileNotFoundError(f"持仓文件不存在: {path}")
         holdings: list[tuple[str, float, float | None]] = []
+        codes = set()
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
             if reader.fieldnames is None or "code" not in reader.fieldnames or "quantity" not in reader.fieldnames:
@@ -626,44 +675,36 @@ class LivePortfolio:
                 code = str(row["code"]).strip()
                 if not code:
                     continue
+                if code in codes:
+                    raise ValueError(f"持仓代码重复: {code}")
+                codes.add(code)
                 quantity = float(str(row["quantity"]).strip())
                 raw_cost = str(row.get("cost_basis") or "").strip()
                 cost_basis = float(raw_cost) if raw_cost else None
+                if not isfinite(quantity) or quantity < 0:
+                    raise ValueError(f"持仓数量必须为非负有限数: {code}")
+                if cost_basis is not None and (not isfinite(cost_basis) or cost_basis < 0):
+                    raise ValueError(f"持仓成本必须为非负有限数: {code}")
                 holdings.append((code, quantity, cost_basis))
         return holdings
-
-    def _load_assets(self, payload: list[dict[str, Any]]) -> dict[str, Asset]:
-        assets: dict[str, Asset] = {}
-        for item in payload:
-            asset = Asset(
-                asset_id=item["asset_id"],
-                code=str(item["code"]),
-                name=item.get("name", item["code"]),
-                asset_type=item.get("asset_type", "etf"),
-                exchange=item.get("exchange", "CN"),
-                currency=item.get("currency", "CNY"),
-                lot_size=int(item.get("lot_size", 100)),
-                price_limit_pct=item.get("price_limit_pct", 0.10),
-            )
-            assets[asset.asset_id] = asset
-        return assets
 
     def _load_state(self) -> PortfolioState | None:
         if not self.state_path.exists():
             return None
         payload = json.loads(self.state_path.read_text(encoding="utf-8"))
-        return PortfolioState.from_dict(payload)
+        state = PortfolioState.from_dict(payload)
+        state.validate_assets(self.assets)
+        return state
 
     def _apply_dividends(self, state: PortfolioState, asof: date) -> None:
-        path = Path(self.config.get("live", {}).get("dividends_path") or
-                    Path(__file__).resolve().parents[2] / "data" / "platform_dividends.csv")
+        data_config = self.config.get("data") or {}
+        directory = data_config.get("market_store_dir") or data_config.get("data_dir") or Path(__file__).resolve().parents[2] / "data"
+        path = Path(self.config.get("live", {}).get("dividends_path") or data_config.get("dividends_csv") or
+                    Path(directory) / "platform_dividends.csv")
+        if (self.config.get("live", {}).get("dividends_path") or data_config.get("dividends_csv")) and not path.exists():
+            raise FileNotFoundError(f"Configured dividend file missing: {path}")
         apply_dividends(state, asof, path, self.code_to_asset_id,
                         self.portfolio_dir / "execution_ledger.csv")
-
-    def _write_state(self, state: PortfolioState) -> None:
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.state_path.open("w", encoding="utf-8") as handle:
-            json.dump(state.to_dict(), handle, ensure_ascii=False, indent=2)
 
     def _read_real_nav_rows(self) -> list[dict[str, str]]:
         if not self.real_nav_path.exists():
@@ -682,23 +723,30 @@ class LivePortfolio:
 
         规则：首行整笔视为申购（unit_nav=1）；此后每日先用"扣除当日申赎的
         组合值"对旧份额算单位净值，再按该净值增发/赎回份额——单位净值曲线
-        对外部资金流保持连续。极端情形（净值/份额被赎穿归零）按新起点重置。
+        对外部资金流保持连续。全部赎回期间保留最后单位净值，再次入金按该净值发份额。
         """
         units = 0.0
+        unit_nav = 1.0
         for row in rows:
             total = float(row.get("total_value") or 0.0)
             flow = float(row.get("external_flow") or 0.0)
             pre_flow_value = total - flow
-            if units <= 0 or pre_flow_value <= 0:
+            if units <= 0:
+                units = max(total, 0.0) / unit_nav
+            elif pre_flow_value <= 0:
                 units = max(total, 0.0)  # 新起点：整笔申购，unit_nav 从 1 重新出发
+                unit_nav = 1.0
             else:
                 unit_nav = pre_flow_value / units
                 if flow and unit_nav > 0:
                     units += flow / unit_nav
+            units = max(units, 0.0)
+            if units > 0:
+                unit_nav = total / units
             row["external_flow"] = f"{flow:.2f}"
             row["units"] = f"{units:.6f}"
             # 8 位小数：unit_nav≈1 量级,6 位会引入 ~1e-6 的日收益率量化误差
-            row["unit_nav"] = f"{total / units:.8f}" if units > 0 else ""
+            row["unit_nav"] = f"{unit_nav:.8f}"
 
     def _append_real_nav(
         self,
@@ -729,17 +777,8 @@ class LivePortfolio:
         )
         rows.sort(key=lambda row: row["date"])
         self._recompute_unit_chain(rows)
-        self._write_real_nav(rows)
+        write_csv_stable(self.real_nav_path, pd.DataFrame(rows))
         return rows
-
-    def _write_real_nav(self, rows: list[dict[str, str]]) -> None:
-        with self.real_nav_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(
-                handle,
-                fieldnames=["date", "cash", "positions_value", "total_value", "external_flow", "units", "unit_nav"],
-            )
-            writer.writeheader()
-            writer.writerows(rows)
 
     def amend_flow(self, asof_date: str | date, external_flow: float) -> dict[str, Any]:
         """补报/修正历史某日的申赎金额（忘了 --external-flow 的回档通道）。
@@ -749,6 +788,8 @@ class LivePortfolio:
         返回 {date, old_flow, new_flow, changed: [{date, unit_nav_before, unit_nav_after}, ...]}。
         """
         asof = parse_date(asof_date)
+        if not isfinite(float(external_flow)):
+            raise ValueError("外部资金流必须为有限数。")
         rows = self._read_real_nav_rows()
         target = [row for row in rows if row["date"] == date_str(asof)]
         if not target:
@@ -760,7 +801,7 @@ class LivePortfolio:
             if row["date"] == date_str(asof):
                 row["external_flow"] = f"{float(external_flow):.2f}"
         self._recompute_unit_chain(rows)
-        self._write_real_nav(rows)
+        write_csv_stable(self.real_nav_path, pd.DataFrame(rows))
         changed = [
             {"date": row["date"], "unit_nav_before": before[row["date"]], "unit_nav_after": row["unit_nav"]}
             for row in rows

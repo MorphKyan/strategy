@@ -28,6 +28,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from math import isfinite
 from pathlib import Path
 
 import pandas as pd
@@ -43,8 +44,9 @@ os.chdir(ROOT)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from src.platform_core.data_store import write_csv_stable  # noqa: E402
-from src.platform_core.etf_premium import NAV_DIRNAME  # noqa: E402
+from src.platform_core.data import LocalCsvBarData  # noqa: E402
+from src.platform_core.data_store import assets_from_config, write_csv_stable  # noqa: E402
+from src.platform_core.etf_premium import NAV_DIRNAME, EtfPremiumStore  # noqa: E402
 
 LSJZ_URL = "https://api.fund.eastmoney.com/f10/lsjz"
 PAGE_SIZE = 20  # 东财硬上限，调大无效且会被静默截断
@@ -65,7 +67,7 @@ def _session() -> requests.Session:
 
 
 def fetch_nav(code: str, session: requests.Session, max_pages: int = 400) -> pd.DataFrame:
-    """抓单只 ETF 的全历史净值。按 TotalCount 翻页，空页或抓满才停。"""
+    """抓单只 ETF 的完整净值；分页数量、日期或数值异常时拒绝入库。"""
     rows: list[dict] = []
     total: int | None = None
     for page in range(1, max_pages + 1):
@@ -73,14 +75,18 @@ def fetch_nav(code: str, session: requests.Session, max_pages: int = 400) -> pd.
         payload = None
         for attempt in range(4):
             try:
-                payload = session.get(url, timeout=20).json()
+                response = session.get(url, timeout=20)
+                response.raise_for_status()
+                payload = response.json()
                 break
             except Exception as exc:  # noqa: BLE001
                 if attempt == 3:
                     raise RuntimeError(f"{code} 第 {page} 页抓取失败: {type(exc).__name__}: {exc}") from exc
                 time.sleep(1.5 * (attempt + 1))
-        if total is None:
-            total = int(payload.get("TotalCount") or 0)
+        count = int(payload.get("TotalCount") or 0)
+        if count <= 0 or (total is not None and count != total):
+            raise RuntimeError(f"{code}: 缺少有效 TotalCount 或分页期间总数变化，拒绝入库")
+        total = count
         chunk = (payload.get("Data") or {}).get("LSJZList") or []
         if not chunk:
             break
@@ -91,30 +97,26 @@ def fetch_nav(code: str, session: requests.Session, max_pages: int = 400) -> pd.
 
     if not rows:
         raise RuntimeError(f"{code}: 未取到任何净值记录")
-    if total and len(rows) < total:
-        raise RuntimeError(f"{code}: 抓到 {len(rows)} 行 < TotalCount {total}，疑似分页截断，拒绝入库")
+    if len(rows) != total:
+        raise RuntimeError(f"{code}: 抓到 {len(rows)} 行 != TotalCount {total}，疑似分页截断，拒绝入库")
 
     frame = pd.DataFrame(rows)[["FSRQ", "DWJZ", "LJJZ"]]
     frame.columns = ["trade_date", "unit_nav", "cum_nav"]
-    frame = frame[frame["unit_nav"].astype(str).str.strip() != ""].copy()
-    frame["unit_nav"] = pd.to_numeric(frame["unit_nav"], errors="coerce")
-    frame["cum_nav"] = pd.to_numeric(frame["cum_nav"], errors="coerce")
-    frame = frame.dropna(subset=["unit_nav"])
-    frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce").dt.date
-    frame = frame.dropna(subset=["trade_date"])
-    frame = frame.sort_values("trade_date").drop_duplicates("trade_date", keep="last")
+    frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="raise").dt.date
+    for column in ("unit_nav", "cum_nav"):
+        frame[column] = pd.to_numeric(frame[column], errors="raise")
+        if not frame[column].map(lambda value: isfinite(value) and value > 0).all():
+            raise ValueError(f"{code}: {column} 必须为有限正数，拒绝入库")
+    if frame["trade_date"].isna().any() or frame["trade_date"].duplicated().any():
+        raise ValueError(f"{code}: 净值日期缺失或重复，疑似重复分页，拒绝入库")
+    frame = frame.sort_values("trade_date")
     return frame.reset_index(drop=True)
 
 
 def codes_from_config(config_path: Path) -> list[str]:
     with config_path.open("r", encoding="utf-8") as handle:
         config = yaml.safe_load(handle) or {}
-    codes = []
-    for asset in config.get("assets") or []:
-        code = str(asset.get("code") or "").strip()
-        if code:
-            codes.append(code)
-    return codes
+    return [asset.code for asset in assets_from_config(config.get("assets") or []) if asset.asset_type == "etf"]
 
 
 def guard_history_shrink(path: Path, frame: pd.DataFrame) -> None:
@@ -122,14 +124,12 @@ def guard_history_shrink(path: Path, frame: pd.DataFrame) -> None:
     if not path.exists():
         return
     old = pd.read_csv(path)
-    if len(frame) < len(old):
-        raise RuntimeError(
-            f"{path.name}: 新数据 {len(frame)} 行 < 已入库 {len(old)} 行，疑似源端残史，拒绝覆盖"
-        )
-    old_last = str(old["trade_date"].max())
-    new_last = str(frame["trade_date"].max())
-    if new_last < old_last:
-        raise RuntimeError(f"{path.name}: 新数据截止 {new_last} 早于已入库 {old_last}，拒绝覆盖")
+    old_dates = pd.to_datetime(old["trade_date"], errors="raise")
+    new_dates = pd.to_datetime(frame["trade_date"], errors="raise")
+    if old_dates.isna().any() or old_dates.duplicated().any():
+        raise ValueError(f"{path.name}: 已存日期缺失或重复，拒绝覆盖")
+    if not set(old_dates).issubset(new_dates):
+        raise RuntimeError(f"{path.name}: 新结果缺少已存历史日期，拒绝覆盖")
 
 
 def main() -> int:
@@ -150,7 +150,14 @@ def main() -> int:
         codes += codes_from_config(Path(args.config))
     codes = list(dict.fromkeys(codes))
 
+    if not codes:
+        parser.error("没有可抓取的 ETF 代码")
     data_dir = Path(args.data_dir)
+    if args.report:
+        assets = assets_from_config([{"asset_id": code, "code": code} for code in codes])
+        market = LocalCsvBarData(data_dir, assets)
+        asof = max(market.calendar)
+        premiums = EtfPremiumStore(data_dir)
     out_dir = data_dir / NAV_DIRNAME
     out_dir.mkdir(parents=True, exist_ok=True)
     session = _session()
@@ -160,36 +167,27 @@ def main() -> int:
     for code in codes:
         try:
             frame = fetch_nav(code, session)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[FAIL] {code}: {exc}")
-            failures.append(code)
-            continue
-        frame["source"] = SOURCE
-        frame["updated_at"] = stamp
-        path = out_dir / f"{code}.csv"
-        try:
+            frame["source"] = SOURCE
+            frame["updated_at"] = stamp
+            path = out_dir / f"{code}.csv"
             guard_history_shrink(path, frame)
+            wrote = write_csv_stable(path, frame, key_column="trade_date")
+            print(
+                f"[OK] {code}: {len(frame)} 行 {frame['trade_date'].iloc[0]} ~ {frame['trade_date'].iloc[-1]}"
+                f" {'(已写盘)' if wrote else '(无变化)'}"
+            )
+            if args.report:
+                history = premiums.observable_history(code, asof)
+                if history.empty:
+                    raise ValueError("扣除发布滞后后无可观测溢价")
+                premium = history["premium"]
+                print(
+                    f"       可观测溢价（截至 {asof}，观测 {history.index[-1]}）: 最新 {premium.iloc[-1]*100:.2f}%"
+                    f" | 中位 {premium.median()*100:.2f}% | 均值 {premium.mean()*100:.2f}% | 配对 {len(history)} 日"
+                )
         except Exception as exc:  # noqa: BLE001
             print(f"[FAIL] {code}: {exc}")
             failures.append(code)
-            continue
-        wrote = write_csv_stable(path, frame, key_column="trade_date")
-        print(
-            f"[OK] {code}: {len(frame)} 行 {frame['trade_date'].iloc[0]} ~ {frame['trade_date'].iloc[-1]}"
-            f" {'(已写盘)' if wrote else '(无变化)'}"
-        )
-        if args.report:
-            price_path = data_dir / f"{code}.csv"
-            if price_path.exists():
-                price = pd.read_csv(price_path)
-                ccol = "close" if "close" in price.columns else "close_price"
-                price["trade_date"] = pd.to_datetime(price["trade_date"], errors="coerce").dt.date
-                merged = price[["trade_date", ccol]].merge(frame[["trade_date", "unit_nav"]], on="trade_date")
-                premium = merged[ccol] / merged["unit_nav"] - 1.0
-                print(
-                    f"       溢价: 最新 {premium.iloc[-1]*100:.2f}% | 中位 {premium.median()*100:.2f}%"
-                    f" | 均值 {premium.mean()*100:.2f}% | 配对 {len(merged)} 日"
-                )
 
     if failures:
         print(f"\n失败 {len(failures)} 只: {', '.join(failures)}")

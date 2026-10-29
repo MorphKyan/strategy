@@ -128,6 +128,8 @@ def discover_runs(root: Path | None = None, include_temporary: bool = False) -> 
             continue
         excluded_dirs = TEMPORARY_EXCLUDED_DIRS if results_dir.name == "temporary_backtests" else EXCLUDED_RESULT_DIRS
         for record in _discover_runs_in_root(results_dir, excluded_dirs=excluded_dirs):
+            if not include_temporary and (record.manifest.get("artifact_provenance") or {}).get("classification") != "fixed_full_history":
+                continue
             records.append(record)
 
     return sorted(records, key=lambda item: (item.generated_at, item.run_id), reverse=True)
@@ -264,62 +266,6 @@ def read_run_table(run_dir: Path, name: str) -> pd.DataFrame:
             if "net_value" in frame:
                 frame["drawdown"] = frame["net_value"] / frame["net_value"].cummax() - 1.0
     return frame
-
-
-def get_runs_signature(root: Path | None = None) -> str:
-    root = (root or platform_root()).resolve()
-    results_dir = root / "results"
-    if not results_dir.exists():
-        return ""
-
-    items: list[str] = []
-    for dirpath, dirnames, filenames in os.walk(results_dir):
-        pruned_dirs = []
-        for d in dirnames:
-            d_lower = d.lower()
-            if (
-                d in EXCLUDED_RESULT_DIRS or
-                "sensitivity_raw" in d_lower or
-                "backtest_cache" in d_lower or
-                "sim_portfolios" in d_lower or
-                "live_portfolios" in d_lower or
-                "backtests_sweep" in d_lower or
-                "research" in d_lower or
-                "_sweep" in d_lower or
-                "_raw" in d_lower or
-                "compare" in d_lower
-            ):
-                continue
-            pruned_dirs.append(d)
-        dirnames[:] = pruned_dirs
-
-        if "manifest.json" in filenames and "nav.csv" in filenames:
-            manifest_path = Path(dirpath) / "manifest.json"
-            try:
-                mtime = manifest_path.stat().st_mtime
-                items.append(f"{dirpath}:{mtime}")
-            except OSError:
-                pass
-    return ",".join(sorted(items))
-
-
-def get_configs_signature(root: Path | None = None) -> str:
-    root = (root or platform_root()).resolve()
-    config_dir = root / "configs"
-    if not config_dir.exists():
-        return ""
-
-    items: list[str] = []
-    for dirpath, dirnames, filenames in os.walk(config_dir):
-        for f in filenames:
-            if f.endswith(".yaml"):
-                path = Path(dirpath) / f
-                try:
-                    mtime = path.stat().st_mtime
-                    items.append(f"{path.as_posix()}:{mtime}")
-                except OSError:
-                    pass
-    return ",".join(sorted(items))
 
 
 def read_run_tables(run_dir: Path) -> dict[str, pd.DataFrame]:
@@ -590,18 +536,20 @@ def rebalance_events(orders: pd.DataFrame) -> pd.DataFrame:
         frame["signal_date"] = pd.to_datetime(frame["signal_date"], errors="coerce")
     else:
         frame["signal_date"] = frame["date"]
-    frame["trade_value"] = pd.to_numeric(frame.get("trade_value", 0), errors="coerce").fillna(0).abs()
+    frame["trade_value"] = pd.to_numeric(
+        frame.get("trade_value", pd.Series(0.0, index=frame.index)), errors="coerce"
+    ).fillna(0).abs()
     grouped = frame.dropna(subset=["date"]).groupby(["signal_date", "date"], dropna=False)
     return grouped.agg(order_count=("date", "size"), trade_value=("trade_value", "sum")).reset_index()
 
 
 def downsample_timeseries(frame: pd.DataFrame, max_points: int = 2000) -> pd.DataFrame:
-    """Reduce rendering payload while retaining first/last and extrema candidates."""
+    """Reduce rendering payload while retaining first and last observations."""
     if frame.empty or len(frame) <= max_points or max_points < 3:
         return frame
     step = max(1, math.ceil((len(frame) - 2) / (max_points - 2)))
-    indexes = [0, *range(1, len(frame) - 1, step), len(frame) - 1]
-    return frame.iloc[indexes[: max_points - 1] + [indexes[-1]]].drop_duplicates().copy()
+    indexes = [0, *range(1, len(frame) - 1, step)][:max_points - 1] + [len(frame) - 1]
+    return frame.iloc[indexes].copy()
 
 
 def portfolio_risk_analysis(
@@ -718,11 +666,13 @@ def read_portfolio_nav(portfolio_dir: Path, kind: str) -> pd.DataFrame:
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
     frame["total_value"] = pd.to_numeric(frame["total_value"], errors="coerce")
     # 收益口径优先用单位净值（份额化后申赎不污染收益率；旧档案无此列回退总值）
-    if "unit_nav" in frame and pd.to_numeric(frame["unit_nav"], errors="coerce").notna().all():
+    if "unit_nav" in frame:
         frame["net_value"] = pd.to_numeric(frame["unit_nav"], errors="coerce")
     else:
         frame["net_value"] = frame["total_value"]
-    frame = frame.dropna(subset=["date", "net_value"])
+    valid = frame["date"].notna() & frame["net_value"].map(lambda value: math.isfinite(value) and value > 0)
+    invalid_count = int((~valid).sum())
+    frame = frame[valid]
     # 稳定排序保持段内先后，同日保留最后（=最新一次 advance）的估值
     frame = frame.sort_values("date", kind="stable").drop_duplicates("date", keep="last")
     columns = [
@@ -730,7 +680,10 @@ def read_portfolio_nav(portfolio_dir: Path, kind: str) -> pd.DataFrame:
         for column in ("date", "net_value", "total_value", "cash", "positions_value", "external_flow", "pending_intent_count")
         if column in frame
     ]
-    return frame[columns].reset_index(drop=True)
+    result = frame[columns].reset_index(drop=True)
+    if invalid_count:
+        result.attrs["quality_note"] = f"已略过 {invalid_count} 行无效日期或净值；单位净值缺失时不会改用账户金额计算收益，请核对台账。"
+    return result
 
 
 def latest_ticket(portfolio_dir: Path) -> dict[str, Any] | None:

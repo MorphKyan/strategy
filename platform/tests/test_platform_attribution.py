@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
 
 from src.platform_core.attribution import (
     build_live_attribution,
+    load_real_nav,
     load_shadow_nav,
     month_window,
     previous_month,
     render_attribution_md,
 )
 from src.platform_core.sim import SimPortfolio
+from src.platform_core.models import PortfolioState, TargetPortfolio
 from src.platform_core.storage import InMemoryStore
+from src.platform_core.strategy import RiskParityStrategy
 
 
 # ---------------------------------------------------------------- SimPortfolio.load
@@ -85,6 +88,53 @@ def test_sim_portfolio_load_missing_state_raises(tmp_path: Path):
         SimPortfolio.load("nope", config, InMemoryStore())
 
 
+def test_sim_runs_in_same_second_preserve_previous_artifacts(tmp_path: Path, monkeypatch):
+    class Clock:
+        tick = 0
+
+        @classmethod
+        def now(cls):
+            cls.tick += 1
+            return datetime(2024, 1, 31, 12, 0, 0, cls.tick)
+
+    monkeypatch.setattr("src.platform_core.sim.datetime", Clock)
+    data_dir = tmp_path / "data"
+    _write_market_data(data_dir, ["2024-01-29", "2024-01-30"])
+    config = _sim_config(data_dir, tmp_path / "sims")
+    portfolio = SimPortfolio("sim", config, InMemoryStore(), PortfolioState(cash=1000), tmp_path / "checkpoint")
+    first = portfolio.advance("2024-01-30")
+    before = (first.output_dir / "nav.csv").read_bytes()
+    second = portfolio.advance("2024-01-30")
+    assert first.output_dir != second.output_dir
+    assert (first.output_dir / "nav.csv").read_bytes() == before
+    assert second.metrics["processed_days"] == 0
+
+
+def test_daily_sim_restarts_match_batch_and_preserve_monthly_schedule(tmp_path: Path, monkeypatch):
+    data_dir = tmp_path / "data"
+    _write_market_data(data_dir, ["2024-01-29", "2024-01-30", "2024-01-31"])
+    config = _sim_config(data_dir, tmp_path / "sims")
+    config["execution"]["slippage_bps"] = 0
+    config["strategy"] = {
+        "strategy_name": "risk_parity", "strategy_version_id": 999,
+        "params": {"universe": ["A"], "init_calc_days": 0, "rebalance_frequency": "monthly"},
+    }
+    monkeypatch.setattr(RiskParityStrategy, "_inverse_vol_target",
+                        lambda self, context, universe: TargetPortfolio({"A": .5}))
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text(json.dumps(PortfolioState(cash=10000).to_dict()))
+    daily = SimPortfolio.create_from_checkpoint(checkpoint, config, InMemoryStore(), portfolio_id="daily")
+    daily.advance("2024-01-29")
+    daily = SimPortfolio.load("daily", config, InMemoryStore())
+    daily.advance("2024-01-30")
+    assert not daily.state.pending_intents
+    daily = SimPortfolio.load("daily", config, InMemoryStore())
+    daily.advance("2024-01-31")
+    batch = SimPortfolio.create_from_checkpoint(checkpoint, config, InMemoryStore(), portfolio_id="batch")
+    batch.advance("2024-01-31")
+    assert daily.state.to_dict() == batch.state.to_dict()
+
+
 # ---------------------------------------------------------------- 归因数学
 
 
@@ -137,6 +187,31 @@ def test_build_live_attribution_insufficient_sample():
     assert not result["sufficient"]
     report = render_attribution_md(result, "live_x", "shadow_x", "2024-06")
     assert "样本不足" in report
+
+
+def test_attribution_uses_unit_nav_for_return_and_account_value_for_total_display(tmp_path):
+    (tmp_path / "real_nav.csv").write_text(
+        "date,total_value,cash,unit_nav\n2024-06-03,1000,100,1\n2024-06-04,2000,1100,1\n")
+    rows = load_real_nav(tmp_path)
+    shadow = _rows({"2024-06-03": (1000, 100), "2024-06-04": (1000, 100)})
+    result = build_live_attribution(rows, shadow, date(2024, 6, 1), date(2024, 6, 30))
+    assert result["real_cum_return"] == 0
+    assert result["real_total_start"] == 1000 and result["real_total_end"] == 2000
+
+
+def test_missing_unit_nav_never_falls_back_to_deposit_contaminated_account_value(tmp_path):
+    (tmp_path / "real_nav.csv").write_text(
+        "date,total_value,cash,unit_nav\n2024-06-03,1000,100,1\n2024-06-04,2000,1100,\n")
+    with pytest.raises(ValueError):
+        load_real_nav(tmp_path)
+
+
+@pytest.mark.parametrize("value", [0, float("nan"), float("inf")])
+def test_invalid_shadow_nav_does_not_generate_infinite_or_undefined_attribution(value):
+    real = _rows({"2024-06-03": (1000, 100), "2024-06-04": (1000, 100)})
+    shadow = _rows({"2024-06-03": (value, 100), "2024-06-04": (1000, 100)})
+    with pytest.raises(ValueError, match="有限正净值"):
+        build_live_attribution(real, shadow, date(2024, 6, 1), date(2024, 6, 30))
 
 
 def test_month_helpers():

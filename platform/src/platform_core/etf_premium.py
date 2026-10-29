@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from math import isfinite
 from pathlib import Path
 
 import pandas as pd
@@ -45,7 +46,7 @@ class PremiumResult:
 
 
 class EtfPremiumStore:
-    """按需加载 + 进程内缓存的 ETF 溢价仓库。
+    """按需加载并在本次运行实例内缓存的 ETF 溢价仓库。
 
     一个回测会对同一标的反复取溢价（每月一次 × 数年），故按代码缓存整条配对好的
     序列，切片在内存里做。数据量很小（单只 ~3200 行）。
@@ -60,9 +61,6 @@ class EtfPremiumStore:
     def asset_code(asset_id: str) -> str:
         """CN_ETF:513100.SH -> 513100，与行情 CSV / 净值 CSV 的文件名对应。"""
         return asset_id.split(":")[-1].split(".")[0]
-
-    def has_data(self, asset_id: str) -> bool:
-        return (self.nav_dir / f"{self.asset_code(asset_id)}.csv").exists()
 
     def load_premium_series(self, asset_code: str) -> pd.DataFrame:
         """返回按日期升序、索引为 trade_date 的 DataFrame（close/unit_nav/premium）。
@@ -82,24 +80,52 @@ class EtfPremiumStore:
         if not price_path.exists():
             raise FileNotFoundError(f"ETF 行情数据不存在: {price_path}")
 
-        nav = pd.read_csv(nav_path, usecols=["trade_date", "unit_nav"])
-        nav["trade_date"] = pd.to_datetime(nav["trade_date"], errors="coerce").dt.date
-        nav["unit_nav"] = pd.to_numeric(nav["unit_nav"], errors="coerce")
-        nav = nav.dropna().drop_duplicates("trade_date", keep="last")
+        nav = pd.read_csv(nav_path)
+        nav = nav[["trade_date", "unit_nav", *(["cum_nav"] if "cum_nav" in nav else [])]]
+        nav["trade_date"] = pd.to_datetime(nav["trade_date"]).dt.date
+        for column in nav.columns.drop("trade_date"):
+            nav[column] = pd.to_numeric(nav[column], errors="raise")
+        nav = nav.drop_duplicates("trade_date", keep="last")
 
         price = pd.read_csv(price_path)
         close_column = "close" if "close" in price.columns else "close_price"
         price = price[["trade_date", close_column]].rename(columns={close_column: "close"})
-        price["trade_date"] = pd.to_datetime(price["trade_date"], errors="coerce").dt.date
-        price["close"] = pd.to_numeric(price["close"], errors="coerce")
-        price = price.dropna().drop_duplicates("trade_date", keep="last")
+        price["trade_date"] = pd.to_datetime(price["trade_date"]).dt.date
+        price["close"] = pd.to_numeric(price["close"], errors="raise")
+        price = price.drop_duplicates("trade_date", keep="last")
+
+        for frame in (nav, price):
+            if frame["trade_date"].isna().any():
+                raise ValueError(f"ETF 数据日期缺失: {asset_code}")
+            for column in frame.columns.drop("trade_date"):
+                if not frame[column].map(lambda value: isfinite(value) and value > 0).all():
+                    raise ValueError(f"ETF 数据必须为有限正数: {asset_code}.{column}")
 
         merged = price.merge(nav, on="trade_date", how="inner").sort_values("trade_date")
-        merged = merged[merged["unit_nav"] > 0]
         merged["premium"] = merged["close"] / merged["unit_nav"] - 1.0
         merged = merged.set_index("trade_date")
         self._series_cache[asset_code] = merged
         return merged
+
+    def observable_history(
+        self,
+        asset_id: str,
+        asof: date,
+        publication_lag_days: int = DEFAULT_PUBLICATION_LAG_DAYS,
+    ) -> pd.DataFrame:
+        """asof 日已可观测的溢价历史，统一扣除净值发布滞后。
+
+        取满足 `trade_date <= asof` 的观测后，再向前丢弃 `publication_lag_days` 条
+        （按观测序列的交易日计数，不按自然日——自然日会在长假后放松滞后）。
+        历史不足时返回空表；滞后不得低于保守的两个交易日。
+        """
+        code = self.asset_code(asset_id)
+        series = self.load_premium_series(code)
+        history = series[series.index <= asof]
+        lag = int(publication_lag_days)
+        if lag < DEFAULT_PUBLICATION_LAG_DAYS:
+            raise ValueError(f"QDII 净值发布滞后不得小于 {DEFAULT_PUBLICATION_LAG_DAYS} 个交易日。")
+        return history.iloc[:-lag]
 
     def premium_at(
         self,
@@ -107,41 +133,15 @@ class EtfPremiumStore:
         asof: date,
         publication_lag_days: int = DEFAULT_PUBLICATION_LAG_DAYS,
     ) -> PremiumResult | None:
-        """asof 日**可观测**的最新溢价读数，已扣除净值发布滞后。
-
-        取满足 `trade_date <= asof` 的观测后，再向前丢弃 `publication_lag_days` 条
-        （按观测序列的交易日计数，不按自然日——自然日会在长假后放松滞后）。
-        历史不足时返回 None，由调用方决定如何处置（本课题的约定是"没有信号就不下注"）。
-        """
-        code = self.asset_code(asset_id)
-        series = self.load_premium_series(code)
-        history = series[series.index <= asof]
-        lag = max(0, int(publication_lag_days))
-        if len(history) <= lag:
+        history = self.observable_history(asset_id, asof, publication_lag_days)
+        if history.empty:
             return None
-        row = history.iloc[-(lag + 1)]
-        observed_date = history.index[-(lag + 1)]
+        row = history.iloc[-1]
         return PremiumResult(
-            asset_code=code,
-            observed_date=observed_date,
+            asset_code=self.asset_code(asset_id),
+            observed_date=history.index[-1],
             close=float(row["close"]),
             unit_nav=float(row["unit_nav"]),
             premium=float(row["premium"]),
             observations=int(len(history)),
         )
-
-
-_STORE_CACHE: dict[str, EtfPremiumStore] = {}
-
-
-def get_store(data_dir: str | Path) -> EtfPremiumStore:
-    """按 data_dir 复用 store 实例，避免每个回测日重复读盘。"""
-    key = str(Path(data_dir).resolve())
-    if key not in _STORE_CACHE:
-        _STORE_CACHE[key] = EtfPremiumStore(key)
-    return _STORE_CACHE[key]
-
-
-def reset_store_cache() -> None:
-    """测试用：清空进程内缓存。"""
-    _STORE_CACHE.clear()

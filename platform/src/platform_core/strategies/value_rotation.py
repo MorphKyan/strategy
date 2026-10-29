@@ -47,7 +47,7 @@ R039（动量轮动）当日验收 Failed——败因是鞭打与 V 型反转，
 
 from __future__ import annotations
 
-from src.platform_core.index_valuation import get_store
+from src.platform_core.index_valuation import IndexValuationStore
 from src.platform_core.models import TargetPortfolio
 from src.platform_core.strategy import Strategy, StrategyContext
 
@@ -57,6 +57,7 @@ class IndustryValueRotationStrategy(Strategy):
     version = "0.1.0"
 
     def initialize(self, context: StrategyContext) -> None:
+        self.valuation_store = IndexValuationStore(context.data.data_dir)
         context.set_cooldown(int(context.params.get("cooldown_days", 0)))
         context.set_rebalance_frequency(context.params.get("rebalance_frequency", "monthly"))
 
@@ -80,8 +81,7 @@ class IndustryValueRotationStrategy(Strategy):
         if not universe:
             return None
 
-        store = get_store(context.data.data_dir)
-        results = store.percentiles_at(
+        results = self.valuation_store.percentiles_at(
             universe,
             context.date,
             metric=str(context.params.get("valuation_metric", "pb_lf")),

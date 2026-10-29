@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.platform_core.index_valuation import IndexValuationStore, reset_store_cache
+from src.platform_core.index_valuation import IndexValuationStore
 from src.platform_core.models import PortfolioState, Position
 from src.platform_core.strategies.value_rotation import IndustryValueRotationStrategy
 from src.platform_core.strategy import BUILTIN_STRATEGIES, StrategyContext
@@ -124,14 +124,15 @@ def _make_universe(tmp_path: Path, cheap_to_rich: list[str], length: int = 800) 
 
 
 def test_strategy_selects_cheapest_and_leaves_cash_when_short(tmp_path: Path) -> None:
-    reset_store_cache()
     codes = ["A1", "A2", "A3", "A4", "A5", "A6"]
     params = _make_universe(tmp_path, codes)
     params.update({"top_n": 3, "rank_buffer": 2, "min_history": 100, "percentile_window": 1250})
     asof = pd.bdate_range("2020-01-01", periods=800).date[-1]
 
     strategy = IndustryValueRotationStrategy()
-    target = strategy.generate_theoretical_targets(_context(tmp_path, asof, {}, params))
+    ctx = _context(tmp_path, asof, {}, params)
+    strategy.initialize(ctx)
+    target = strategy.generate_theoretical_targets(ctx)
 
     assert target is not None
     assert set(target.weights) == {"CN_ETF:A1.SH", "CN_ETF:A2.SH", "CN_ETF:A3.SH"}
@@ -146,12 +147,13 @@ def test_strategy_selects_cheapest_and_leaves_cash_when_short(tmp_path: Path) ->
 
 
 def test_rank_buffer_keeps_incumbent_and_excludes_short_history(tmp_path: Path) -> None:
-    reset_store_cache()
     codes = ["A1", "A2", "A3", "A4", "A5", "A6"]
     params = _make_universe(tmp_path, codes)
     params.update({"top_n": 3, "rank_buffer": 2, "min_history": 100, "percentile_window": 1250})
     asof = pd.bdate_range("2020-01-01", periods=800).date[-1]
     strategy = IndustryValueRotationStrategy()
+
+    strategy.initialize(_context(tmp_path, asof, {}, params))
 
     # A5 排名第 5，在 top_n(3)+buffer(2)=5 内 → 现任留任，挤掉本该入选的 A3
     target = strategy.generate_theoretical_targets(
@@ -173,7 +175,6 @@ def test_rank_buffer_keeps_incumbent_and_excludes_short_history(tmp_path: Path) 
 
 def test_monthly_cadence_and_registration(tmp_path: Path) -> None:
     """月频节奏：只有当日是当月最后一个交易日才出目标（基类判断，T+1 执行）。"""
-    reset_store_cache()
     codes = ["A1", "A2", "A3", "A4"]
     params = _make_universe(tmp_path, codes)
     params.update({"top_n": 2, "min_history": 100})
@@ -208,7 +209,6 @@ def test_rebalance_on_start_matches_baseline_entry_convention(tmp_path: Path) ->
 
     实测：候选若空仓等到首个月末，2024-09-18 起点会因错过政策行情产生 -49.6pp 伪劣势。
     """
-    reset_store_cache()
     codes = ["A1", "A2", "A3", "A4"]
     params = _make_universe(tmp_path, codes)
     params.update({"top_n": 2, "min_history": 100})
@@ -226,3 +226,18 @@ def test_rebalance_on_start_matches_baseline_entry_convention(tmp_path: Path) ->
     ctx_off = _context(tmp_path, mid_month, {}, params_off, calendar=calendar, last_date=None)
     strategy.initialize(ctx_off)
     assert strategy.generate_targets(ctx_off) is None
+
+
+def test_new_strategy_run_reads_updated_valuation_snapshot(tmp_path: Path) -> None:
+    _build_store(tmp_path, {"A1": [3, 2, 1], "A2": [1, 2, 3]})
+    asof = pd.bdate_range("2020-01-01", periods=3).date[-1]
+    params = {"universe": ["CN_ETF:A1.SH", "CN_ETF:A2.SH"], "min_history": 3, "top_n": 1}
+    ctx = _context(tmp_path, asof, {}, params)
+    first = IndustryValueRotationStrategy()
+    first.initialize(ctx)
+    assert set(first.generate_theoretical_targets(ctx).weights) == {"CN_ETF:A1.SH"}
+
+    _build_store(tmp_path, {"A1": [1, 2, 3], "A2": [3, 2, 1]})
+    second = IndustryValueRotationStrategy()
+    second.initialize(ctx)
+    assert set(second.generate_theoretical_targets(ctx).weights) == {"CN_ETF:A2.SH"}

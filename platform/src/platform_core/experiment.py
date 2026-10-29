@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import json
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,7 +13,7 @@ from src.platform_core.engine import PlatformBacktestEngine
 from src.platform_core.metrics import OOS_START_DATE, TRAINING_END_DATE, build_platform_metrics, comparison_metrics
 from src.platform_core.runtime_config import apply_runtime_dates
 from src.platform_core.slippage import apply_slippage_scenario
-from src.platform_core.storage import SQLiteStore, InMemoryStore
+from src.platform_core.storage import SQLiteStore, InMemoryStore, write_json
 from src.platform_core.visualization import render_platform_charts
 
 
@@ -33,24 +32,6 @@ class ExperimentResult:
     baseline: ExperimentRun | None
     metrics_path: Path
     report_path: Path
-
-
-def load_yaml(path: str | Path) -> dict[str, Any]:
-    with Path(path).open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
-
-
-def write_json(path: str | Path, payload: dict[str, Any]) -> None:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, ensure_ascii=False, indent=2)
-
-
-def write_text(path: str | Path, content: str) -> None:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
 
 
 def strategy_name(config: dict[str, Any]) -> str:
@@ -93,27 +74,6 @@ def num_or_na(value: Any) -> str:
 
 def bool_zh(value: Any) -> str:
     return "是" if bool(value) else "否"
-
-
-def recommendation(candidate: dict[str, Any], baseline: dict[str, Any] | None) -> str:
-    if baseline is None:
-        return "复核"
-    if not candidate.get("training_metrics_available"):
-        return "继续改进：缺少训练样本指标"
-    if not candidate.get("oos_metrics_available"):
-        return "继续改进：缺少样本外指标"
-    if not baseline.get("training_metrics_available") or not baseline.get("oos_metrics_available"):
-        return "继续改进：baseline 缺少训练或样本外指标"
-
-    candidate_oos = candidate.get("oos_metrics") or {}
-    baseline_oos = baseline.get("oos_metrics") or {}
-    sharpe_up = (candidate_oos.get("sharpe_ratio") or 0) > (baseline_oos.get("sharpe_ratio") or 0)
-    drawdown_ok = (candidate_oos.get("max_drawdown") or 0) >= (baseline_oos.get("max_drawdown") or 0)
-    candidate_turnover = candidate_oos.get("annualized_turnover_amount", candidate_oos.get("annualized_turnover")) or 0
-    baseline_turnover = baseline_oos.get("annualized_turnover_amount", baseline_oos.get("annualized_turnover")) or 0
-    turnover_ok = candidate_turnover <= baseline_turnover * 1.2
-    execution_ok = (candidate_oos.get("rejected_order_count") or 0) <= (baseline_oos.get("rejected_order_count") or 0)
-    return "接受" if sharpe_up and drawdown_ok and turnover_ok and execution_ok else "继续改进"
 
 
 def metric_lines(title: str, metrics: dict[str, Any]) -> list[str]:
@@ -226,8 +186,8 @@ def build_report(
     lines.extend(
         [
             "",
-            "## 建议",
-            f"- {recommendation(c, baseline.metrics if baseline else None)}",
+            "## 验证范围",
+            "本报告展示指定窗口的指标对比。研究结论需结合数据可用性、样本长度、成本场景与起点敏感性。",
             "",
             "## 说明",
             "- 指标根据平台生成的 CSV 产物计算。",
@@ -252,8 +212,10 @@ def run_platform_experiment(
 ) -> ExperimentResult:
     candidate_config_path = Path(candidate_config_path)
     baseline_config_path = Path(baseline_config_path) if baseline_config_path else candidate_config_path
-    candidate_config = apply_runtime_dates(load_yaml(candidate_config_path), start_date=start_date, end_date=end_date)
-    baseline_config = None if skip_baseline else apply_runtime_dates(load_yaml(baseline_config_path), start_date=start_date, end_date=end_date)
+    candidate_config = apply_runtime_dates(yaml.safe_load(candidate_config_path.read_text(encoding="utf-8")),
+                                           start_date=start_date, end_date=end_date)
+    baseline_config = None if skip_baseline else apply_runtime_dates(
+        yaml.safe_load(baseline_config_path.read_text(encoding="utf-8")), start_date=start_date, end_date=end_date)
     if slippage_scenario is not None:
         candidate_config = apply_slippage_scenario(candidate_config, slippage_scenario)
         if baseline_config is not None:
@@ -262,11 +224,11 @@ def run_platform_experiment(
     resolved_name = experiment_name or strategy_name(candidate_config)
     if slippage_scenario is not None:
         resolved_name = f"{resolved_name}_{slippage_scenario}"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     report_dir = Path(report_root) / resolved_name / timestamp
     raw_dir = Path(raw_root) / resolved_name / timestamp
-    report_dir.mkdir(parents=True, exist_ok=True)
-    raw_dir.mkdir(parents=True, exist_ok=True)
+    report_dir.mkdir(parents=True, exist_ok=False)
+    raw_dir.mkdir(parents=True, exist_ok=False)
 
     enable_db = (candidate_config.get("backtest") or {}).get("enable_database", False)
     if enable_db:
@@ -290,7 +252,6 @@ def run_platform_experiment(
         candidate.metrics.get("oos_metrics") or {},
         (baseline.metrics.get("oos_metrics") if baseline else None),
     )
-    recommendation_text = recommendation(candidate.metrics, baseline.metrics if baseline else None)
     payload = {
         "experiment_name": resolved_name,
         "candidate_config": str(candidate_config_path),
@@ -301,14 +262,12 @@ def run_platform_experiment(
         "comparison": comparison,
         "training_comparison": training_comparison,
         "oos_comparison": oos_comparison,
-        "recommendation": recommendation_text,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
     metrics_path = report_dir / "metrics.json"
     report_path = report_dir / "report.md"
     write_json(metrics_path, payload)
-    write_text(
-        report_path,
+    report_path.write_text(
         build_report(
             resolved_name,
             candidate,
@@ -318,13 +277,13 @@ def run_platform_experiment(
             comparison,
             training_comparison,
             oos_comparison,
-        ),
+        ), encoding="utf-8",
     )
     shutil.copy2(candidate_config_path, report_dir / "candidate_config.yaml")
     if baseline is not None and baseline_config_path:
         shutil.copy2(baseline_config_path, report_dir / "baseline_config.yaml")
-    write_text(report_dir / "latest_candidate_raw_results_path.txt", str(candidate.output_dir))
+    (report_dir / "latest_candidate_raw_results_path.txt").write_text(str(candidate.output_dir), encoding="utf-8")
     if baseline is not None:
-        write_text(report_dir / "latest_baseline_raw_results_path.txt", str(baseline.output_dir))
+        (report_dir / "latest_baseline_raw_results_path.txt").write_text(str(baseline.output_dir), encoding="utf-8")
 
     return ExperimentResult(report_dir=report_dir, candidate=candidate, baseline=baseline, metrics_path=metrics_path, report_path=report_path)

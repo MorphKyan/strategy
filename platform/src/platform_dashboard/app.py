@@ -783,6 +783,8 @@ def render_portfolio_detail(portfolios: list[PortfolioRecord], runs: list[RunRec
     st.caption(str(record.path))
 
     nav = portfolio_nav(record)
+    if nav.attrs.get("quality_note"):
+        st.warning(nav.attrs["quality_note"])
     state = record.state
     pending = state.get("pending_intents") or {}
     returns = trailing_returns(nav)

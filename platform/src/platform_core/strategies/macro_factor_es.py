@@ -1,13 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Macro Factor ES Strategy (No Look-Ahead Bias).
-
-Based on Thierry Roncalli & Guillaume Weisang (2016) 'Risk Parity Portfolios with Risk Factors'.
-Implements Section 4 Constrained Risk Budgeting and Smooth Factor Parity:
-1. 252-day SVD/PCA orthogonal factor decomposition;
-2. EWMA Beta smoothing (lambda = 0.85);
-3. Asset-level risk budget corridor bounds ([0.65 * base, 1.35 * base]).
-"""
+"""平滑 PCA 暴露的协方差因子风险平价，资产预算区间采用软惩罚。"""
 
 from __future__ import annotations
 import numpy as np
@@ -18,26 +10,24 @@ from src.platform_core.models import TargetPortfolio
 from src.platform_core.strategy import RiskParityStrategy, StrategyContext
 
 class RiskParityMacroFactorStrategy(RiskParityStrategy):
-    """
-    Macro Factor ES Strategy under Roncalli (2016) Sec 4 Standards.
-    """
+    """PCA 因子风险分配；没有执行 Expected Shortfall 优化。"""
 
     name = "risk_parity_macro_factor"
     version = "0.1.0"
-
-    def __init__(self):
-        super().__init__()
-        self._prev_B_smooth = None
 
     def _inverse_vol_target(
         self,
         context: StrategyContext,
         universe: list[str],
     ) -> TargetPortfolio | None:
-        rolling_window = int(context.params.get("rolling_window", 252)) # Paper recommends 252D (1 year)
+        rolling_window = int(context.params.get("rolling_window", 252))
         min_periods = int(context.params.get("min_periods", 120))
         volatility_target = float(context.params.get("volatility_target", 0.08))
-        lambda_beta = float(context.params.get("lambda_beta", 0.85)) # Roncalli 2016 Sec 4 EWMA Beta smoothing
+        lambda_beta = float(context.params.get("lambda_beta", 0.85))
+        if rolling_window < 2 or not 2 <= min_periods <= rolling_window:
+            raise ValueError("Require 2 <= min_periods <= rolling_window.")
+        if not 0 <= lambda_beta <= 1 or not np.isfinite(volatility_target) or volatility_target <= 0:
+            raise ValueError("Require 0 <= lambda_beta <= 1 and positive finite volatility_target.")
 
         raw_base_budgets = context.params.get("risk_budgets", {})
 
@@ -49,7 +39,7 @@ class RiskParityMacroFactorStrategy(RiskParityStrategy):
             return None
 
         returns = price_frame.pct_change().dropna().tail(rolling_window)
-        if len(returns) < min_periods - 5:
+        if len(returns) < min_periods:
             return None
 
         n_assets = len(universe)
@@ -59,32 +49,29 @@ class RiskParityMacroFactorStrategy(RiskParityStrategy):
             n_assets = len(asset_cols)
 
         # Base budgets
-        b_base = np.zeros(n_assets)
-        for i, code in enumerate(asset_cols):
-            b_base[i] = raw_base_budgets.get(code, 1.0 / n_assets)
-        b_base = b_base / np.sum(b_base)
+        b_base = self._normalize_risk_budgets(raw_base_budgets, asset_cols)
 
         R = returns[asset_cols].values # (T, N)
-        T = len(returns)
 
-        # 1. Roncalli & Weisang (2016) SVD/PCA Betas + Section 4 EWMA Beta Smoothing
-        try:
-            U, S, Vt = np.linalg.svd(R - np.mean(R, axis=0), full_matrices=False)
-            B_raw = Vt[:3, :].T # (N, 3) Factor Betas Matrix
-        except Exception:
-            B_raw = np.ones((n_assets, 3)) / 3.0
+        # 1. SVD/PCA betas with EWMA smoothing
+        _, _, Vt = np.linalg.svd(R - np.mean(R, axis=0), full_matrices=False)
+        B_raw = Vt[:3, :].T
 
-        if self._prev_B_smooth is None or self._prev_B_smooth.shape != B_raw.shape:
+        previous = np.asarray(context.runtime.get("macro_factor_betas", []))
+        if previous.shape != B_raw.shape or context.runtime.get("macro_factor_universe") != asset_cols:
             B_smooth = B_raw
         else:
-            B_smooth = lambda_beta * self._prev_B_smooth + (1.0 - lambda_beta) * B_raw
-        self._prev_B_smooth = B_smooth
+            # PCA 轴的正负号等价，先对齐才能对跨期暴露求均值。
+            B_raw = B_raw * np.where(np.sum(previous * B_raw, axis=0) < 0, -1.0, 1.0)
+            B_smooth = lambda_beta * previous + (1.0 - lambda_beta) * B_raw
 
         # 2. Asset Covariance Matrix
         Cov_R = np.cov(R, rowvar=False) + np.eye(n_assets) * 1e-6
-        target_factor_budgets = np.array([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0])
+        n_factors = B_smooth.shape[1]
+        target_factor_budgets = np.full(n_factors, 1.0 / n_factors)
+        B_pinv = np.linalg.pinv(B_smooth.T)
 
-        # 3. Section 4 Constrained Asset Budget Bounds [0.65 * base, 1.35 * base]
+        # 3. Soft asset-budget corridor [0.65 * base, 1.35 * base]
         b_min = b_base * 0.65
         b_max = b_base * 1.35
 
@@ -101,7 +88,6 @@ class RiskParityMacroFactorStrategy(RiskParityStrategy):
             mrc_asset = (Cov_R @ w) / port_sd
             factor_exp = B_smooth.T @ w # (3,)
             
-            B_pinv = np.linalg.pinv(B_smooth.T)
             mrc_factor = B_pinv.T @ mrc_asset
 
             trc_factor = factor_exp * mrc_factor
@@ -120,7 +106,9 @@ class RiskParityMacroFactorStrategy(RiskParityStrategy):
         constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1.0}]
 
         res = minimize(factor_rc_loss, w0, method="SLSQP", bounds=bounds, constraints=constraints, options={"maxiter": 200})
-        w_raw = np.maximum(res.x if res.success else w0, 0.0)
+        if not res.success or not np.isfinite(res.x).all() or np.sum(res.x) <= 0:
+            raise RuntimeError("Macro-factor solver failed; no substitute weights were produced.")
+        w_raw = np.maximum(res.x, 0.0)
         w_raw = w_raw / np.sum(w_raw)
 
         # 5. Volatility Target Overlay
@@ -131,4 +119,6 @@ class RiskParityMacroFactorStrategy(RiskParityStrategy):
         scale = min(scale, 1.0)
 
         weights = {asset_cols[i]: float(w_raw[i] * scale) for i in range(n_assets)}
+        context.runtime["macro_factor_betas"] = B_smooth.tolist()
+        context.runtime["macro_factor_universe"] = asset_cols
         return TargetPortfolio(weights)

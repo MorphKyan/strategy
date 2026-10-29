@@ -32,6 +32,16 @@ SLIPPAGE_SCENARIOS: dict[str, dict[str, Any]] = {
 REQUIRED_SLIPPAGE_SCENARIOS = tuple(SLIPPAGE_SCENARIOS.keys())
 
 
+def resolve_slippage_scenarios(selection: str) -> tuple[str, ...]:
+    if selection == "standard":
+        return ("default", "stress")
+    if selection == "all":
+        return REQUIRED_SLIPPAGE_SCENARIOS
+    if selection in SLIPPAGE_SCENARIOS:
+        return (selection,)
+    raise ValueError(f"Unknown slippage scenario: {selection}")
+
+
 def apply_slippage_scenario(config: dict[str, Any], scenario: str) -> dict[str, Any]:
     if scenario not in SLIPPAGE_SCENARIOS:
         raise ValueError(f"Unknown slippage scenario: {scenario}")

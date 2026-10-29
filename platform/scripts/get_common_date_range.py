@@ -27,10 +27,6 @@ def resolve_path(path_str: str, root_dir: Path, orig_cwd: Path) -> Path:
         return root_dir.parent / p
     return root_dir / p
 
-def load_yaml(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
 def get_asset_dates(data_dir: Path, code: str) -> set:
     path = data_dir / f"{code}.csv"
     if not path.exists():
@@ -74,7 +70,7 @@ def main() -> int:
             if not config_path.exists():
                 print(f"Error: Config file not found: {config_path_str}", file=sys.stderr)
                 return 1
-            config = load_yaml(config_path)
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
             for asset in config.get("assets", []):
                 if "code" in asset:
                     codes.add(str(asset["code"]).strip())

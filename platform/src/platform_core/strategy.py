@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from src.platform_core.data import LocalCsvBarData
@@ -18,6 +19,7 @@ class StrategyContext:
     data: LocalCsvBarData
     params: dict[str, Any]
     runtime: dict[str, Any] = field(default_factory=dict)
+    theoretical_target: TargetPortfolio | None = None
 
     def set_cooldown(self, days: int) -> None:
         self.runtime["cooldown_days"] = max(0, int(days))
@@ -49,10 +51,12 @@ class Strategy:
         return None
 
     def generate_targets(self, context: StrategyContext) -> TargetPortfolio | None:
+        context.theoretical_target = None
         if not self.should_check_rebalance(context):
             return None
 
         target = self.generate_theoretical_targets(context)
+        context.theoretical_target = target
         if target is None:
             return None
 
@@ -171,6 +175,16 @@ class RiskParityStrategy(Strategy):
     name = "risk_parity"
     version = "0.1.0"
 
+    @staticmethod
+    def _normalize_risk_budgets(configured: dict[str, float], universe: list[str]) -> np.ndarray:
+        if not isinstance(configured, dict) or not universe:
+            raise ValueError("risk_budgets must be a mapping for a nonempty universe.")
+        budgets = np.asarray([float(configured.get(asset_id, 1 / len(universe))) for asset_id in universe])
+        if not np.isfinite(budgets).all() or (budgets <= 0).any():
+            raise ValueError("Every risk budget must be finite and strictly positive.")
+        budgets /= budgets.max()
+        return budgets / budgets.sum()
+
     def initialize(self, context: StrategyContext) -> None:
         context.runtime["opened"] = context.params.get("init_mode", "calculate") == "manual"
         context.runtime["rebalance_frequency"] = context.params.get("rebalance_frequency", "quarterly")
@@ -210,7 +224,6 @@ class RiskParityStrategy(Strategy):
         return self._inverse_vol_target(context, universe)
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        import numpy as np
         
         rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
         min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
@@ -228,10 +241,7 @@ class RiskParityStrategy(Strategy):
             window = max(2, int(rolling_window / 5))
             min_p = max(2, int(min_periods / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             window = max(2, int(rolling_window / 20))
             min_p = max(2, int(min_periods / 20))
         else:
@@ -268,7 +278,6 @@ class RiskParityStrategy(Strategy):
         return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
 
     def _solve_risk_parity(self, Sigma: np.ndarray) -> np.ndarray:
-        import numpy as np
         N = Sigma.shape[0]
         
         try:
@@ -325,10 +334,7 @@ class RiskParityEWMAStrategy(RiskParityStrategy):
             span = max(2, int(ewma_span / 5))
             min_p = max(2, int(ewma_min_periods / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             span = max(2, int(ewma_span / 20))
             min_p = max(2, int(ewma_min_periods / 20))
         else:
@@ -381,10 +387,7 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
             span = max(2, int(ewma_span / 5))
             min_p = max(2, int(ewma_min_periods / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             span = max(2, int(ewma_span / 20))
             min_p = max(2, int(ewma_min_periods / 20))
         else:
@@ -490,10 +493,7 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
             window = max(2, int(rolling_window / 5))
             min_p = max(2, int(min_periods / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             window = max(2, int(rolling_window / 20))
             min_p = max(2, int(min_periods / 20))
         else:
@@ -520,7 +520,7 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
         # 求解风险平价权重
         try:
             weights = self._solve_risk_parity(Sigma)
-        except Exception as e:
+        except Exception:
             # 如果求解失败，降级为等权重
             weights = np.ones(N) / N
             
@@ -528,7 +528,6 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
         return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
 
     def _estimate_covariance(self, X: np.ndarray, target: str) -> np.ndarray:
-        import numpy as np
         T, N = X.shape
         if N <= 1:
             return np.cov(X, rowvar=False).reshape(N, N)
@@ -613,7 +612,6 @@ class HierarchicalRiskParityStrategy(RiskParityStrategy):
     version = "0.1.0"
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        import numpy as np
         
         rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
         min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
@@ -633,10 +631,7 @@ class HierarchicalRiskParityStrategy(RiskParityStrategy):
             window = max(2, int(rolling_window / 5))
             min_p = max(2, int(min_periods / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             window = max(2, int(rolling_window / 20))
             min_p = max(2, int(min_periods / 20))
         else:
@@ -751,7 +746,6 @@ class RiskParityCVaRDynamicBudgetStrategy(RiskParityLWCovStrategy):
     version = "0.1.0"
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        import numpy as np
         
         rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
         min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
@@ -770,10 +764,7 @@ class RiskParityCVaRDynamicBudgetStrategy(RiskParityLWCovStrategy):
             window = max(2, int(rolling_window / 5))
             min_p = max(2, int(min_periods / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             window = max(2, int(rolling_window / 20))
             min_p = max(2, int(min_periods / 20))
         else:
@@ -850,7 +841,6 @@ class RiskParityCVaRDynamicBudgetStrategy(RiskParityLWCovStrategy):
         return TargetPortfolio({asset_id: float(weights[i]) for i, asset_id in enumerate(universe)})
 
     def _solve_risk_parity_dynamic(self, Sigma: np.ndarray, b_target: np.ndarray) -> np.ndarray:
-        import numpy as np
         N = Sigma.shape[0]
         diag_var = np.diag(Sigma)
         
@@ -916,7 +906,6 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
         if volatility_target is not None:
             volatility_target = float(volatility_target)
             if volatility_target > 0:
-                import numpy as np
                 rolling_window = int(context.params.get("rolling_window", 120))
                 min_periods = int(context.params.get("min_periods", 20))
                 use_nav = bool(context.params.get("use_nav", False))
@@ -949,7 +938,6 @@ class AdaptiveRiskDeviationVolatilityTriggeredStrategy(RiskParityLWCovStrategy):
         return target
 
     def should_rebalance(self, context: StrategyContext, target: TargetPortfolio) -> bool:
-        import numpy as np
 
         has_position = any(
             position.quantity > 1e-9 for position in context.state.positions.values()
@@ -1075,7 +1063,6 @@ class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
         context.runtime["selected_assets"] = []  # 记录上一期入选的资产列表
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        import numpy as np
         
         rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
         min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
@@ -1099,10 +1086,7 @@ class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
             window = max(2, int(rolling_window / 5))
             min_p = max(2, int(min_periods / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             window = max(2, int(rolling_window / 20))
             min_p = max(2, int(min_periods / 20))
         else:
@@ -1277,7 +1261,6 @@ class RiskParityGerberStrategy(RiskParityLWCovStrategy):
     version = "0.1.0"
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        import numpy as np
         
         rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
         min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
@@ -1297,10 +1280,7 @@ class RiskParityGerberStrategy(RiskParityLWCovStrategy):
             window = max(2, int(rolling_window / 5))
             min_p = max(2, int(min_periods / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             window = max(2, int(rolling_window / 20))
             min_p = max(2, int(min_periods / 20))
         else:
@@ -1397,7 +1377,6 @@ class RiskParityEWMACovStrategy(RiskParityLWCovStrategy):
     version = "0.1.0"
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        import numpy as np
 
         rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 250)))
         min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
@@ -1420,10 +1399,7 @@ class RiskParityEWMACovStrategy(RiskParityLWCovStrategy):
             min_p = max(2, int(min_periods / 5))
             span = max(2, int(ewma_cov_span / 5))
         elif estimation_freq == "monthly":
-            try:
-                price_frame = price_frame.resample("ME").last().dropna()
-            except Exception:
-                price_frame = price_frame.resample("M").last().dropna()
+            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
             window = max(2, int(rolling_window / 20))
             min_p = max(2, int(min_periods / 20))
             span = max(2, int(ewma_cov_span / 20))

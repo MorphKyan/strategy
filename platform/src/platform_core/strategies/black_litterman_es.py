@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
-"""
-Strict Point-in-Time Black-Litterman Hybrid ES Strategy (No Look-Ahead Bias).
+"""PIT 基本面按 ES 缩放预算，再以协方差风险平价分配权重。
 
-Based on Thierry Roncalli (2013, 2015) 'Introducing Expected Returns into Risk Parity Portfolios'.
-Sources date-specific Point-in-Time fundamental statistics (ChinaBond 30Y/10Y YTM, Index Dividend Yields)
-published on or before each rebalance date t.
-Applies Roncalli's exact paper parameter gamma = 0.08 with 252-day rolling Expected Shortfall.
+注册名沿用旧配置；当前实现没有 Black-Litterman 贝叶斯后验。
 """
 
 from __future__ import annotations
@@ -18,50 +14,41 @@ from src.platform_core.models import TargetPortfolio
 from src.platform_core.strategy import RiskParityStrategy, StrategyContext
 
 class RiskParityBlackLittermanStrategy(RiskParityStrategy):
-    """
-    Black-Litterman ES Strategy with Real Fundamental Data.
-    """
+    """基本面倾斜预算的协方差风险平价。"""
 
     name = "risk_parity_black_litterman"
     version = "0.1.0"
 
-    def __init__(self):
-        super().__init__()
-        self._bond_ytm_df = None
+    def initialize(self, context: StrategyContext) -> None:
+        super().initialize(context)
         self._pit_views_df = None
-        self._load_pit_fundamental_data()
-
-    def _load_pit_fundamental_data(self):
-        try:
-            root = Path(__file__).resolve().parents[3]
-            csv_path = root / "data" / "fundamental_macro" / "pit_fundamental_views_daily.csv"
-            if csv_path.exists():
-                df = pd.read_csv(csv_path)
-                df["trade_date"] = pd.to_datetime(df["trade_date"])
-                self._pit_views_df = df.sort_values("trade_date")
-        except Exception:
-            self._pit_views_df = None
-
-        try:
-            root = Path(__file__).resolve().parents[3]
-            bond_csv = root / "data" / "fundamental_macro" / "china_bond_yields_daily_pit.csv"
-            if bond_csv.exists():
-                df = pd.read_csv(bond_csv)
-                df["date"] = pd.to_datetime(df["date"])
-                self._bond_ytm_df = df.sort_values("date").set_index("date")
-        except Exception:
-            self._bond_ytm_df = None
+        csv_path = Path(context.data.data_dir) / "fundamental_macro" / "pit_fundamental_views_daily.csv"
+        if csv_path.exists():
+            frame = pd.read_csv(csv_path, dtype={"symbol": str}, usecols=["trade_date", "symbol", "value"])
+            frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="raise")
+            frame["symbol"] = frame["symbol"].str.strip()
+            frame["value"] = pd.to_numeric(frame["value"], errors="raise")
+            if (frame[["trade_date", "symbol"]].isna().any().any()
+                    or frame["symbol"].str.strip().eq("").any()
+                    or not np.isfinite(frame["value"]).all()
+                    or frame.duplicated(["trade_date", "symbol"]).any()):
+                raise ValueError(f"Invalid or duplicate PIT fundamental observations: {csv_path}")
+            self._pit_views_df = frame.sort_values("trade_date")
 
     def _inverse_vol_target(
         self,
         context: StrategyContext,
         universe: list[str],
     ) -> TargetPortfolio | None:
-        rolling_window = int(context.params.get("rolling_window", 252)) # Paper recommends 252D
+        rolling_window = int(context.params.get("rolling_window", 252))
         min_periods = int(context.params.get("min_periods", 120))
         confidence_level = float(context.params.get("confidence_level", 0.95))
         volatility_target = float(context.params.get("volatility_target", 0.08))
-        gamma = float(context.params.get("tilt_gamma", 0.08)) # Roncalli exact paper gamma
+        gamma = float(context.params.get("tilt_gamma", 0.08))
+        if rolling_window < 2 or not 2 <= min_periods <= rolling_window:
+            raise ValueError("Require 2 <= min_periods <= rolling_window.")
+        if not 0 < confidence_level < 1 or not np.isfinite([volatility_target, gamma]).all() or volatility_target <= 0:
+            raise ValueError("Require valid confidence_level, positive volatility_target and finite tilt_gamma.")
 
         raw_base_budgets = context.params.get("risk_budgets", {})
 
@@ -73,7 +60,7 @@ class RiskParityBlackLittermanStrategy(RiskParityStrategy):
             return None
 
         returns = price_frame.pct_change().dropna().tail(rolling_window)
-        if len(returns) < min_periods - 5:
+        if len(returns) < min_periods:
             return None
 
         n_assets = len(universe)
@@ -83,10 +70,7 @@ class RiskParityBlackLittermanStrategy(RiskParityStrategy):
             n_assets = len(asset_cols)
 
         # 1. Base Risk Budgets
-        b_base = np.zeros(n_assets)
-        for i, code in enumerate(asset_cols):
-            b_base[i] = raw_base_budgets.get(code, 1.0 / n_assets)
-        b_base = b_base / np.sum(b_base)
+        b_base = self._normalize_risk_budgets(raw_base_budgets, asset_cols)
 
         # 2. Extract Point-in-Time Fundamental Views at date t (Strictly No Look-Ahead Bias)
         current_dt = pd.to_datetime(context.date)
@@ -127,14 +111,15 @@ class RiskParityBlackLittermanStrategy(RiskParityStrategy):
             else:
                 mu_pit[i] = 0.0  # Mathematically neutral zero tilt when PIT fundamental view is unavailable
 
-        # 3. Thierry Roncalli (2015) Paper Exact Tilting Formula:
-        # b_i* = b_i^base * exp(gamma * mu_i / ES_i) / Z
+        # 在对数域归一化，避免较大的有效倾斜值使 exp 溢出。
         es_vec_safe = np.maximum(es_vec, 1e-4)
-        tilt_exp = np.exp(gamma * (mu_pit / es_vec_safe))
-        b_tilted = b_base * tilt_exp
-        b_tilted = b_tilted / np.sum(b_tilted)
+        log_budgets = np.log(b_base) + gamma * (mu_pit / es_vec_safe)
+        if not np.isfinite(log_budgets).all():
+            raise ValueError("Fundamental budget tilt is not finite.")
+        b_tilted = np.exp(log_budgets - log_budgets.max())
+        b_tilted /= b_tilted.sum()
 
-        # 4. ES Optimization under Point-in-Time Tilted Budgets
+        # 4. Covariance risk parity under the tilted budgets
         Cov_R = np.cov(R, rowvar=False) + np.eye(n_assets) * 1e-6
 
         def es_rc_loss(w):
@@ -158,7 +143,9 @@ class RiskParityBlackLittermanStrategy(RiskParityStrategy):
         constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1.0}]
 
         res = minimize(es_rc_loss, w0, method="SLSQP", bounds=bounds, constraints=constraints, options={"maxiter": 200})
-        w_raw = np.maximum(res.x if res.success else w0, 0.0)
+        if not res.success or not np.isfinite(res.x).all() or np.sum(res.x) <= 0:
+            raise RuntimeError("Fundamental risk-budget solver failed; no substitute weights were produced.")
+        w_raw = np.maximum(res.x, 0.0)
         w_raw = w_raw / np.sum(w_raw)
 
         # 5. Volatility Target Overlay

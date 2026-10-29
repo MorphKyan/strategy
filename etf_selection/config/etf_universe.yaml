@@ -28,13 +28,13 @@ selection:
       liquidity: 0.1
       sleeve_coverage: 0.1
     sleeve_qdii:
-      holding_cost: 0.3
+      expense_ratio: 0.3
       premium_std: 0.3
       liquidity: 0.3
       history: 0.1
 paths:
   data_dir: platform/data
-  platform_base_config: platform/configs/baseline_r1_domestic_rolling.yaml
+  platform_base_config: platform/configs/domestic_rolling_bond_10y.yaml
   generated_config_dir: etf_selection/generated_configs
   report_dir: etf_selection/reports
   platform_experiment_script: platform/scripts/run_platform_experiment.py

@@ -56,9 +56,10 @@ class FixedWeightThresholdStrategy(Strategy):
         current = context.state.weights(prices)
         abs_band = float(context.params.get("abs_band", 0.05))
         rel_band = float(context.params.get("rel_band", 0.25))
-        for asset_id, target_w in target.weights.items():
+        for asset_id in set(target.weights) | set(current):
+            target_w = target.weights.get(asset_id, 0.0)
             deviation = abs(current.get(asset_id, 0.0) - target_w)
-            if deviation > abs_band or (target_w > 0 and deviation > rel_band * target_w):
+            if deviation > abs_band or deviation > rel_band * target_w:
                 return True
         return False
 

@@ -14,19 +14,14 @@ from src.platform_core.data_store import MarketDataStore, assets_from_config
 from src.platform_core.sync_universe import etf_assets
 
 
-def load_config(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Sync platform market/fundamental data into the local standard store.")
-    parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Platform YAML config path.")
+    parser.add_argument("--config", default="configs/domestic_rolling_bond_10y.yaml", help="Platform YAML config path.")
     parser.add_argument("--fetch", action="store_true", help="Call Finshare. Without this flag, only validate local standard data.")
     args = parser.parse_args()
 
     config_path = (ROOT / args.config).resolve() if not Path(args.config).is_absolute() else Path(args.config)
-    config = load_config(config_path)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     data_config = config.get("data", {})
     assets = assets_from_config(config.get("assets", []))
     backtest = config.get("backtest") or {}

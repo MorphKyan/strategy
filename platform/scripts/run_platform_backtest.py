@@ -12,27 +12,22 @@ os.chdir(ROOT)
 
 from src.platform_core.engine import PlatformBacktestEngine
 from src.platform_core.runtime_config import apply_runtime_dates
-from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, apply_slippage_scenario
+from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, apply_slippage_scenario, resolve_slippage_scenarios
 from src.platform_core.storage import SQLiteStore
-
-
-def load_config(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run an M0-M2 daily platform backtest.")
-    parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Platform YAML config path.")
+    parser.add_argument("--config", default="configs/domestic_rolling_bond_10y.yaml", help="Platform YAML config path.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
     parser.add_argument("--output-dir", help="Override output root directory.")
     parser.add_argument("--start-date", help="Runtime backtest start date, YYYY-MM-DD. Defaults to earliest available data.")
     parser.add_argument("--end-date", help="Runtime backtest end date, YYYY-MM-DD. Defaults to latest available data.")
     parser.add_argument(
         "--slippage-scenario",
-        choices=[*REQUIRED_SLIPPAGE_SCENARIOS, "all"],
-        default="all",
-        help="Slippage scenario to run. Default `all` runs default, stress, and dynamic_participation.",
+        choices=[*REQUIRED_SLIPPAGE_SCENARIOS, "standard", "all"],
+        default="standard",
+        help="默认 standard 运行 default + stress；all 额外运行 dynamic_participation。",
     )
     args = parser.parse_args()
 
@@ -42,7 +37,8 @@ def main() -> int:
     if args.output_dir:
         output_dir = (ROOT / args.output_dir).resolve() if not Path(args.output_dir).is_absolute() else Path(args.output_dir)
 
-    base_config = apply_runtime_dates(load_config(config_path), start_date=args.start_date, end_date=args.end_date)
+    base_config = apply_runtime_dates(yaml.safe_load(config_path.read_text(encoding="utf-8")),
+                                      start_date=args.start_date, end_date=args.end_date)
     enable_db = (base_config.get("backtest") or {}).get("enable_database", False)
     if enable_db:
         store = SQLiteStore(db_path)
@@ -50,11 +46,12 @@ def main() -> int:
         from src.platform_core.storage import InMemoryStore
         store = InMemoryStore()
     try:
-        scenario_names = REQUIRED_SLIPPAGE_SCENARIOS if args.slippage_scenario == "all" else (args.slippage_scenario,)
+        scenario_names = resolve_slippage_scenarios(args.slippage_scenario)
         results = []
         for scenario in scenario_names:
             config = apply_slippage_scenario(base_config, scenario)
-            result = PlatformBacktestEngine(config=config, store=store, output_dir=output_dir).run()
+            result = PlatformBacktestEngine(config=config, store=store, output_dir=output_dir,
+                                           config_path=config_path).run()
             results.append((scenario, result))
     finally:
         store.close()
@@ -63,7 +60,8 @@ def main() -> int:
     for scenario, result in results:
         print(f"[{scenario}] output: {result.output_dir}")
         print(f"[{scenario}] run id: {result.run_id}")
-        print(f"[{scenario}] total return: {result.metrics.get('total_return', 0.0) * 100:.2f}%")
+        total_return = result.metrics.get("total_return")
+        print(f"[{scenario}] total return: {format(total_return, '.2%') if total_return is not None else 'N/A'}")
         print(f"[{scenario}] trade count: {result.metrics.get('trade_count', 0)}")
     return 0
 

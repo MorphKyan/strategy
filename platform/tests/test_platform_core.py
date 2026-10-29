@@ -14,7 +14,6 @@ from src.platform_core.execution import ExecutionConfig, ExecutionEngine, FeePro
 from src.platform_core.experiment import run_platform_experiment
 from src.platform_core.metrics import build_platform_metrics
 from src.platform_core.models import Asset, Bar, PendingIntent, PortfolioState, Position, TargetPortfolio
-from src.platform_core.sim import SimPortfolio
 from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, apply_slippage_scenario
 from src.platform_core.storage import SQLiteStore, InMemoryStore
 from src.platform_core.strategy import MonthlyEqualWeightStrategy
@@ -90,6 +89,23 @@ def test_fee_profile_applies_minimum_fee():
     fee = FeeProfile(rate=0.001, min_fee=5)
     assert fee.calculate(1000) == 5
     assert fee.calculate(10000) == 10
+
+
+@pytest.mark.parametrize("rate,minimum", [(-.01, 0), (.01, -5), (float("nan"), 0), (0, float("inf"))])
+def test_fee_profile_rejects_invalid_costs(rate, minimum):
+    with pytest.raises(ValueError):
+        FeeProfile(rate=rate, min_fee=minimum)
+
+
+@pytest.mark.parametrize("cash,rate,minimum,expected", [
+    (1000, 0, 0, 100), (1000, .01, 5, 99), (1000, 0, 5, 99),
+    (1000, 0, 1001, 0), (1000, 0, 990, 1),
+])
+def test_buy_cash_cap_respects_minimum_and_rate(cash, rate, minimum, expected):
+    engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=rate, min_fee=minimum)))
+    quantity = engine._cap_buy_quantity(1000, price=10, cash=cash, lot_size=1)
+    assert quantity == expected
+    assert quantity == 0 or quantity * 10 + engine.config.fee_profile.calculate(quantity * 10) <= cash
 
 
 def test_execution_applies_default_and_qdii_commodity_slippage():
@@ -447,6 +463,9 @@ def test_platform_backtest_outputs_and_checkpoint_resume(tmp_path: Path):
     ]
     for name in expected_files:
         assert (result.output_dir / name).exists()
+    persisted_metrics = build_platform_metrics(result.output_dir)
+    for key in ("turnover_amount_total", "turnover_quantity_total", "annualized_return", "annualized_volatility", "sharpe_ratio"):
+        assert result.metrics[key] == pytest.approx(persisted_metrics[key])
     checkpoint_path = result.output_dir / "checkpoints" / "2024-01-31.json"
     assert checkpoint_path.exists()
     checkpoint = load_checkpoint(checkpoint_path)
@@ -1064,12 +1083,15 @@ def test_platform_experiment_runner_writes_standard_report(tmp_path: Path):
     assert payload["candidate"]["trade_count"] > 0
     assert payload["baseline"]["trade_count"] > 0
     assert "sharpe_ratio_delta" in payload["comparison"]
+    assert "recommendation" not in payload
+    assert "## 验证范围" in result.report_path.read_text(encoding="utf-8")
 
 
 def test_market_store_guards_history_shrink(tmp_path):
     import pandas as pd
 
-    store = MarketDataStore(tmp_path)
+    from src.platform_core.data_store import merge_observations
+
     path = tmp_path / "TEST.csv"
     old = pd.DataFrame(
         {
@@ -1081,12 +1103,12 @@ def test_market_store_guards_history_shrink(tmp_path):
 
     # 降级源只回短窗（首日晚于本地）→ 保留本地更早历史，重叠部分以新数据为准
     short = pd.DataFrame({"trade_date": ["2026-01-05", "2026-01-06"], "close": [2.1, 2.2]})
-    merged = store._guard_history_shrink(path, short, "TEST")
+    merged = merge_observations(path, short)
     assert merged["trade_date"].tolist() == ["2020-01-02", "2020-01-03", "2026-01-05", "2026-01-06"]
     assert merged.loc[merged["trade_date"] == "2026-01-05", "close"].iloc[0] == 2.1
-    assert any("short-window source guard" in note for note in store.quality.notes)
 
-    # 全量数据（首日不晚于本地）→ 照常整体覆盖
+    # 即使首日覆盖本地，响应中缺失的中间行情也不能被删除。
     full = pd.DataFrame({"trade_date": ["2020-01-02", "2026-01-06"], "close": [1.0, 2.2]})
-    untouched = store._guard_history_shrink(path, full, "TEST")
-    assert untouched is full
+    merged = merge_observations(path, full)
+    assert merged["trade_date"].tolist() == ["2020-01-02", "2020-01-03", "2026-01-05", "2026-01-06"]
+    assert merged["close"].tolist() == [1.0, 1.1, 2.0, 2.2]

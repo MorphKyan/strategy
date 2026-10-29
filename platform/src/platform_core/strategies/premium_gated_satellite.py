@@ -45,21 +45,21 @@ R022（QDII 折溢价轮动）用折溢价做**连续打分**并 Passed；本策
 
 from __future__ import annotations
 
-from src.platform_core.etf_premium import DEFAULT_PUBLICATION_LAG_DAYS, get_store
-from src.platform_core.models import TargetPortfolio
-from src.platform_core.strategy import Strategy, StrategyContext
+from src.platform_core.etf_premium import DEFAULT_PUBLICATION_LAG_DAYS, EtfPremiumStore
+from src.platform_core.strategy import StrategyContext
+from src.platform_core.strategies.fixed_weight import FixedWeightThresholdStrategy
 
 _GATE_STATE_KEY = "r056_premium_gate_open"
 _GATE_DIAG_KEY = "r056_premium_gate_diagnostics"
 
 
-class PremiumGatedSatelliteStrategy(Strategy):
+class PremiumGatedSatelliteStrategy(FixedWeightThresholdStrategy):
     name = "premium_gated_satellite"
     version = "0.1.0"
 
     def initialize(self, context: StrategyContext) -> None:
-        context.set_cooldown(int(context.params.get("cooldown_days", 0)))
-        context.set_rebalance_frequency("daily")  # 每日检测（不等于每日交易）
+        super().initialize(context)
+        self.premium_store = EtfPremiumStore(context.data.data_dir)
 
     # ------------------------------------------------------------------ 闸门
 
@@ -71,8 +71,7 @@ class PremiumGatedSatelliteStrategy(Strategy):
         cap = float(context.params.get("premium_cap", 0.02))
         lag = int(context.params.get("publication_lag_days", DEFAULT_PUBLICATION_LAG_DAYS))
         try:
-            store = get_store(context.data.data_dir)
-            result = store.premium_at(satellite, context.date, publication_lag_days=lag)
+            result = self.premium_store.premium_at(satellite, context.date, publication_lag_days=lag)
         except FileNotFoundError:
             return False
         if result is None:
@@ -96,31 +95,6 @@ class PremiumGatedSatelliteStrategy(Strategy):
         return bool(remembered)
 
     # ------------------------------------------------------------------ 目标
-
-    def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
-        targets = self._target_weights(context)
-        if not targets:
-            return None
-        return TargetPortfolio(targets)
-
-    def should_rebalance(self, context: StrategyContext, target: TargetPortfolio) -> bool:
-        prices = {asset_id: bar.close for asset_id, bar in context.bars.items()}
-        has_position = any(
-            position.quantity > 1e-9 for position in context.state.positions.values()
-        )
-        if not has_position:
-            return True
-
-        current = context.state.weights(prices)
-        abs_band = float(context.params.get("abs_band", 0.05))
-        rel_band = float(context.params.get("rel_band", 0.25))
-        # 目标里已消失的资产（闸门刚关掉的卫星）也要参与判定，否则关闸不触发交易
-        for asset_id in set(target.weights) | set(current):
-            target_w = target.weights.get(asset_id, 0.0)
-            deviation = abs(current.get(asset_id, 0.0) - target_w)
-            if deviation > abs_band or (target_w > 0 and deviation > rel_band * target_w):
-                return True
-        return False
 
     def _target_weights(self, context: StrategyContext) -> dict[str, float] | None:
         core_weights = context.params.get("core_weights") or {}

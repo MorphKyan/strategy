@@ -25,7 +25,7 @@ def main() -> int:
     args = parser.parse_args()
 
     platform_data_dir = (ROOT / args.platform_data_dir).resolve() if not Path(args.platform_data_dir).is_absolute() else Path(args.platform_data_dir)
-    output_dir = Path(args.output_dir) if args.output_dir else ROOT / "reports" / "data_validation" / datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path(args.output_dir) if args.output_dir else ROOT / "reports" / "data_validation" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     if not output_dir.is_absolute():
         output_dir = ROOT / output_dir
 

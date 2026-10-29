@@ -21,26 +21,26 @@ Use `.\env\Scripts\python.exe` for venv/uv layouts, or substitute `.\env\python.
 
 ```powershell
 # Run a single daily platform backtest
-.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\domestic_rolling_bond_10y.yaml --start-date 2019-02-28 --end-date 2025-06-30
 
 # Run a standardized experiment with baseline comparison
-.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\baseline_r1_domestic_rolling.yaml --start-date 2019-02-28 --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\domestic_rolling_bond_10y.yaml --start-date 2019-02-28 --end-date 2025-06-30
 
 # Run a start-date sensitivity analysis
-.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\baseline_r1_domestic_rolling.yaml --end-date 2025-06-30
+.\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\domestic_rolling_bond_10y.yaml --end-date 2025-06-30
 
 # Fetch/Sync latest ETF market prices and metadata
-.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\baseline_r1_domestic_rolling.yaml
+.\env\Scripts\python.exe platform\scripts\sync_platform_data.py --config configs\domestic_rolling_bond_10y.yaml
 
 # Run a simulated portfolio rollover tracking script
-.\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\baseline_r1_domestic_rolling.yaml --checkpoint platform\results\platform_sim_portfolio\checkpoint.json --asof-date 2026-05-30
+.\env\Scripts\python.exe platform\scripts\run_sim_portfolio.py --config configs\domestic_rolling_bond_10y.yaml --checkpoint platform\results\platform_sim_portfolio\checkpoint.json --asof-date 2026-05-30
 
 # Launch the local read-only dashboard (default port 8501, override with PORT)
 .\env\Scripts\python.exe platform\scripts\run_dashboard.py
 
 # Live-mirror portfolio: import real holdings, then plan next-day order tickets
-.\env\Scripts\python.exe platform\scripts\run_live_cycle.py reconcile --config configs\baseline_r1_domestic_rolling.yaml --holdings my_holdings.csv --cash 12345.67
-.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\baseline_r1_domestic_rolling.yaml --sync --notify
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py reconcile --config configs\domestic_rolling_bond_10y.yaml --holdings my_holdings.csv --cash 12345.67
+.\env\Scripts\python.exe platform\scripts\run_live_cycle.py cycle --config configs\domestic_rolling_bond_10y.yaml --sync --notify
 ```
 
 Relative paths in platform commands are resolved from `platform/`.

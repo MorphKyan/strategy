@@ -37,7 +37,7 @@ def load_assets_from_configs(config_paths: Iterable[str | Path]) -> list[dict[st
                     f"{_asset_identity(existing)} != {_asset_identity(asset)} ({path})"
                 )
             assets.setdefault(key, asset)
-    return sorted(assets.values(), key=_asset_sort_key)
+    return sorted(assets.values(), key=_asset_identity)
 
 
 def parse_asset_spec(spec: str) -> dict[str, Any]:
@@ -86,7 +86,7 @@ def merge_assets(*groups: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
             if existing is not None and _asset_identity(existing) != _asset_identity(asset):
                 raise ValueError(f"Conflicting definitions for {key}")
             merged.setdefault(key, asset)
-    return sorted(merged.values(), key=_asset_sort_key)
+    return sorted(merged.values(), key=_asset_identity)
 
 
 def etf_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -94,14 +94,6 @@ def etf_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _asset_identity(asset: dict[str, Any]) -> tuple[str, str, str]:
-    return (
-        str(asset.get("code", "")),
-        str(asset.get("exchange", "")),
-        str(asset.get("asset_type", "")),
-    )
-
-
-def _asset_sort_key(asset: dict[str, Any]) -> tuple[str, str, str]:
     return (
         str(asset.get("code", "")),
         str(asset.get("exchange", "")),

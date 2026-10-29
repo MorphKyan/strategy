@@ -52,7 +52,7 @@ SMTP_TO_ENV = "RQ_SMTP_TO"
 def resolve_channels(notify_config: dict[str, Any] | None) -> list[dict[str, Any]]:
     """显式 `notify.channels` 优先；否则按环境变量自动发现。"""
     explicit = (notify_config or {}).get("channels")
-    if explicit:
+    if explicit is not None:
         return list(explicit)
     channels: list[dict[str, Any]] = []
     if os.environ.get(SERVERCHAN_KEY_ENV):
@@ -72,14 +72,19 @@ def resolve_channels(notify_config: dict[str, Any] | None) -> list[dict[str, Any
 
 def send_notification(title: str, text: str, notify_config: dict[str, Any] | None = None) -> bool:
     """向所有已配置渠道推送；任一渠道成功即返回 True。失败打日志，绝不抛异常。"""
-    channels = resolve_channels(notify_config)
+    try:
+        channels = resolve_channels(notify_config)
+    except (TypeError, ValueError) as exc:
+        logger.warning("通知配置无效（%s）", type(exc).__name__)
+        return False
     if not channels:
         logger.warning("未配置任何通知渠道（设 %s 或 RQ_SMTP_* 环境变量，或在配置里写 notify.channels）", SERVERCHAN_KEY_ENV)
         return False
     ok_any = False
     for channel in channels:
-        channel_type = str(channel.get("type", "")).lower()
+        channel_type = "unknown"
         try:
+            channel_type = str(channel.get("type", "")).lower()
             if channel_type == "serverchan":
                 ok = _send_serverchan(channel, title, text)
             elif channel_type == "smtp":
@@ -87,8 +92,9 @@ def send_notification(title: str, text: str, notify_config: dict[str, Any] | Non
             else:
                 logger.warning("未知通知渠道类型: %r", channel_type)
                 ok = False
-        except Exception:  # noqa: BLE001 - 推送失败不允许影响主流程
-            logger.exception("通知渠道 %s 推送失败", channel_type)
+        except Exception as exc:  # noqa: BLE001 - 推送失败不允许影响主流程
+            # HTTP 异常正文和堆栈可能包含带 SendKey 的请求地址。
+            logger.warning("通知渠道 %s 推送失败（%s）", channel_type, type(exc).__name__)
             ok = False
         ok_any = ok_any or ok
     return ok_any
@@ -210,7 +216,8 @@ def markdown_to_html(text: str) -> str:
             continue
 
         # 普通段落：连续非空且非块级起始的行合并
-        para = []
+        para = [_inline(stripped)]
+        index += 1
         while index < len(lines):
             current = lines[index].strip()
             if not current or current.startswith(("#", ">", "|")) or re.match(r"^([-*]|\d+\.)\s+", current):

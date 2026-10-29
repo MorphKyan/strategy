@@ -104,6 +104,22 @@ def test_explicit_target_weights_are_normalized():
     assert target.weights["A"] == pytest.approx(0.4)
 
 
+def test_fixed_weight_exits_positions_removed_from_target():
+    context = _context(
+        {"A": (4900.0, 10.0), "B": (4900.0, 10.0), "C": (200.0, 10.0)},
+        cash=0.0, params={"universe": ["A", "B"]},
+    )
+    target = FixedWeightThresholdStrategy().generate_targets(context)
+    assert target is not None
+    assert target.weights == {"A": 0.5, "B": 0.5}
+
+
+@pytest.mark.parametrize("weight", [float("nan"), float("inf"), float("-inf")])
+def test_target_portfolio_rejects_nonfinite_weights(weight):
+    with pytest.raises(ValueError, match="finite"):
+        TargetPortfolio({"A": weight})
+
+
 def test_risk_parity_uses_explicit_5_25_thresholds():
     strategy = RiskParityStrategy()
     target = TargetPortfolio({asset_id: 0.25 for asset_id in "ABCD"})

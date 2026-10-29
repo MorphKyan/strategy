@@ -18,14 +18,9 @@ from src.platform_core.data import LocalCsvBarData
 from src.platform_core.data_store import assets_from_config
 from src.platform_core.experiment import run_backtest, strategy_name
 from src.platform_core.runtime_config import apply_runtime_dates
-from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, apply_slippage_scenario
+from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, apply_slippage_scenario, resolve_slippage_scenarios
 from src.platform_core.storage import SQLiteStore
 from src.platform_core.visualization import render_sensitivity_charts
-
-
-def load_config(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
 
 
 def set_start_date(config: dict, start_date: str) -> dict:
@@ -55,13 +50,14 @@ def calendar_for_config(config: dict) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run platform start-date sensitivity analysis.")
-    parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Platform config path.")
+    parser.add_argument("--config", default="configs/domestic_rolling_bond_10y.yaml", help="Platform config path.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
-    parser.add_argument("--step", type=int, default=3, help="Trading-day step between start dates. Default: 3.")
-    parser.add_argument(
+    spacing = parser.add_mutually_exclusive_group()
+    spacing.add_argument("--step", type=int, help="诊断运行的交易日步长；常规研究默认每两个月一个起点。")
+    spacing.add_argument(
         "--calendar-month-step",
         type=int,
-        help="按自然月生成锚点，并取锚点当日或其后首个交易日；设置后优先于 --step。",
+        help="自然月步长（默认 2），取锚点当日或其后首个交易日。",
     )
     parser.add_argument(
         "--raw-root",
@@ -71,15 +67,18 @@ def main() -> int:
     parser.add_argument("--report-root", default="reports/sensitivity", help="Root for sensitivity summary reports.")
     parser.add_argument("--charts", action="store_true", help="Render per-run charts. Off by default because sensitivity can produce many runs.")
     parser.add_argument("--end-date", help="Runtime sensitivity end date, YYYY-MM-DD. Use 2025-06-30 for training-sample research.")
+    parser.add_argument("--start-date", help="Runtime sensitivity start date, YYYY-MM-DD.")
     parser.add_argument(
         "--slippage-scenario",
-        choices=[*REQUIRED_SLIPPAGE_SCENARIOS, "all"],
-        default="all",
-        help="Slippage scenario to run. Default `all` runs default, stress, and dynamic_participation.",
+        choices=[*REQUIRED_SLIPPAGE_SCENARIOS, "standard", "all"],
+        default="standard",
+        help="默认 standard 运行 default + stress；all 额外运行 dynamic_participation。",
     )
     args = parser.parse_args()
 
-    if args.step <= 0:
+    if args.step is None and args.calendar_month_step is None:
+        args.calendar_month_step = 2
+    if args.step is not None and args.step <= 0:
         raise ValueError("--step must be positive.")
     if args.calendar_month_step is not None and args.calendar_month_step <= 0:
         raise ValueError("--calendar-month-step must be positive.")
@@ -89,13 +88,14 @@ def main() -> int:
     raw_root = (ROOT / args.raw_root).resolve() if not Path(args.raw_root).is_absolute() else Path(args.raw_root)
     report_root = (ROOT / args.report_root).resolve() if not Path(args.report_root).is_absolute() else Path(args.report_root)
 
-    base_config = apply_runtime_dates(load_config(config_path), end_date=args.end_date)
+    base_config = apply_runtime_dates(yaml.safe_load(config_path.read_text(encoding="utf-8")),
+                                      start_date=args.start_date, end_date=args.end_date)
     name = strategy_name(base_config)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     report_dir = report_root / name / timestamp
     raw_dir = raw_root / name / timestamp
-    report_dir.mkdir(parents=True, exist_ok=True)
-    raw_dir.mkdir(parents=True, exist_ok=True)
+    report_dir.mkdir(parents=True, exist_ok=False)
+    raw_dir.mkdir(parents=True, exist_ok=False)
 
     calendar = calendar_for_config(base_config)
     if args.calendar_month_step is None:
@@ -122,7 +122,7 @@ def main() -> int:
         from src.platform_core.storage import InMemoryStore
         store = InMemoryStore()
     try:
-        scenario_names = REQUIRED_SLIPPAGE_SCENARIOS if args.slippage_scenario == "all" else (args.slippage_scenario,)
+        scenario_names = resolve_slippage_scenarios(args.slippage_scenario)
         for scenario in scenario_names:
             scenario_config = apply_slippage_scenario(base_config, scenario)
             for start_date in dates:
@@ -159,25 +159,26 @@ def main() -> int:
         "step": args.step,
         "calendar_month_step": args.calendar_month_step,
         "slippage_scenario": args.slippage_scenario,
-        "required_slippage_scenarios": list(REQUIRED_SLIPPAGE_SCENARIOS),
+        "required_slippage_scenarios": list(scenario_names),
         "sample_count": len(rows),
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "summary_csv": str(report_dir / "sensitivity_summary.csv"),
         "runs": rows,
     }
     (report_dir / "manifest.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    spacing_label = f"{args.calendar_month_step} 个自然月" if args.calendar_month_step is not None else f"{args.step} 个交易日"
     (report_dir / "report.md").write_text(
         "\n".join(
             [
                 f"# 平台起始日敏感度分析：{name}",
                 "",
                 f"- 配置：`{config_path}`",
-                f"- 步长：`{args.step}` 个交易日",
+                f"- 步长：{spacing_label}",
                 f"- 样本数量：`{len(rows)}`",
                 f"- 汇总 CSV：`{report_dir / 'sensitivity_summary.csv'}`",
                 f"- 原始结果根目录：`{raw_dir}`",
                 "",
-                "本分析不限制样本数，会对配置回测日历中每隔 `step` 个交易日的起始日期逐一评估。",
+                f"本分析不限制样本数，按 {spacing_label} 生成起点并取当日或其后首个可用交易日。",
             ]
         )
         + "\n",

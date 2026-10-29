@@ -21,6 +21,8 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
 
     def initialize(self, context: StrategyContext) -> None:
         super().initialize(context)
+        if context.params.get("solver_method", "slsqp") not in {"auto", "slsqp"}:
+            raise ValueError("Only the SLSQP ES budget solver is supported; the bisection fallback was removed.")
         if str(context.params.get("trend_filter_mode", "binary")).lower() == "fast_slow":
             self._signal_interest_rate = SignalInterestRate(context.params.get("trend_filter_risk_free"))
 
@@ -35,8 +37,8 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         es_method = str(context.params.get("es_method", "historical")).lower()
         fhs_decay = float(context.params.get("fhs_decay", 0.94))
 
-        if rolling_window < 2 or min_periods < 2:
-            raise ValueError("rolling_window and min_periods must both be at least 2.")
+        if not 2 <= min_periods <= rolling_window:
+            raise ValueError("Require 2 <= min_periods <= rolling_window.")
         if not 0.0 < confidence_level < 1.0:
             raise ValueError("confidence_level must be strictly between 0 and 1.")
 
@@ -59,8 +61,6 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
 
         budgets = self._risk_budgets(context, universe)
 
-        max_weights_cfg = context.params.get("max_weights")
-        min_weights_cfg = context.params.get("min_weights")
         entropy_penalty = float(
             context.params.get(
                 "entropy_penalty",
@@ -70,25 +70,29 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
                 ),
             )
         )
-        solver_method = str(context.params.get("solver_method", "auto")).lower()
 
-        max_weights = None
-        if isinstance(max_weights_cfg, dict):
-            max_weights = np.asarray(
-                [float(max_weights_cfg.get(asset_id, 1.0)) for asset_id in universe],
-                dtype=float,
-            )
-        elif isinstance(max_weights_cfg, (list, tuple)):
-            max_weights = np.asarray(max_weights_cfg, dtype=float)
-
-        min_weights = None
-        if isinstance(min_weights_cfg, dict):
-            min_weights = np.asarray(
-                [float(min_weights_cfg.get(asset_id, 0.0)) for asset_id in universe],
-                dtype=float,
-            )
-        elif isinstance(min_weights_cfg, (list, tuple)):
-            min_weights = np.asarray(min_weights_cfg, dtype=float)
+        if not np.isfinite(entropy_penalty) or entropy_penalty < 0:
+            raise ValueError("Entropy penalty must be finite and nonnegative.")
+        configured_universe = context.params.get("universe") or list(context.assets) or universe
+        bounds = []
+        for name, default in (("max_weights", 1.0), ("min_weights", 0.0)):
+            configured = context.params.get(name)
+            if configured is None:
+                bounds.append(None)
+                continue
+            if isinstance(configured, dict):
+                if set(configured) - set(configured_universe):
+                    raise ValueError(f"{name} contains assets outside the configured universe.")
+                values = np.asarray([configured.get(asset_id, default) for asset_id in configured_universe], dtype=float)
+            elif isinstance(configured, (list, tuple, np.ndarray)):
+                values = np.asarray(configured, dtype=float)
+            else:
+                raise ValueError(f"{name} must be a mapping or a universe-aligned vector.")
+            if (values.shape != (len(configured_universe),) or not np.isfinite(values).all()
+                    or (values < 0).any() or (values > 1).any()):
+                raise ValueError(f"{name} must contain one finite value in [0, 1] per configured asset.")
+            bounds.append(values[[configured_universe.index(asset_id) for asset_id in universe]])
+        max_weights, min_weights = bounds
 
         if max_weights is not None or min_weights is not None or entropy_penalty > 0.0:
             weights = self._solve_constrained_expected_shortfall_risk_budget(
@@ -98,7 +102,6 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
                 max_weights=max_weights,
                 min_weights=min_weights,
                 entropy_penalty=entropy_penalty,
-                solver_method=solver_method,
             )
         else:
             weights = self._solve_expected_shortfall_risk_budget(
@@ -110,33 +113,32 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         volatility_target = context.params.get("volatility_target")
         if volatility_target is not None:
             target = float(volatility_target)
-            if target > 0.0:
-                covariance = np.cov(returns.to_numpy(dtype=float), rowvar=False)
-                covariance = np.atleast_2d(covariance)
-                portfolio_volatility = float(
-                    np.sqrt(max(weights @ covariance @ weights, 0.0) * 252.0)
-                )
-                if portfolio_volatility > 0.0:
-                    weights *= min(1.0, target / portfolio_volatility)
+            if not np.isfinite(target) or target <= 0:
+                raise ValueError("volatility_target must be finite and positive when specified.")
+            covariance = np.cov(returns.to_numpy(dtype=float), rowvar=False)
+            covariance = np.atleast_2d(covariance)
+            portfolio_volatility = float(
+                np.sqrt(max(weights @ covariance @ weights, 0.0) * 252.0)
+            )
+            if portfolio_volatility > 0.0:
+                weights *= min(1.0, target / portfolio_volatility)
 
         trend_filter_window = context.params.get("trend_filter_window")
         trend_filter_windows = context.params.get("trend_filter_windows")
         trend_filter_mode = str(context.params.get("trend_filter_mode", "binary")).lower()
 
         if trend_filter_mode == "fast_slow":
-            rate = getattr(self, "_signal_interest_rate", None)
-            if rate is None:
-                rate = SignalInterestRate(context.params.get("trend_filter_risk_free"))
-                self._signal_interest_rate = rate
             signal_assets = context.params.get("trend_filter_assets", universe)
-            unknown = set(signal_assets) - set(universe)
+            if not isinstance(signal_assets, list):
+                raise ValueError("trend_filter_assets must be a list of configured asset IDs.")
+            unknown = set(signal_assets) - set(configured_universe)
             if unknown:
                 raise ValueError(f"trend_filter_assets outside universe: {sorted(unknown)}")
             for index, asset_id in enumerate(universe):
                 if asset_id not in signal_assets:
                     continue
                 signal = monthly_fast_slow_signal(
-                    price_frame[asset_id], context.date, rate, getattr(context.data, "calendar", ())
+                    price_frame[asset_id], context.date, self._signal_interest_rate, context.data.calendar
                 )
                 # During the 13-month signal warmup, retain this sleeve in cash.
                 weights[index] *= 0.0 if signal is None else {
@@ -261,17 +263,15 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         if not isinstance(configured, dict):
             raise ValueError("risk_budgets must be a mapping keyed by every universe asset.")
 
-        missing = [asset_id for asset_id in universe if asset_id not in configured]
-        extra = [asset_id for asset_id in configured if asset_id not in universe]
+        configured_universe = context.params.get("universe") or list(context.assets) or universe
+        missing = [asset_id for asset_id in configured_universe if asset_id not in configured]
+        extra = [asset_id for asset_id in configured if asset_id not in configured_universe]
         if missing or extra:
             raise ValueError(
                 f"risk_budgets must match universe exactly; missing={missing}, extra={extra}."
             )
 
-        budgets = np.asarray([float(configured[asset_id]) for asset_id in universe])
-        if not np.all(np.isfinite(budgets)) or np.any(budgets <= 0.0):
-            raise ValueError("Every risk budget must be finite and strictly positive.")
-        return budgets / budgets.sum()
+        return RiskParityStrategy._normalize_risk_budgets(configured, universe)
 
     @staticmethod
     def _solve_expected_shortfall_risk_budget(
@@ -329,7 +329,7 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
 
         exposures = np.asarray(solution.x, dtype=float)
         total = float(exposures.sum())
-        if not np.all(np.isfinite(exposures)) or np.any(exposures <= 0.0) or total <= 0.0:
+        if not np.all(np.isfinite(exposures)) or np.any(exposures <= 0.0) or not np.isfinite(total) or total <= 0.0:
             raise RuntimeError("Expected Shortfall solver returned invalid exposures.")
         return exposures / total
 
@@ -341,21 +341,18 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         max_weights: np.ndarray | None = None,
         min_weights: np.ndarray | None = None,
         entropy_penalty: float = 0.0,
-        solver_method: str = "auto",
     ) -> np.ndarray:
-        """Solve constrained and regularized Rockafellar-Uryasev ES risk-budgeting.
-
-        Implements Constrained Risk Budgeting following:
-        - Jean-Charles Richard & Thierry Roncalli (2019) 'Constrained Risk Budgeting
-          Portfolios: Theory, Algorithms, Applications & Puzzles', arXiv:1902.05710.
-        - Bera & Park (2008) 'Optimal Portfolio Diversification Using the Maximum
-          Entropy Principle' / HHI concentration penalty.
-        """
+        """Minimize ES risk-contribution budget error with box bounds and HHI penalty."""
         observations, assets = returns.shape
         if observations < 2 or assets < 1 or not np.all(np.isfinite(returns)):
             raise ValueError("Expected Shortfall requires a finite 2D return matrix.")
         if budgets.shape != (assets,):
             raise ValueError("Risk budget count must match the return matrix columns.")
+        scale = float(np.max(np.abs(returns)))
+        if scale == 0:
+            raise ValueError("Expected Shortfall requires nonzero return scenarios.")
+        # 风险贡献占比与收益单位无关，先统一量级避免单位影响数值梯度。
+        returns = returns / scale
 
         min_w = (
             np.full(assets, 1e-6, dtype=float)
@@ -368,27 +365,22 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
             else np.asarray(max_weights, dtype=float)
         )
 
-        min_w = np.clip(min_w, 1e-8, 1.0)
-        max_w = np.clip(max_w, min_w, 1.0)
+        if min_w.shape != (assets,) or max_w.shape != (assets,):
+            raise ValueError("Weight bound count must match the return matrix columns.")
+        if (not np.all(np.isfinite(min_w)) or not np.all(np.isfinite(max_w))
+                or np.any(min_w < 0) or np.any(max_w > 1) or np.any(min_w > max_w)):
+            raise ValueError("Weight bounds must be finite and satisfy 0 <= min <= max <= 1.")
+        if not np.isfinite(entropy_penalty) or entropy_penalty < 0:
+            raise ValueError("Entropy penalty must be finite and nonnegative.")
 
         # Check feasibility of box constraints sum(min_w) <= 1 <= sum(max_w)
-        if float(np.sum(min_w)) > 1.0 + 1e-6:
+        if float(np.sum(min_w)) > 1.0 + 1e-10:
             raise ValueError(f"Sum of min_weights ({np.sum(min_w)}) exceeds 1.0.")
-        if float(np.sum(max_w)) < 1.0 - 1e-6:
+        if float(np.sum(max_w)) < 1.0 - 1e-10:
             raise ValueError(f"Sum of max_weights ({np.sum(max_w)}) is less than 1.0.")
 
-        if solver_method == "bisection":
-            return RiskParityExpectedShortfallFixedBudgetStrategy._solve_bisection_constrained_es(
-                returns, budgets, confidence_level, min_w, max_w, entropy_penalty
-            )
-
         # Initial point: projected budgets onto box constraint and normalized
-        w0 = np.clip(budgets.copy(), min_w, max_w)
-        w0_sum = float(np.sum(w0))
-        if w0_sum > 0:
-            w0 /= w0_sum
-        else:
-            w0 = np.full(assets, 1.0 / assets)
+        w0 = RiskParityExpectedShortfallFixedBudgetStrategy._project_box_simplex(budgets, min_w, max_w)
 
         bounds = [(float(min_w[i]), float(max_w[i])) for i in range(assets)]
         constraints = [{"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)}]
@@ -424,96 +416,29 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
             )
 
         if not solution.success:
-            # Fallback to Bisection algorithm (Algorithm 1 / 7 from Richard & Roncalli 2019)
-            solution_x = (
-                RiskParityExpectedShortfallFixedBudgetStrategy._solve_bisection_constrained_es(
-                    returns, budgets, confidence_level, min_w, max_w, entropy_penalty
-                )
-            )
-        else:
-            solution_x = np.asarray(solution.x, dtype=float)
-
-        exposures = np.clip(solution_x, min_w, max_w)
-        total = float(exposures.sum())
-        if not np.all(np.isfinite(exposures)) or np.any(exposures <= 0.0) or total <= 0.0:
-            raise RuntimeError("Constrained Expected Shortfall solver returned invalid exposures.")
-        return exposures / total
+            raise RuntimeError(f"Constrained Expected Shortfall solver failed: {solution.message}")
+        return RiskParityExpectedShortfallFixedBudgetStrategy._project_box_simplex(solution.x, min_w, max_w)
 
     @staticmethod
-    def _solve_bisection_constrained_es(
-        returns: np.ndarray,
-        budgets: np.ndarray,
-        confidence_level: float,
-        min_w: np.ndarray,
-        max_w: np.ndarray,
-        entropy_penalty: float = 0.0,
-    ) -> np.ndarray:
-        """Solve constrained RB via Richard & Roncalli (2019) Algorithm 1/7 Bisection."""
-        assets = len(budgets)
-        a_lam, b_lam = 1e-4, 1.0
-        bounds = [(float(min_w[i]), float(max_w[i])) for i in range(assets)]
-        x_cur = np.clip(budgets.copy(), min_w, max_w)
-
-        for _ in range(50):
-            lam = 0.5 * (a_lam + b_lam)
-
-            def obj(x: np.ndarray) -> float:
-                es_val, _ = (
-                    RiskParityExpectedShortfallFixedBudgetStrategy._empirical_es_and_gradient(
-                        returns, x, confidence_level
-                    )
-                )
-                barrier = float(lam * np.dot(budgets, np.log(np.maximum(x, 1e-12))))
-                hhi = float(entropy_penalty * np.sum(x ** 2))
-                return float(es_val - barrier + hhi)
-
-            def grad(x: np.ndarray) -> np.ndarray:
-                _, es_grad = (
-                    RiskParityExpectedShortfallFixedBudgetStrategy._empirical_es_and_gradient(
-                        returns, x, confidence_level
-                    )
-                )
-                return es_grad - lam * budgets / np.maximum(x, 1e-12) + 2.0 * entropy_penalty * x
-
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    message="Values in x were outside bounds during a minimize step",
-                    category=RuntimeWarning,
-                )
-                res = minimize(
-                    obj,
-                    x_cur,
-                    jac=grad,
-                    method="SLSQP",
-                    bounds=bounds,
-                    options={"ftol": 1e-12, "maxiter": 500, "disp": False},
-                )
-            x_cur = res.x
-            s = float(np.sum(x_cur))
-            if abs(s - 1.0) < 1e-6:
-                break
-            if s < 1.0:
-                a_lam = lam
+    def _project_box_simplex(values: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> np.ndarray:
+        """求满足上下限且和为 1 的权重，避免归一化重新破坏边界。"""
+        values = np.asarray(values, dtype=float)
+        if values.shape != lower.shape or not np.all(np.isfinite(values)):
+            raise RuntimeError("Constrained Expected Shortfall solver returned invalid exposures.")
+        values = np.clip(values, lower, upper)
+        left = float(np.min(values - upper))
+        right = float(np.max(values - lower))
+        for _ in range(60):
+            shift = (left + right) / 2
+            weights = np.clip(values - shift, lower, upper)
+            if float(weights.sum()) > 1:
+                left = shift
             else:
-                b_lam = lam
-
-        # Strict projection onto simplex intersected with box bounds
-        w = np.clip(x_cur, min_w, max_w)
-        w /= float(np.sum(w))
-        for _ in range(10):
-            exceed = w > max_w + 1e-8
-            if not np.any(exceed):
-                break
-            w = np.minimum(w, max_w)
-            excess = 1.0 - float(np.sum(w))
-            free = w < max_w - 1e-8
-            if np.any(free):
-                w[free] += excess * (budgets[free] / float(np.sum(budgets[free])))
-            else:
-                break
-
-        return w / float(np.sum(w))
+                right = shift
+        weights = np.clip(values - (left + right) / 2, lower, upper)
+        if abs(float(weights.sum()) - 1) > 1e-9:
+            raise RuntimeError("Cannot project Expected Shortfall weights onto the requested bounds.")
+        return weights
 
     @staticmethod
     def _empirical_es_and_gradient(
@@ -529,6 +454,8 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         levels whose effective tail count is not an integer.
         """
         losses = -(returns @ exposures)
+        if not 0 < confidence_level < 1:
+            raise ValueError("confidence_level must be strictly between 0 and 1.")
         tail_mass = (1.0 - confidence_level) * len(losses)
         if tail_mass <= 0.0:
             raise ValueError("Expected Shortfall tail mass must be positive.")

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import pandas as pd
-from src.platform_core.strategy import StrategyContext, get_strategy_class
+from src.platform_core.strategy import RiskParityStrategy, StrategyContext, get_strategy_class
 from src.platform_core.strategies.expected_shortfall import (
     RiskParityExpectedShortfallFixedBudgetStrategy,
 )
@@ -41,6 +41,57 @@ def test_expected_shortfall_solver_rejects_budget_dimension_mismatch():
             np.asarray([0.5, 0.5]),
             confidence_level=0.95,
         )
+
+
+def test_risk_budget_normalization_does_not_overflow_on_large_finite_inputs():
+    assert RiskParityStrategy._normalize_risk_budgets({"A": 1e308, "B": 1e308}, ["A", "B"]) == pytest.approx([.5, .5])
+
+
+@pytest.mark.parametrize("value", [0, -1, float("nan"), float("inf")])
+def test_invalid_active_risk_budgets_are_rejected(value):
+    with pytest.raises(ValueError, match="risk budget"):
+        RiskParityStrategy._normalize_risk_budgets({"A": value, "B": 1}, ["A", "B"])
+
+
+def test_cooldown_subset_renormalizes_budgets_without_rejecting_inactive_assets():
+    context = StrategyContext(None, {"A": None, "B": None}, {}, None, None,
+                              {"universe": ["A", "B"], "risk_budgets": {"A": 1, "B": 1}})
+    budgets = RiskParityExpectedShortfallFixedBudgetStrategy._risk_budgets(context, ["B"])
+    assert budgets == pytest.approx([1.])
+
+
+def _cooldown_context(extra_params):
+    from types import SimpleNamespace
+
+    prices = pd.DataFrame({"B": 100 * .99 ** np.arange(15), "C": 100 * .98 ** np.arange(15)},
+                          index=pd.bdate_range("2024-01-01", periods=15))
+    return StrategyContext(prices.index[-1], {asset: None for asset in "ABC"}, {}, None,
+                           SimpleNamespace(get_price_frame=lambda *args, **kwargs: prices.copy()),
+                           {"universe": list("ABC"), "risk_budgets": {"A": .4, "B": .4, "C": .2},
+                            "rolling_window": 10, "min_periods": 10, **extra_params})
+
+
+def test_vector_caps_follow_declared_asset_order_when_cooldown_removes_an_asset():
+    context = _cooldown_context({"max_weights": [.3, .8, .2]})
+    target = RiskParityExpectedShortfallFixedBudgetStrategy()._inverse_vol_target(context, ["B", "C"])
+    assert target.weights == pytest.approx({"B": .8, "C": .2})
+
+
+@pytest.mark.parametrize("params", [{"max_weights": "0.5"}, {"min_weights": {"typo": .1}},
+                                   {"entropy_penalty": float("nan")}, {"entropy_penalty": -1},
+                                   {"volatility_target": float("nan")}, {"volatility_target": -1},
+                                   {"min_periods": 11}])
+def test_invalid_es_options_are_not_silently_ignored(params):
+    with pytest.raises(ValueError):
+        RiskParityExpectedShortfallFixedBudgetStrategy()._inverse_vol_target(_cooldown_context(params), ["B", "C"])
+
+
+def test_fast_slow_asset_selection_allows_a_configured_asset_in_cooldown():
+    context = _cooldown_context({"trend_filter_mode": "fast_slow", "trend_filter_assets": ["A"],
+                                 "trend_filter_risk_free": {"source": "fixed", "annual_rate": 0}})
+    strategy = RiskParityExpectedShortfallFixedBudgetStrategy()
+    strategy.initialize(context)
+    assert strategy._inverse_vol_target(context, ["B", "C"]).weights == pytest.approx({"B": .8, "C": .2}, abs=1e-5)
 
 
 def test_filtered_historical_scenarios_rescale_past_shocks_to_latest_volatility():

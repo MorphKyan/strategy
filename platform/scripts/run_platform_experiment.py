@@ -10,12 +10,12 @@ if str(ROOT) not in sys.path:
 os.chdir(ROOT)
 
 from src.platform_core.experiment import run_platform_experiment
-from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS
+from src.platform_core.slippage import REQUIRED_SLIPPAGE_SCENARIOS, resolve_slippage_scenarios
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a standardized platform experiment with optional baseline comparison.")
-    parser.add_argument("--config", default="configs/baseline_r1_domestic_rolling.yaml", help="Candidate platform config path.")
+    parser.add_argument("--config", default="configs/domestic_rolling_bond_10y.yaml", help="Candidate platform config path.")
     parser.add_argument("--baseline-config", help="Baseline platform config path. Defaults to --config.")
     parser.add_argument("--experiment-name", help="Report grouping name. Defaults to the first strategy name.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
@@ -31,9 +31,9 @@ def main() -> int:
     parser.add_argument("--end-date", help="Runtime backtest end date for candidate and baseline, YYYY-MM-DD.")
     parser.add_argument(
         "--slippage-scenario",
-        choices=[*REQUIRED_SLIPPAGE_SCENARIOS, "all"],
-        default="all",
-        help="Slippage scenario to run. Default `all` runs default, stress, and dynamic_participation.",
+        choices=[*REQUIRED_SLIPPAGE_SCENARIOS, "standard", "all"],
+        default="standard",
+        help="默认 standard 运行 default + stress；all 额外运行 dynamic_participation。",
     )
     args = parser.parse_args()
 
@@ -45,7 +45,7 @@ def main() -> int:
     raw_root = (ROOT / args.raw_root).resolve() if not Path(args.raw_root).is_absolute() else Path(args.raw_root)
     report_root = (ROOT / args.report_root).resolve() if not Path(args.report_root).is_absolute() else Path(args.report_root)
 
-    scenario_names = REQUIRED_SLIPPAGE_SCENARIOS if args.slippage_scenario == "all" else (args.slippage_scenario,)
+    scenario_names = resolve_slippage_scenarios(args.slippage_scenario)
     for scenario in scenario_names:
         result = run_platform_experiment(
             candidate_config_path=config_path,

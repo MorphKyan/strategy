@@ -12,7 +12,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
@@ -25,6 +25,10 @@ if str(PLATFORM_ROOT) not in sys.path:
     sys.path.insert(0, str(PLATFORM_ROOT))
 os.chdir(PLATFORM_ROOT)
 
+from src.platform_core.data import LocalCsvBarData  # noqa: E402
+from src.platform_core.data_store import assets_from_config, validate_market_dates  # noqa: E402
+from src.platform_core.engine import load_strategy_config  # noqa: E402
+from src.platform_core.strategy import RiskParityStrategy  # noqa: E402
 from src.platform_core.strategies.expected_shortfall import (  # noqa: E402
     RiskParityExpectedShortfallFixedBudgetStrategy,
 )
@@ -34,11 +38,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--etf-config",
-        default="configs/capital_100k/domestic_dividend_commodity_expected_shortfall_fixed_budget_511090_30y_100k.yaml",
+        default="configs/capital_100k/es_120d_hist_100k.yaml",
     )
     parser.add_argument(
         "--index-config",
-        default="configs/index_benchmark/domestic_dividend_commodity_expected_shortfall_fixed_budget_cba21801_30y_100k.yaml",
+        default="configs/index_benchmark/index_es_120d_hist_100k.yaml",
     )
     parser.add_argument("--windows", default="120,252,500")
     parser.add_argument("--methods", default="historical,filtered")
@@ -67,34 +71,19 @@ def load_yaml(path_value: str) -> tuple[Path, dict]:
         return path, yaml.safe_load(handle)
 
 
-def adjusted_close(code: str, data_dir: Path) -> pd.Series:
-    frame = pd.read_csv(data_dir / f"{code}.csv")
-    frame["trade_date"] = pd.to_datetime(frame["trade_date"])
-    close = pd.to_numeric(frame["close"], errors="coerce")
-    factor_path = data_dir / f"{code}_hfq_factor.csv"
-    if factor_path.exists():
-        factor_frame = pd.read_csv(factor_path)
-        factor_frame["trade_date"] = pd.to_datetime(factor_frame["trade_date"])
-        factor = pd.to_numeric(
-            factor_frame.set_index("trade_date")["hfq_factor"], errors="coerce"
-        )
-        factor = frame["trade_date"].map(factor).ffill().fillna(1.0)
-    elif "adjust_factor" in frame.columns:
-        factor = pd.to_numeric(frame["adjust_factor"], errors="coerce").fillna(1.0)
-    else:
-        factor = pd.Series(1.0, index=frame.index)
-    values = pd.Series((close * factor).to_numpy(), index=frame["trade_date"], name=code)
-    return values[~values.index.duplicated(keep="last")].sort_index()
-
-
-def config_prices(config: dict, data_dir: Path) -> tuple[pd.DataFrame, list[str], np.ndarray]:
-    assets = {item["asset_id"]: str(item["code"]) for item in config["assets"]}
-    universe = list(config["strategy"]["params"]["universe"])
-    series = [adjusted_close(assets[asset_id], data_dir).rename(asset_id) for asset_id in universe]
-    prices = pd.concat(series, axis=1).dropna()
-    raw_budgets = config["strategy"]["params"]["risk_budgets"]
-    budgets = np.asarray([float(raw_budgets[asset_id]) for asset_id in universe])
-    budgets /= budgets.sum()
+def config_prices(config: dict) -> tuple[pd.DataFrame, list[str], np.ndarray]:
+    params = load_strategy_config(config["strategy"])["params"]
+    assets = assets_from_config(config["assets"])
+    universe = params.get("universe") or [asset.asset_id for asset in assets]
+    budgets = params.get("risk_budgets")
+    if not isinstance(budgets, dict) or set(budgets) != set(universe):
+        raise ValueError("risk_budgets must match the complete universe.")
+    budgets = RiskParityStrategy._normalize_risk_budgets(budgets, universe)
+    data = LocalCsvBarData(PLATFORM_ROOT / config.get("data", {}).get("data_dir", "data"), assets)
+    prices = data.get_price_frame(universe, max(data.calendar))
+    if prices is None or prices.empty:
+        raise ValueError("No aligned price history for the configured universe.")
+    prices.index = pd.to_datetime(prices.index)
     return prices, universe, budgets
 
 
@@ -111,13 +100,15 @@ def es_risk_contributions(
     contributions = weights * marginal
     total = float(contributions.sum())
     if not np.isfinite(total) or abs(total) <= 1e-14:
-        return np.full_like(weights, np.nan)
+        raise ValueError("ES risk-contribution shares are undefined for zero or nonfinite total risk.")
     return contributions / total
 
 
 def moving_block_sample(values: np.ndarray, block_size: int, rng: np.random.Generator) -> np.ndarray:
     observations = len(values)
-    size = min(max(1, block_size), observations)
+    if observations < 2 or block_size < 1:
+        raise ValueError("Block sampling requires at least two observations and a positive block size.")
+    size = min(block_size, observations)
     blocks = int(np.ceil(observations / size))
     starts = rng.integers(0, observations - size + 1, size=blocks)
     sampled = np.concatenate([values[start : start + size] for start in starts], axis=0)
@@ -185,8 +176,8 @@ def diagnostic_rows(
                     "tail_observations": int(
                         np.ceil((1 - confidence_level) * window - 1e-12)
                     ),
-                    "risk_budget_l1_error": float(np.nansum(np.abs(contributions - budgets))),
-                    "risk_budget_max_abs_error": float(np.nanmax(np.abs(contributions - budgets))),
+                    "risk_budget_l1_error": float(np.abs(contributions - budgets).sum()),
+                    "risk_budget_max_abs_error": float(np.abs(contributions - budgets).max()),
                     "delete_worst_weight_l1_change": float(np.abs(deleted_weights - weights).sum()),
                     "delete_worst_weight_max_change": float(np.abs(deleted_weights - weights).max()),
                 }
@@ -212,6 +203,8 @@ def bootstrap_rows(
     block_size: int,
     rng: np.random.Generator,
 ) -> list[dict[str, object]]:
+    if repetitions < 2 or block_size < 1:
+        raise ValueError("Bootstrap requires at least two repetitions and a positive block size.")
     returns = prices.pct_change().dropna()
     rows: list[dict[str, object]] = []
     for window in windows:
@@ -231,6 +224,8 @@ def bootstrap_rows(
                     samples.append(weight)
                 except (RuntimeError, ValueError):
                     failures += 1
+            if len(samples) < 2:
+                raise RuntimeError(f"Bootstrap has fewer than two successful repetitions: {proxy}/{window}/{method}; failed={failures}")
             matrix = np.asarray(samples)
             for index, asset_id in enumerate(universe):
                 rows.append(
@@ -253,11 +248,11 @@ def bootstrap_rows(
 
 
 def generate_configs(
-    config_path: Path,
     config: dict,
     proxy: str,
     windows: list[int],
     methods: list[str],
+    confidence_level: float,
     fhs_decay: float,
     output_dir: Path,
 ) -> list[Path]:
@@ -269,24 +264,25 @@ def generate_configs(
         for method in methods:
             generated = copy.deepcopy(config)
             run_name = f"es_robustness_{proxy}_w{window}_{method}"
-            generated["platform"]["run_name"] = run_name
-            generated["output"]["results_dir"] = "results/temporary_backtests/direct"
+            generated.setdefault("platform", {})["run_name"] = run_name
+            generated.setdefault("output", {})["results_dir"] = "results/temporary_backtests/direct"
             params = generated["strategy"]["params"]
             params["rolling_window"] = window
             params["min_periods"] = window
+            params["confidence_level"] = confidence_level
             params["es_method"] = method
             if method == "filtered":
                 params["fhs_decay"] = fhs_decay
             else:
                 params.pop("fhs_decay", None)
             path = output_dir / f"{run_name}.yaml"
-            with path.open("w", encoding="utf-8", newline="\n") as handle:
+            with path.open("x", encoding="utf-8", newline="\n") as handle:
                 yaml.safe_dump(generated, handle, allow_unicode=True, sort_keys=False)
             paths.append(path)
     return paths
 
 
-def tracking_summary(etf_prices: pd.DataFrame, index_prices: pd.DataFrame) -> dict[str, float | str | int]:
+def tracking_summary(etf_prices: pd.DataFrame, index_prices: pd.DataFrame) -> dict[str, float | str | int | None]:
     etf_asset = next(column for column in etf_prices if "511090" in column)
     index_asset = next(column for column in index_prices if "CBA21801" in column)
     pair = pd.concat(
@@ -294,6 +290,8 @@ def tracking_summary(etf_prices: pd.DataFrame, index_prices: pd.DataFrame) -> di
         axis=1,
     ).dropna()
     returns = pair.pct_change().dropna()
+    if len(returns) < 2 or (returns.std(ddof=1) <= 0).any():
+        raise ValueError("Tracking statistics require at least two common returns and nonzero volatility.")
     difference = returns["etf"] - returns["index"]
     downside = returns.loc[returns["index"] < 0]
     return {
@@ -304,7 +302,8 @@ def tracking_summary(etf_prices: pd.DataFrame, index_prices: pd.DataFrame) -> di
         "annualized_tracking_error": float(difference.std(ddof=1) * np.sqrt(252)),
         "annualized_mean_return_difference": float(difference.mean() * 252),
         "etf_to_index_beta": float(returns.cov().iloc[0, 1] / returns["index"].var(ddof=1)),
-        "downside_correlation": float(downside.corr().iloc[0, 1]),
+        "downside_correlation": (float(downside.corr().iloc[0, 1])
+                                 if len(downside) >= 2 and (downside.std(ddof=1) > 0).all() else None),
         "etf_annualized_volatility": float(returns["etf"].std(ddof=1) * np.sqrt(252)),
         "index_annualized_volatility": float(returns["index"].std(ddof=1) * np.sqrt(252)),
     }
@@ -314,19 +313,24 @@ def main() -> int:
     args = parse_args()
     windows = [int(item) for item in args.windows.split(",")]
     methods = [item.strip().lower() for item in args.methods.split(",")]
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if (not windows or any(window < 3 for window in windows) or len(set(windows)) != len(windows)
+            or not methods or set(methods) - {"historical", "filtered"} or len(set(methods)) != len(methods)
+            or args.bootstrap_reps < 2 or args.bootstrap_block_size < 1
+            or not 0 < args.confidence_level < 1 or not 0 < args.fhs_decay < 1):
+        raise ValueError("Invalid windows, methods, confidence level, decay or bootstrap parameters.")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     output_dir = Path(args.output_dir) if args.output_dir else Path(
         f"results/temporary_backtests/es_robustness/{timestamp}"
     )
     if not output_dir.is_absolute():
         output_dir = PLATFORM_ROOT / output_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=False)
 
     etf_path, etf_config = load_yaml(args.etf_config)
     index_path, index_config = load_yaml(args.index_config)
-    data_dir = PLATFORM_ROOT / str(etf_config.get("data", {}).get("data_dir", "data"))
-    etf_prices, etf_universe, etf_budgets = config_prices(etf_config, data_dir)
-    index_prices, index_universe, index_budgets = config_prices(index_config, data_dir)
+    etf_prices, etf_universe, etf_budgets = config_prices(etf_config)
+    index_prices, index_universe, index_budgets = config_prices(index_config)
+    validate_market_dates({"etf": etf_prices.index[-1].date(), "index": index_prices.index[-1].date()}, date.today())
 
     all_diagnostics: list[dict[str, object]] = []
     all_bootstrap: list[dict[str, object]] = []
@@ -370,17 +374,19 @@ def main() -> int:
 
     tracking = tracking_summary(etf_prices, index_prices)
     with (output_dir / "tracking_summary.json").open("w", encoding="utf-8") as handle:
-        json.dump(tracking, handle, ensure_ascii=False, indent=2)
+        json.dump(tracking, handle, ensure_ascii=False, indent=2, allow_nan=False)
 
     config_dir = Path(args.generated_config_dir)
     if not config_dir.is_absolute():
         config_dir = PLATFORM_ROOT / config_dir
+    config_dir = config_dir / timestamp
+    config_dir.mkdir(parents=True, exist_ok=False)
     generated = []
     generated.extend(
-        generate_configs(etf_path, etf_config, "etf_511090", windows, methods, args.fhs_decay, config_dir)
+        generate_configs(etf_config, "etf_511090", windows, methods, args.confidence_level, args.fhs_decay, config_dir)
     )
     generated.extend(
-        generate_configs(index_path, index_config, "index_cba21801", windows, methods, args.fhs_decay, config_dir)
+        generate_configs(index_config, "index_cba21801", windows, methods, args.confidence_level, args.fhs_decay, config_dir)
     )
 
     manifest = {

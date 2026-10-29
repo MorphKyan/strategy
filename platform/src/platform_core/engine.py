@@ -1,22 +1,28 @@
 from __future__ import annotations
 
-import csv
 import json
-import shutil
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
+import pandas as pd
 
-from src.platform_core.corporate_actions import apply_due_splits, load_splits, resolve_split_effective_dates
+from src.platform_core.corporate_actions import (
+    apply_due_dividends, apply_due_splits, load_corporate_actions, resolve_split_effective_dates,
+)
 from src.platform_core.data import LocalCsvBarData
-from src.platform_core.data_store import MarketDataStore
+from src.platform_core.data_store import MarketDataStore, assets_from_config
 from src.platform_core.execution import ExecutionConfig, ExecutionEngine
-from src.platform_core.models import Asset, PendingIntent, PortfolioState, TargetPortfolio, date_str, parse_date
-from src.platform_core.storage import SQLiteStore, InMemoryStore
+from src.platform_core.metrics import compute_period_metrics
+from src.platform_core.models import PortfolioState, Position, date_str
+from src.platform_core.runtime_config import apply_runtime_dates
+from src.platform_core.slippage import SLIPPAGE_SCENARIOS, apply_slippage_scenario
+from src.platform_core.storage import SQLiteStore, InMemoryStore, write_csv_rows, write_json
 from src.platform_core.strategy import StrategyContext, get_strategy_class
+
+PLATFORM_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass
@@ -33,14 +39,26 @@ def load_strategy_config(payload: Any) -> dict[str, Any]:
         raise ValueError("Platform `strategy.strategy_name` is required.")
     if "start_date" in payload or "end_date" in payload:
         raise ValueError("Platform strategy configs must not include dates.")
+    params = payload.get("params", {})
+    if not isinstance(params, dict):
+        raise ValueError("Platform strategy.params must be a mapping.")
+    universe = params.get("universe", [])
+    if not isinstance(universe, (list, tuple)) or any(not isinstance(asset_id, str) or not asset_id for asset_id in universe):
+        raise ValueError("Platform strategy universe must be a list of asset IDs.")
+    if len(universe) != len(set(universe)):
+        raise ValueError("Platform strategy universe contains duplicate asset IDs.")
     return dict(payload)
 
 
 class PlatformBacktestEngine:
-    def __init__(self, config: dict[str, Any], store: SQLiteStore | InMemoryStore, output_dir: str | Path | None = None):
+    def __init__(self, config: dict[str, Any], store: SQLiteStore | InMemoryStore,
+                 output_dir: str | Path | None = None, config_path: str | Path | None = None):
         self.config = config
         self.store = store
-        self.assets = self._load_assets(config.get("assets", []))
+        self.assets = {asset.asset_id: asset for asset in assets_from_config(config.get("assets", []))}
+        if not self.assets:
+            raise ValueError("At least one asset is required.")
+        self.non_tradable_indices = [asset.asset_id for asset in self.assets.values() if asset.asset_type == "index"]
         self.strategy_config = load_strategy_config(config.get("strategy"))
         backtest_config = config.get("backtest") or {}
         data_config = config.get("data", {})
@@ -62,45 +80,36 @@ class PlatformBacktestEngine:
             start_date=backtest_config.get("start_date"),
             end_date=backtest_config.get("end_date"),
         )
+        if not self.data.calendar:
+            raise ValueError("No market data in the requested runtime window.")
 
         execution_config = config.get("execution", {})
         self.execution = ExecutionEngine(ExecutionConfig.from_config(execution_config))
         self.slippage_scenario = execution_config.get("slippage_scenario", "custom")
         run_name = config.get("platform", {}).get("run_name", "platform_backtest")
         self.run_id = f"{run_name}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
-        configured_output = output_dir or config.get("output", {}).get("results_dir", "results/platform")
-        self.output_dir = Path(configured_output) / self.run_id
+        self.artifact_provenance = self._artifact_provenance(config_path)
+        temporary_root = PLATFORM_ROOT / "results/temporary_backtests/direct"
+        configured_output = Path(output_dir or config.get("output", {}).get("results_dir") or temporary_root).resolve()
+        if configured_output.is_relative_to(PLATFORM_ROOT / "results/backtests"):
+            if self.artifact_provenance["classification"] != "fixed_full_history":
+                configured_output = temporary_root
+        self.output_dir = configured_output / self.run_id
         self.checkpoint_dir = self.output_dir / "checkpoints"
         
         self.code_to_asset_id = {asset.code: asset_id for asset_id, asset in self.assets.items()}
-        self.dividends = self._load_dividends()
-        self.splits = load_splits(self.config)
-
-    def _load_dividends(self) -> list[dict[str, Any]]:
-        platform_dir = Path(__file__).resolve().parent.parent.parent
-        path = platform_dir / "data" / "platform_dividends.csv"
-        if not path.exists():
-            return []
-        dividends = []
-        with path.open("r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                dividends.append({
-                    "code": row["code"].strip(),
-                    "ex_date": parse_date(row["ex_date"].strip()),
-                    "payment_date": parse_date(row["payment_date"].strip()),
-                    "dividend_per_share": float(row["dividend_per_share"].strip()),
-                })
-        return dividends
+        self.dividends = load_corporate_actions(self.config, "dividends")
+        self.splits = load_corporate_actions(self.config, "splits")
 
     def run(self) -> PlatformBacktestResult:
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        state = self._initial_state()
+        state.validate_assets(self.assets)
+        self.output_dir.mkdir(parents=True, exist_ok=False)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self._write_config_snapshot()
         backtest_id = self.store.record_backtest(self.run_id, self.config, self.output_dir)
         resolve_split_effective_dates(self.splits, self.code_to_asset_id, self.data)
 
-        state = self._initial_state()
         nav_rows: list[dict[str, Any]] = []
         position_rows: list[dict[str, Any]] = []
         order_rows: list[dict[str, Any]] = []
@@ -109,48 +118,22 @@ class PlatformBacktestEngine:
         active_strategy = None
         active_strategy_runtime: dict[str, Any] = {}
         active_strategy_version_id: int | None = None
+        identity = {"strategy_name": self.strategy_config["strategy_name"], "params": self.strategy_config.get("params", {})}
 
         for current_date in self.data.calendar:
             # 1. Process Splits（在 split_date 后首个真实交易日生效，见 corporate_actions）
             apply_due_splits(self.splits, state, self.code_to_asset_id, current_date)
 
-            # 2. Process Ex-Dividends
-            for div in self.dividends:
-                if div["ex_date"] == current_date:
-                    asset_id = self.code_to_asset_id.get(div["code"])
-                    if asset_id and asset_id in state.positions:
-                        pos = state.positions[asset_id]
-                        if pos.quantity > 0:
-                            amount = pos.quantity * div["dividend_per_share"]
-                            state.dividend_receivables.append({
-                                "asset_id": asset_id,
-                                "payment_date": div["payment_date"],
-                                "amount": amount,
-                            })
-
-            # 3. Process Cash Payouts
-            remaining_receivables = []
-            for item in state.dividend_receivables:
-                if item["payment_date"] <= current_date:
-                    state.cash += item["amount"]
-                else:
-                    remaining_receivables.append(item)
-            state.dividend_receivables = remaining_receivables
+            apply_due_dividends(self.dividends, state, self.code_to_asset_id, current_date)
 
             bars = self.data.bars_on(current_date)
             if active_strategy is None:
                 if self.strategy_config.get("cancel_pending_on_start", False):
                     state.pending_intents.clear()
                 strategy_cls = get_strategy_class(self.strategy_config["strategy_name"])
-                version_id = self.strategy_config.get("strategy_version_id")
-                if version_id is not None:
-                    try:
-                        self.store.get_strategy_version(int(version_id))
-                    except KeyError:
-                        version_id = None
-                if version_id is None:
-                    version_id = self.store.ensure_builtin_version(strategy_cls, self.strategy_config.get("params", {}))
-                    self.strategy_config["strategy_version_id"] = version_id
+                version_id = self.store.ensure_builtin_version(strategy_cls, self.strategy_config.get("params", {}))
+                self.strategy_config["strategy_version_id"] = version_id
+                identity["source_hash"] = self.store.get_strategy_version(version_id)["source_hash"]
                 self.store.add_strategy_reference(int(version_id), "backtest", str(backtest_id))
                 active_strategy = strategy_cls()
                 active_strategy_runtime = {}
@@ -167,7 +150,7 @@ class PlatformBacktestEngine:
                 active_strategy_version_id = int(version_id)
 
             state.decrement_cooldowns()
-            pending_target = self._target_from_pending(state, current_date)
+            pending_target = state.pending_target(current_date)
             if pending_target is not None:
                 skipped_orders = []
                 orders, trades = self.execution.apply_target(
@@ -178,7 +161,7 @@ class PlatformBacktestEngine:
                     target=pending_target,
                     cooldown_days=int(active_strategy_runtime.get("cooldown_days", 0)),
                     close_absent_positions=False,
-                    signal_dates=self._signal_dates_from_pending(state, current_date),
+                    signal_dates=state.pending_signal_dates(current_date),
                     skipped_orders=skipped_orders,
                 )
                 order_rows.extend(order.to_row() for order in orders)
@@ -197,8 +180,15 @@ class PlatformBacktestEngine:
             )
             target = active_strategy.generate_targets(context)
             if target is not None:
-                self._validate_target_assets(target)
-                self._replace_pending(state, target, current_date)
+                unknown = set(target.weights) - set(self.assets)
+                if unknown:
+                    raise ValueError(f"Target portfolio contains unknown assets: {sorted(unknown)}")
+                state.replace_pending(target, current_date)
+
+            state.strategy_state["_strategy_runtime"] = {
+                "identity": identity,
+                "runtime": active_strategy_runtime,
+            }
 
             prices = {asset_id: bar.close for asset_id, bar in bars.items()}
             total_value = state.total_value(prices)
@@ -229,97 +219,69 @@ class PlatformBacktestEngine:
             state.last_date = current_date
             if (self.config.get("backtest") or {}).get("enable_checkpoints", False):
                 checkpoint_path = self.checkpoint_dir / f"{date_str(current_date)}.json"
-                self._write_json(checkpoint_path, state.to_dict())
+                write_json(checkpoint_path, state.to_dict())
                 self.store.add_checkpoint(self.run_id, date_str(current_date), checkpoint_path)
 
         if not (self.config.get("backtest") or {}).get("enable_checkpoints", False) and self.data.calendar:
             last_date = self.data.calendar[-1]
             checkpoint_path = self.checkpoint_dir / f"{date_str(last_date)}.json"
-            self._write_json(checkpoint_path, state.to_dict())
+            write_json(checkpoint_path, state.to_dict())
             self.store.add_checkpoint(self.run_id, date_str(last_date), checkpoint_path)
 
 
-        self._write_csv("nav.csv", nav_rows)
-        self._write_csv("positions.csv", position_rows)
-        self._write_csv("orders.csv", order_rows)
-        self._write_csv("skipped_orders.csv", skipped_order_rows)
-        self._write_csv("trades.csv", trade_rows)
-        metrics = self._metrics(nav_rows, trade_rows, order_rows, skipped_order_rows)
+        write_csv_rows(self.output_dir / "nav.csv", nav_rows)
+        write_csv_rows(self.output_dir / "positions.csv", position_rows)
+        write_csv_rows(self.output_dir / "orders.csv", order_rows)
+        write_csv_rows(self.output_dir / "skipped_orders.csv", skipped_order_rows)
+        write_csv_rows(self.output_dir / "trades.csv", trade_rows)
+        metrics = compute_period_metrics(
+            pd.DataFrame(nav_rows), pd.DataFrame(trade_rows), pd.DataFrame(order_rows),
+            pd.DataFrame(skipped_order_rows), pd.DataFrame(position_rows),
+        )
         metrics["slippage_scenario"] = self.slippage_scenario
         self._write_manifest(metrics)
         self._write_report(metrics)
         return PlatformBacktestResult(run_id=self.run_id, output_dir=self.output_dir, metrics=metrics)
 
-    def _load_assets(self, payload: list[dict[str, Any]]) -> dict[str, Asset]:
-        assets: dict[str, Asset] = {}
-        for item in payload:
-            asset = Asset(
-                asset_id=item["asset_id"],
-                code=str(item["code"]),
-                name=item.get("name", item["code"]),
-                asset_type=item.get("asset_type", "etf"),
-                exchange=item.get("exchange", "CN"),
-                currency=item.get("currency", "CNY"),
-                lot_size=int(item.get("lot_size", 100)),
-                price_limit_pct=item.get("price_limit_pct", 0.10),
-            )
-            assets[asset.asset_id] = asset
-        if not assets:
-            raise ValueError("At least one asset is required.")
-        return assets
-
     def _initial_state(self) -> PortfolioState:
         portfolio = self.config.get("portfolio", {})
-        state = PortfolioState(cash=float(portfolio.get("initial_cash", 0.0)))
+        positions = {}
         for item in portfolio.get("initial_positions", []):
-            position = state.position(item["asset_id"])
-            position.quantity = float(item.get("quantity", 0.0))
-            position.cost_basis = float(item.get("cost_basis", 0.0))
-        return state
+            asset_id = item["asset_id"]
+            if asset_id in positions:
+                raise ValueError(f"Duplicate initial position: {asset_id}")
+            positions[asset_id] = Position(asset_id, float(item.get("quantity", 0.0)), float(item.get("cost_basis", 0.0)))
+        return PortfolioState(cash=float(portfolio.get("initial_cash", 0.0)), positions=positions)
 
     def _initial_equity(self) -> float:
         portfolio = self.config.get("portfolio", {})
         return float(portfolio.get("initial_equity") or portfolio.get("initial_cash") or 1.0)
 
-    @staticmethod
-    def _target_from_pending(state: PortfolioState, current_date: date) -> TargetPortfolio | None:
-        due = {
-            asset_id: intent.target_weight
-            for asset_id, intent in state.pending_intents.items()
-            if intent.created_date < current_date
-        }
-        if not due:
-            return None
-        return TargetPortfolio(due)
-
-    @staticmethod
-    def _signal_dates_from_pending(state: PortfolioState, current_date: date) -> dict[str, date]:
+    def _artifact_provenance(self, config_path: str | Path | None) -> dict[str, Any]:
+        common_dates = set.intersection(*(set(days) for days in self.data.real_bar_dates.values()))
+        common_start = min(common_dates) if common_dates else None
+        common_end = max(common_dates) if common_dates else None
+        fixed_config = False
+        source = Path(config_path).resolve() if config_path is not None else None
+        if source is not None and source.suffix in {".yaml", ".yml"} and source.is_relative_to(PLATFORM_ROOT / "configs"):
+            if not source.is_relative_to(PLATFORM_ROOT / "configs/generated"):
+                original = yaml.safe_load(source.read_text(encoding="utf-8"))
+                if not any((original.get("backtest") or {}).get(key) for key in ("start_date", "end_date")):
+                    runtime = self.config.get("backtest") or {}
+                    expected = apply_runtime_dates(original, runtime.get("start_date"), runtime.get("end_date"))
+                    if self.slippage_scenario in SLIPPAGE_SCENARIOS:
+                        expected = apply_slippage_scenario(expected, self.slippage_scenario)
+                    fixed_config = expected == self.config
+        full_history = self.data.calendar[0] == common_start and self.data.calendar[-1] == common_end
         return {
-            asset_id: intent.signal_date or intent.created_date
-            for asset_id, intent in state.pending_intents.items()
-            if intent.created_date < current_date
+            "classification": "fixed_full_history" if fixed_config and full_history else "temporary",
+            "config_path": str(source) if source is not None else None,
+            "fixed_config": fixed_config,
+            "common_start_date": date_str(common_start),
+            "common_end_date": date_str(common_end),
+            "start_date": date_str(self.data.calendar[0]),
+            "end_date": date_str(self.data.calendar[-1]),
         }
-
-    @staticmethod
-    def _replace_pending(state: PortfolioState, target: TargetPortfolio, current_date: date) -> None:
-        target_weights = dict(target.weights)
-        for asset_id, position in state.positions.items():
-            if position.quantity > 1e-9 and asset_id not in target_weights:
-                target_weights[asset_id] = 0.0
-        state.pending_intents = {
-            asset_id: PendingIntent(
-                asset_id=asset_id,
-                target_weight=weight,
-                created_date=current_date,
-                signal_date=current_date,
-            )
-            for asset_id, weight in target_weights.items()
-        }
-
-    def _validate_target_assets(self, target: TargetPortfolio) -> None:
-        unknown = set(target.weights) - set(self.assets)
-        if unknown:
-            raise ValueError(f"Target portfolio contains unknown assets: {sorted(unknown)}")
 
     def _write_config_snapshot(self) -> None:
         with (self.output_dir / "config_snapshot.yaml").open("w", encoding="utf-8") as handle:
@@ -330,6 +292,9 @@ class PlatformBacktestEngine:
             "run_id": self.run_id,
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "engine": "platform_core.daily_event",
+            "artifact_provenance": self.artifact_provenance,
+            "instrument_semantics": {"research_simulation": bool(self.non_tradable_indices),
+                                     "non_tradable_indices": self.non_tradable_indices},
             "execution_model": {
                 "signal_execution_lag_days": 1,
                 "execution_price_field": self.execution.config.price_field,
@@ -339,7 +304,7 @@ class PlatformBacktestEngine:
             "metrics": metrics,
             "data_quality_notes": self.data.quality.notes + self.data_quality_notes,
         }
-        self._write_json(self.output_dir / "manifest.json", payload)
+        write_json(self.output_dir / "manifest.json", payload)
 
     def _write_report(self, metrics: dict[str, Any]) -> None:
         lines = [
@@ -348,8 +313,8 @@ class PlatformBacktestEngine:
             "## 摘要",
             f"- 开始日期：{metrics.get('start_date')}",
             f"- 结束日期：{metrics.get('end_date')}",
-            f"- 累计收益率：{metrics.get('total_return', 0.0) * 100:.2f}%",
-            f"- 最大回撤：{metrics.get('max_drawdown', 0.0) * 100:.2f}%",
+            f"- 累计收益率：{metrics['total_return']:.2%}" if metrics.get("total_return") is not None else "- 累计收益率：无有效净值基准",
+            f"- 最大回撤：{metrics['max_drawdown']:.2%}" if metrics.get("max_drawdown") is not None else "- 最大回撤：无有效净值基准",
             f"- 年化金额换手率：{metrics.get('annualized_turnover_amount', metrics.get('annualized_turnover', 0.0)) * 100:.2f}%",
             f"- 年化数量换手：{metrics.get('annualized_turnover_quantity', 0.0):.4f}",
             f"- 成交笔数：{metrics.get('trade_count', 0)}",
@@ -358,110 +323,16 @@ class PlatformBacktestEngine:
             "## 说明",
             "- 该 M0-M2 引擎使用日频 K 线和目标权重策略。",
             "- 策略目标在信号日收盘后入队，最早于下一交易日执行。",
-            "- 默认成交价使用执行日开盘价与收盘价的中间价代理。",
+            f"- 成交估值价使用配置字段 `{self.execution.config.price_field}`，再按场景计入滑点与交易费。",
             "- 未成交的再平衡意图会在后续交易日继续重试。",
         ]
         quality_notes = self.data.quality.notes + self.data_quality_notes
+        if self.non_tradable_indices:
+            lines.append(f"- 本结果为含发布指数的研究模拟：{', '.join(self.non_tradable_indices)}；指数不可直接交易，模拟成交不代表可执行容量。")
         if quality_notes:
             lines.extend(["", "## 数据质量"])
             lines.extend(f"- {note}" for note in quality_notes)
         (self.output_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-    @staticmethod
-    def _metrics(
-        nav_rows: list[dict[str, Any]],
-        trade_rows: list[dict[str, Any]],
-        order_rows: list[dict[str, Any]] | None = None,
-        skipped_order_rows: list[dict[str, Any]] | None = None,
-    ) -> dict[str, Any]:
-        order_rows = order_rows or []
-        skipped_order_rows = skipped_order_rows or []
-        skipped_reason_counts: dict[str, int] = {}
-        for row in skipped_order_rows:
-            reason = str(row.get("reason") or "unknown")
-            skipped_reason_counts[reason] = skipped_reason_counts.get(reason, 0) + 1
-        if not nav_rows:
-            return {
-                "trade_count": len(trade_rows),
-                "order_count": len(order_rows),
-                "skipped_order_count": len(skipped_order_rows),
-                "skipped_below_lot_or_cash_count": skipped_reason_counts.get("below_lot_or_cash", 0),
-                "skipped_reason_counts": skipped_reason_counts,
-            }
-        net_values = [float(row["net_value"]) for row in nav_rows]
-        total_values = [float(row.get("total_value", 0.0)) for row in nav_rows]
-        average_total_value = sum(total_values) / len(total_values) if total_values else 0.0
-        years = len(nav_rows) / 252 if nav_rows else 0.0
-        turnover_amount_total = sum(abs(float(row.get("trade_value", 0.0))) for row in trade_rows)
-        turnover_quantity_total = sum(abs(float(row.get("quantity", 0.0))) for row in trade_rows)
-        turnover_amount_ratio = (turnover_amount_total / 2) / average_total_value if average_total_value > 0 else 0.0
-        annualized_turnover_amount = turnover_amount_ratio / years if years else turnover_amount_ratio
-        annualized_turnover_quantity = (turnover_quantity_total / 2) / years if years else (turnover_quantity_total / 2)
-        
-        execution_slippage = 0.0
-        sum_slippage_amt = 0.0
-        sum_valuation_amt = 0.0
-        for row in trade_rows:
-            price = float(row.get("price") or 0.0)
-            val_price = float(row.get("valuation_price") or price)
-            qty = float(row.get("quantity") or 0.0)
-            sum_slippage_amt += abs(price - val_price) * qty
-            sum_valuation_amt += val_price * qty
-        if sum_valuation_amt > 0:
-            execution_slippage = sum_slippage_amt / sum_valuation_amt
-
-        fee_total = sum(float(row.get("fee") or 0.0) for row in trade_rows)
-        fee_drag_ratio = 0.0
-        annualized_fee_drag = 0.0
-        if average_total_value > 0:
-            fee_drag_ratio = fee_total / average_total_value
-            annualized_fee_drag = fee_drag_ratio / years if years else fee_drag_ratio
-
-        peak = net_values[0]
-        max_drawdown = 0.0
-        for value in net_values:
-            peak = max(peak, value)
-            if peak:
-                max_drawdown = min(max_drawdown, value / peak - 1)
-        return {
-            "start_date": nav_rows[0]["date"],
-            "end_date": nav_rows[-1]["date"],
-            "observations": len(nav_rows),
-            "total_return": net_values[-1] / net_values[0] - 1 if net_values[0] else 0.0,
-            "max_drawdown": max_drawdown,
-            "trade_count": len(trade_rows),
-            "order_count": len(order_rows),
-            "skipped_order_count": len(skipped_order_rows),
-            "skipped_below_lot_or_cash_count": skipped_reason_counts.get("below_lot_or_cash", 0),
-            "skipped_reason_counts": skipped_reason_counts,
-            "turnover_total": turnover_amount_total / 2,
-            "annualized_turnover": annualized_turnover_amount,
-            "turnover_amount_total": turnover_amount_total / 2,
-            "turnover_amount_ratio": turnover_amount_ratio,
-            "annualized_turnover_amount": annualized_turnover_amount,
-            "turnover_quantity_total": turnover_quantity_total / 2,
-            "annualized_turnover_quantity": annualized_turnover_quantity,
-            "pending_intent_count": int(nav_rows[-1].get("pending_intent_count", 0)),
-            "execution_slippage": execution_slippage,
-            "fee_total": fee_total,
-            "fee_drag_ratio": fee_drag_ratio,
-            "annualized_fee_drag": annualized_fee_drag,
-        }
-
-    def _write_csv(self, name: str, rows: list[dict[str, Any]]) -> None:
-        path = self.output_dir / name
-        if not rows:
-            path.write_text("", encoding="utf-8")
-            return
-        with path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
-            writer.writeheader()
-            writer.writerows(rows)
-
-    @staticmethod
-    def _write_json(path: Path, payload: dict[str, Any]) -> None:
-        with path.open("w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2)
 
 
 def load_checkpoint(path: str | Path) -> PortfolioState:

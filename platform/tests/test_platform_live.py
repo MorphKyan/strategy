@@ -176,6 +176,63 @@ def test_reconcile_rejects_unknown_code(tmp_path: Path):
         portfolio.reconcile(holdings, cash=1000.0, asof_date="2024-01-30")
 
 
+@pytest.mark.parametrize("holdings,cash,flow", [
+    (["AAA,nan,10"], 1000, 0),
+    (["AAA,100,inf"], 1000, 0),
+    (["AAA,100,10"], float("nan"), 0),
+    (["AAA,100,10"], 1000, float("inf")),
+    (["AAA,-100,10"], 1000, 0),
+    (["AAA,100,-10"], 1000, 0),
+    (["AAA,100,10", "AAA,200,10"], 1000, 0),
+])
+def test_invalid_reconcile_input_does_not_overwrite_account(tmp_path: Path, holdings, cash, flow):
+    portfolio = _make_portfolio(tmp_path)
+    path = _write_holdings(tmp_path / "h.csv", ["AAA,300,10"])
+    portfolio.reconcile(path, cash=7000, asof_date="2024-01-29")
+    state_before = portfolio.state_path.read_bytes()
+    nav_before = portfolio.real_nav_path.read_bytes()
+    _write_holdings(path, holdings)
+    with pytest.raises(ValueError):
+        portfolio.reconcile(path, cash=cash, asof_date="2024-01-30", external_flow=flow)
+    assert portfolio.state_path.read_bytes() == state_before
+    assert portfolio.real_nav_path.read_bytes() == nav_before
+
+
+def test_historical_plan_does_not_rewind_latest_runtime_or_tickets(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", ["AAA,300,10"]), cash=7000, asof_date="2024-01-29")
+    portfolio.plan("2024-01-31")
+    before = portfolio.state_path.read_bytes()
+    with pytest.raises(ValueError, match="历史"):
+        portfolio.plan("2024-01-30")
+    assert portfolio.state_path.read_bytes() == before
+    assert not (portfolio.tickets_dir / "ticket_2024-01-30.txt").exists()
+
+
+def test_same_day_no_op_removes_previous_order_csv(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    portfolio.strategy_config = {"strategy_name": "fixed_weight_threshold", "params": {"universe": ["A", "B"]}}
+    holdings = _write_holdings(tmp_path / "h.csv", [])
+    portfolio.reconcile(holdings, cash=10000, asof_date="2024-01-30")
+    first = portfolio.plan("2024-01-31")
+    assert first.ticket_csv.exists()
+    _write_holdings(holdings, ["AAA,500,10", "BBB,500,10"])
+    portfolio.reconcile(holdings, cash=0, asof_date="2024-01-31")
+    repeated = portfolio.plan("2024-01-31")
+    assert not repeated.has_target
+    assert not first.ticket_csv.exists()
+
+
+def test_amend_flow_rejects_nonfinite_value_without_writing(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", []), cash=10000, asof_date="2024-01-29")
+    portfolio.mark_to_market("2024-01-30")
+    before = portfolio.real_nav_path.read_bytes()
+    with pytest.raises(ValueError, match="有限数"):
+        portfolio.amend_flow("2024-01-30", float("nan"))
+    assert portfolio.real_nav_path.read_bytes() == before
+
+
 def test_plan_renders_lot_rounded_ticket_without_touching_real_state(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
@@ -323,6 +380,58 @@ def test_live_config_change_does_not_restore_old_frequency(tmp_path: Path, monke
     portfolio.config["strategy"]["params"]["rebalance_frequency"] = "daily"
     restarted = LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live")
     assert restarted.plan("2024-01-30").has_target
+
+
+def test_daily_target_monitor_recomputes_below_threshold_and_uses_real_trades(tmp_path, monkeypatch):
+    portfolio = _es_portfolio(tmp_path, monkeypatch)
+    portfolio.config["strategy"]["params"]["rebalance_frequency"] = "daily"
+    calls = []
+
+    def calculate(self, context, universe):
+        calls.append(context.date)
+        weight = 0.5 if context.date.day == 29 else 0.52
+        return TargetPortfolio({"A": weight, "B": 1 - weight})
+
+    monkeypatch.setattr(RiskParityExpectedShortfallFixedBudgetStrategy, "_inverse_vol_target", calculate)
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", ["AAA,500,10", "BBB,500,10"]),
+                        cash=0, asof_date="2024-01-29")
+    (portfolio.portfolio_dir / "execution_ledger.csv").write_text(
+        "date,event,code,quantity\n2024-01-28,SELL,AAA,100\n2024-01-29,BUY,AAA,100\n"
+        "2024-01-30,INTERNAL_TRANSFER_IN,AAA,100\n2024-01-30,DIVIDEND,AAA,0\n"
+        "2024-01-30,BUY,AAA,0\n2024-01-31,BUY,AAA,100\n", encoding="utf-8")
+    before = portfolio._load_state()
+    for day, expected in (("2024-01-29", "50.00%"), ("2024-01-30", "52.00%")):
+        restarted = LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live")
+        result = restarted.plan(day)
+        assert not result.has_target and result.order_count == 0
+        assert result.ticket_txt.exists() and result.ticket_csv is None
+        assert expected in result.monitor_text and "现金" in result.monitor_text
+        assert "上次调仓（有成交）：2024-01-29" in result.text
+        assert "2024-01-31" not in result.text
+        valuation = {"date": parse_date(day), "total_value": 10000, "cash": 0,
+                     "weights": {"A": 0.5, "B": 0.5}}
+        _, digest = restarted._render_daily_digest(valuation, result)
+        assert result.monitor_text in digest
+        after = restarted._load_state()
+        assert after.cash == before.cash and after.positions == before.positions
+    assert calls == [parse_date("2024-01-29"), parse_date("2024-01-30")]
+
+
+def test_daily_target_ticket_and_digest_include_unknown_last_trade(tmp_path, monkeypatch):
+    portfolio = _es_portfolio(tmp_path, monkeypatch)
+    portfolio.config["strategy"]["params"]["rebalance_frequency"] = "daily"
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", ["AAA,300,10"]),
+                        cash=7000, asof_date="2024-01-29")
+    sent = []
+    result = LivePortfolio("live_test", portfolio.config, output_root=tmp_path / "live").cycle(
+        "2024-01-30", notifier=lambda title, text: sent.append(text) or True)
+    assert result.plan.has_target and result.plan.order_count > 0
+    assert result.plan.ticket_csv.exists()
+    assert len(sent) == 2
+    for message in sent:
+        assert "上次调仓（有成交）：未知（无有效买卖流水）" in message
+        assert "50.00%" in message
+    assert portfolio._load_state().last_date == parse_date("2024-01-29")
 
 
 @pytest.mark.parametrize("command", ["plan", "cycle", "reconcile", "mark_to_market"])
@@ -519,6 +628,31 @@ def test_withdrawal_redeems_units_and_split_pnl_identity(tmp_path: Path):
     assert "+4.29%" in text  # 7300/7000-1,份额口径
 
 
+def test_full_withdrawal_and_redeposit_preserve_unit_nav():
+    rows = [{"date": day, "total_value": str(total), "external_flow": str(flow)} for day, total, flow in [
+        ("2024-01-25", 10000, 0), ("2024-01-26", 11000, 0),
+        ("2024-01-29", 0, -11000), ("2024-01-30", 0, 0), ("2024-01-31", 5500, 5500),
+    ]]
+    LivePortfolio._recompute_unit_chain(rows)
+    assert [float(row["unit_nav"]) for row in rows] == pytest.approx([1, 1.1, 1.1, 1.1, 1.1])
+    assert [float(row["units"]) for row in rows] == pytest.approx([10000, 10000, 0, 0, 5000])
+
+
+def test_amend_flow_write_failure_preserves_nav(tmp_path: Path, monkeypatch):
+    portfolio = _make_portfolio(tmp_path)
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", []), cash=10000, asof_date="2024-01-29")
+    portfolio.mark_to_market("2024-01-30")
+    before = portfolio.real_nav_path.read_bytes()
+
+    def fail_replace(self, target):
+        raise OSError("disk error")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError, match="disk error"):
+        portfolio.amend_flow("2024-01-30", 1000)
+    assert portfolio.real_nav_path.read_bytes() == before
+
+
 def test_legacy_real_nav_backfills_unit_chain(tmp_path: Path):
     """旧三列档案在下一次写盘时自动回填份额链，历史收益率不变（免迁移）。"""
     portfolio = _make_portfolio(tmp_path)
@@ -620,6 +754,26 @@ def test_mark_to_market_freezes_history_once_newer_row_exists(tmp_path: Path):
     assert result["written"] is True
 
 
+def test_historical_valuation_uses_frozen_cash_and_excludes_future_deposits(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "h.csv", [])
+    portfolio.reconcile(holdings, cash=10000, asof_date="2024-01-29")
+    portfolio.mark_to_market("2024-01-30")
+    _write_holdings(holdings, ["AAA,300,10"])
+    portfolio.reconcile(holdings, cash=17000, asof_date="2024-01-31", external_flow=10000)
+    state_before, nav_before = portfolio.state_path.read_bytes(), portfolio.real_nav_path.read_bytes()
+    historical = portfolio.mark_to_market("2024-01-30")
+    assert historical["written"] is False
+    assert historical["cash"] == 10000
+    assert historical["total_value"] == 10000
+    assert historical["net_invested"] == 10000
+    assert historical["total_pnl"] == 0
+    assert historical["float_pnl"] is None
+    assert historical["realized_pnl"] is None
+    assert portfolio.state_path.read_bytes() == state_before
+    assert portfolio.real_nav_path.read_bytes() == nav_before
+
+
 def test_mark_to_market_appends_daily_real_nav(tmp_path: Path):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
@@ -646,6 +800,21 @@ def test_residual_sentinel_silent_when_ledger_consistent(tmp_path: Path):
 
     assert valuation["realized_pnl"] == pytest.approx(0.0, abs=1e-6)
     assert valuation["realized_residual_alert"] is False
+
+
+def test_partial_execution_ledger_warns_without_breaking_valuation(tmp_path: Path):
+    portfolio = _make_portfolio(tmp_path)
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", ["AAA,300,10"]), cash=7000, asof_date="2024-01-29")
+    portfolio.reconcile(_write_holdings(tmp_path / "h.csv", ["AAA,200,10"]), cash=8099, asof_date="2024-01-30")
+    (portfolio.portfolio_dir / "execution_ledger.csv").write_text(
+        "date,code,event,quantity,gross_amount,fee\n2024-01-30,AAA,SELL,100,1100,1\n")
+    valuation = portfolio.mark_to_market("2024-01-31")
+    assert valuation["total_value"] == 10099
+    assert valuation["expected_realized_pnl"] is None
+    assert valuation["realized_residual_alert"]
+    _, digest = portfolio._render_daily_digest(valuation, PlanResult(
+        "live_test", parse_date("2024-01-31"), False, 0, None, tmp_path / "ticket.txt", ""))
+    assert "缺少持仓成本" in digest
 
 
 def test_residual_sentinel_fires_when_cost_basis_exceeds_inception_mark(tmp_path: Path):
@@ -845,3 +1014,21 @@ def test_send_notification_swallows_channel_exceptions(monkeypatch):
 def test_send_notification_unknown_channel_type(monkeypatch):
     _clear_notify_env(monkeypatch)
     assert send_notification("t", "x", {"channels": [{"type": "pigeon"}]}) is False
+
+
+def test_live_does_not_reuse_runtime_without_matching_source_proof(tmp_path, monkeypatch):
+    from src.platform_core.strategy import MonthlyEqualWeightStrategy
+
+    portfolio = _make_portfolio(tmp_path)
+    holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
+    portfolio.reconcile(holdings, cash=7100, asof_date="2024-01-30")
+    payload = json.loads(portfolio.state_path.read_text())
+    payload["strategy_state"]["_live_strategy_runtime"] = {
+        "identity": {"strategy_name": "monthly_equal_weight", "params": portfolio.strategy_config["params"]},
+        "plan_date": "2024-01-30", "runtime": {"stale": True}, "runtime_before": {"stale": True},
+    }
+    portfolio.state_path.write_text(json.dumps(payload))
+    observed = []
+    monkeypatch.setattr(MonthlyEqualWeightStrategy, "generate_targets", lambda self, context: observed.append(context.runtime.get("stale")))
+    portfolio.plan("2024-01-31")
+    assert observed == [None]

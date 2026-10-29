@@ -12,7 +12,6 @@ from scripts.fetch_etf_dividends import (
     parse_dividend,
     sync_etf_corporate_actions,
 )
-from src.platform_core.corporate_actions import merge_event_table
 from src.platform_core.sync_universe import (
     etf_assets,
     load_assets_from_configs,
@@ -89,7 +88,7 @@ def test_scoped_merge_retains_unrequested_symbols_without_missing_warnings():
     )
 
     merged, notes, additions = _merge_scoped_events(
-        existing, fetched, ["code", "ex_date"], merge_event_table
+        existing, fetched, ["code", "ex_date"]
     )
 
     assert set(merged["code"]) == {"510300", "511090"}
@@ -106,7 +105,7 @@ def test_scoped_merge_does_not_accept_first_candidate_before_validation():
     )
 
     merged, notes, additions = _merge_scoped_events(
-        existing, fetched, ["code", "split_date"], merge_event_table
+        existing, fetched, ["code", "split_date"]
     )
 
     assert list(merged["code"]) == ["510300"]

@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.platform_core.data_store import MarketDataStore
+from src.platform_core.data_store import MarketDataStore, write_csv_stable
 from src.platform_core.models import Asset
 
 
@@ -118,9 +118,86 @@ def test_merge_event_table_keeps_existing_on_same_key_conflict():
 
     from src.platform_core.corporate_actions import merge_event_table
 
-    merged, _, additions = merge_event_table(existing, fetched, ["code", "split_date"])
+    merged, notes, additions = merge_event_table(existing, fetched, ["code", "split_date"])
     assert additions == []
     assert merged.iloc[0]["split_ratio"] == "1.1454"
+    assert any("冲突" in note for note in notes)
+
+
+@pytest.mark.parametrize("existing", [None, pd.DataFrame(), pd.DataFrame([{"code": "OLD", "ex_date": "2024-01-01"}])])
+def test_duplicate_events_are_rejected_even_on_first_import(existing):
+    from src.platform_core.corporate_actions import merge_event_table
+
+    fetched = pd.DataFrame([{"code": "A", "ex_date": "2024-01-01"}] * 2)
+    with pytest.raises(ValueError, match="重复"):
+        merge_event_table(existing, fetched, ["code", "ex_date"])
+
+
+def test_first_event_import_returns_candidates_without_accepting_them():
+    from src.platform_core.corporate_actions import merge_event_table
+
+    fetched = pd.DataFrame([{"code": "A", "split_date": "2024-01-01", "split_ratio": 0.01}])
+    merged, notes, additions = merge_event_table(None, fetched, ["code", "split_date"])
+    assert merged.empty and not notes
+    assert additions[0]["split_ratio"] == "0.01"
+
+
+def test_hfq_report_does_not_overwrite_existing_artifacts(tmp_path):
+    from src.platform_core.data_validation import write_hfq_validation
+
+    path = tmp_path / "hfq_summary.json"
+    path.write_text('{"original": true}')
+    with pytest.raises(FileExistsError):
+        write_hfq_validation(tmp_path, pd.DataFrame(), {"rows": []})
+    assert path.read_text() == '{"original": true}'
+
+
+def test_split_validation_uses_chronological_close_price_alias(tmp_path):
+    from src.platform_core.corporate_actions import validate_split_against_prices
+
+    pd.DataFrame({"trade_date": ["2024-02-02", "2024-01-31", "2024-02-01", "2024-01-30"],
+                  "close_price": [1.5, 2, 1, 3]}).to_csv(tmp_path / "A.csv", index=False)
+    assert validate_split_against_prices("A", "2024-01-31", 2, tmp_path)[0]
+
+
+def test_bounded_sync_preserves_local_rows_outside_and_missing_from_response(tmp_path: Path):
+    original = _bars([("2026-07-09", 4.8), ("2026-07-10", 4.9), ("2026-07-13", 5.0)])
+    revised = _bars([("2026-07-09", 4.81)])
+    source = _FakeSource([original, revised])
+    MarketDataStore(tmp_path, source=source).sync_assets([ASSET], None, None, fetch=True)
+    MarketDataStore(tmp_path, source=source).sync_assets([ASSET], "2026-07-09", "2026-07-10", fetch=True)
+    stored = pd.read_csv(tmp_path / "510300.csv")
+    assert stored["trade_date"].tolist() == ["2026-07-09", "2026-07-10", "2026-07-13"]
+    assert stored["close"].tolist() == [4.81, 4.9, 5.0]
+
+
+def test_csv_replace_failure_preserves_old_file_and_cleans_temp(tmp_path: Path, monkeypatch):
+    path = tmp_path / "prices.csv"
+    original = b"trade_date,close\r\n2026-07-09,4.8\r\n"
+    path.write_bytes(original)
+
+    def fail_replace(self, target):
+        raise OSError("disk error")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError, match="disk error"):
+        write_csv_stable(path, pd.DataFrame({"trade_date": ["2026-07-10"], "close": [4.9]}))
+    assert path.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize("field,value", [("close", 0), ("close", float("inf")), ("adjust_factor", float("inf"))])
+def test_invalid_provider_values_do_not_overwrite_valid_history(tmp_path, field, value):
+    original = _bars([("2026-07-09", 4.8)])
+    bad = original.copy()
+    bad[field] = value
+    source = _FakeSource([original, bad])
+    MarketDataStore(tmp_path, source=source).sync_assets([ASSET], None, None, fetch=True)
+    path = tmp_path / "510300.csv"
+    before = path.read_bytes()
+    with pytest.raises(ValueError):
+        MarketDataStore(tmp_path, source=source).sync_assets([ASSET], None, None, fetch=True)
+    assert path.read_bytes() == before
 
 
 def test_validate_split_against_prices(tmp_path: Path):

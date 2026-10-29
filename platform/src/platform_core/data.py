@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
+from math import isfinite
 from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
 
+from src.platform_core.data_store import DataQualityReport, validate_market_dates
 from src.platform_core.models import Asset, Bar, parse_date
 
 
@@ -18,14 +19,6 @@ PRICE_COLUMNS = {
     "volume": ["volume", "vol"],
     "amount": ["amount", "turnover"],
 }
-
-
-@dataclass
-class DataQualityReport:
-    notes: list[str] = field(default_factory=list)
-
-    def add(self, message: str) -> None:
-        self.notes.append(message)
 
 
 def _first_column(frame: pd.DataFrame, candidates: list[str]) -> str | None:
@@ -41,10 +34,6 @@ class LocalCsvBarData:
         self.assets = {asset.asset_id: asset for asset in assets}
         self.start_date = parse_date(start_date) if start_date else None
         self.end_date = parse_date(end_date) if end_date else None
-        if self.start_date and hasattr(self.start_date, "date"):
-            self.start_date = self.start_date.date()
-        if self.end_date and hasattr(self.end_date, "date"):
-            self.end_date = self.end_date.date()
         self.quality = DataQualityReport()
         self.real_bar_dates: dict[str, list[date]] = {}
         self.frames = self._load_frames()
@@ -66,6 +55,18 @@ class LocalCsvBarData:
             return pd.DataFrame()
         return df.loc[df.index <= end_date, valid_cols].dropna()
 
+    def extend_calendar(self) -> None:
+        """用已知后续交易日或下一工作日补齐边界，避免每日运行都被判成月末。"""
+        if not self.calendar:
+            return
+        last = self.calendar[-1]
+        following = min((day for dates in self.real_bar_dates.values() for day in dates if day > last), default=None)
+        if following is None:
+            following = last + timedelta(days=1)
+            while following.weekday() >= 5:
+                following += timedelta(days=1)
+        self.calendar.append(following)
+
     def _load_frames(self) -> dict[str, pd.DataFrame]:
         frames: dict[str, pd.DataFrame] = {}
         for asset in self.assets.values():
@@ -77,27 +78,23 @@ class LocalCsvBarData:
                 raise ValueError(f"`trade_date` column is required in {path}")
 
             raw["trade_date"] = pd.to_datetime(raw["trade_date"]).dt.date
-            
-            # 校验数据陈旧性（距当前日期不能超过一周，即 7 天；单元测试 pytest 下跳过校验）
-            import sys
-            if "pytest" not in sys.modules:
-                from datetime import date
-                today = date.today()
-                max_date = raw["trade_date"].max()
-                if max_date is not None and (today - max_date).days > 7:
-                    raise RuntimeError(
-                        f"Stale data for {asset.asset_id} in {path}: latest date is {max_date}, which is older than 7 days from today ({today})."
-                    )
+            raw = raw.sort_values("trade_date").reset_index(drop=True)
+            if raw["trade_date"].duplicated().any():
+                raise ValueError(f"Duplicate trade_date rows in {path}")
             factor_col = _first_column(raw, ["hfq_factor", "adjust_factor", "qfq_factor"])
             sidecar_factor = self._sidecar_hfq_factor(asset, raw["trade_date"])
             if not isinstance(sidecar_factor, float):
                 factor = sidecar_factor
-                self.quality.add(f"{asset.asset_id}: using sidecar HFQ factor.")
+                self.quality.notes.append(f"{asset.asset_id}: using sidecar HFQ factor.")
             elif factor_col:
                 factor = raw[factor_col].fillna(1.0)
             else:
                 factor = 1.0
-                self.quality.add(f"{asset.asset_id}: no adjustment factor column or sidecar; using raw prices.")
+                self.quality.notes.append(f"{asset.asset_id}: no adjustment factor column or sidecar; using raw prices.")
+            factor = pd.to_numeric(factor, errors="raise")
+            factor_values = factor if isinstance(factor, pd.Series) else pd.Series([factor])
+            if (factor_values <= 0).any() or not factor_values.map(isfinite).all():
+                raise ValueError(f"Invalid adjustment factors in {path}; factors must be finite and positive.")
 
             normalized = pd.DataFrame({"date": raw["trade_date"]})
             close_col = _first_column(raw, PRICE_COLUMNS["close"])
@@ -105,11 +102,13 @@ class LocalCsvBarData:
                 raise ValueError(f"No close price column found in {path}")
 
             close = pd.to_numeric(raw[close_col], errors="coerce")
+            if (close <= 0).any() or not close.dropna().map(isfinite).all():
+                raise ValueError(f"Invalid close prices in {path}; prices must be finite and positive.")
             for field_name in ["open", "high", "low"]:
                 source = _first_column(raw, PRICE_COLUMNS[field_name])
                 if source is None:
                     normalized[field_name] = close
-                    self.quality.add(f"{asset.asset_id}: missing {field_name}; filled with close.")
+                    self.quality.notes.append(f"{asset.asset_id}: missing {field_name}; filled with close.")
                 else:
                     normalized[field_name] = pd.to_numeric(raw[source], errors="coerce")
             normalized["close"] = close
@@ -124,16 +123,12 @@ class LocalCsvBarData:
                 source = _first_column(raw, PRICE_COLUMNS[field_name])
                 if source is None:
                     normalized[field_name] = 0.0
-                    self.quality.add(f"{asset.asset_id}: missing {field_name}; filled with 0.")
+                    self.quality.notes.append(f"{asset.asset_id}: missing {field_name}; filled with 0.")
                 else:
                     normalized[field_name] = pd.to_numeric(raw[source], errors="coerce").fillna(0.0)
 
             normalized = normalized.sort_values("date").dropna(subset=["close"])
             self.real_bar_dates[asset.asset_id] = normalized["date"].tolist()
-            if self.start_date:
-                normalized = normalized[normalized["date"] >= self.start_date]
-            if self.end_date:
-                normalized = normalized[normalized["date"] <= self.end_date]
 
             previous_close = normalized["close"].shift(1)
             if asset.price_limit_pct is None:
@@ -146,7 +141,13 @@ class LocalCsvBarData:
                 normalized["is_suspended"] = False
             else:
                 normalized["is_suspended"] = normalized["volume"].fillna(0.0) <= 0
+            if self.start_date:
+                normalized = normalized[normalized["date"] >= self.start_date]
+            if self.end_date:
+                normalized = normalized[normalized["date"] <= self.end_date]
             frames[asset.asset_id] = normalized.set_index("date", drop=False)
+        validate_market_dates({asset_id: dates[-1] if dates else None
+                               for asset_id, dates in self.real_bar_dates.items()}, date.today())
         return frames
 
     def _sidecar_hfq_factor(self, asset: Asset, trade_dates: pd.Series) -> pd.Series | float:
@@ -155,11 +156,12 @@ class LocalCsvBarData:
             return 1.0
         factor_frame = pd.read_csv(path)
         if "trade_date" not in factor_frame.columns or "hfq_factor" not in factor_frame.columns:
-            self.quality.add(f"{asset.asset_id}: invalid sidecar HFQ factor file; using raw prices.")
-            return 1.0
+            raise ValueError(f"Invalid sidecar HFQ factor file: {path}")
         factor_frame["trade_date"] = pd.to_datetime(factor_frame["trade_date"]).dt.date
-        factor_by_date = factor_frame.set_index("trade_date")["hfq_factor"]
-        return trade_dates.map(factor_by_date).ffill().fillna(1.0)
+        if factor_frame["trade_date"].isna().any() or factor_frame["trade_date"].duplicated().any():
+            raise ValueError(f"Missing or duplicate HFQ factor dates: {path}")
+        factor_by_date = factor_frame.set_index("trade_date")["hfq_factor"].sort_index().ffill()
+        return factor_by_date.reindex(trade_dates, method="ffill").reset_index(drop=True).fillna(1.0)
 
     def _build_calendar(self) -> list[date]:
         dates = set()
@@ -206,9 +208,6 @@ class LocalCsvBarData:
                     adj_close=adj_close,
                 )
         return bars
-
-    def prices_on(self, current_date: date) -> dict[str, float]:
-        return {asset_id: bar.close for asset_id, bar in self.bars_on(current_date).items()}
 
     def first_bar_date_after(self, asset_id: str, after_date: date) -> date | None:
         """该资产在 after_date 之后第一个有真实行情行的日期。

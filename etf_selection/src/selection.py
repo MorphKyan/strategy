@@ -7,7 +7,7 @@ import math
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,18 +27,12 @@ class CandidateData:
     amount: pd.Series
     volume: pd.Series
     factor_source: str
-    raw_df: pd.DataFrame = None
-
-
-def load_yaml(path: str | Path) -> dict[str, Any]:
-    with Path(path).open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
 
 
 def write_yaml(path: str | Path, payload: dict[str, Any]) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
+    with path.open("x", encoding="utf-8") as handle:
         yaml.safe_dump(payload, handle, allow_unicode=True, sort_keys=False)
 
 
@@ -56,10 +50,6 @@ def sample_split(config: dict[str, Any]) -> tuple[pd.Timestamp, pd.Timestamp]:
     if test_start <= train_end:
         raise ValueError("selection.test_start_date must be later than selection.train_end_date.")
     return train_end, test_start
-
-
-def until_train(series: pd.Series, train_end: pd.Timestamp) -> pd.Series:
-    return series[series.index <= train_end]
 
 
 def first_column(frame: pd.DataFrame, candidates: list[str]) -> str | None:
@@ -88,15 +78,22 @@ def load_adjusted_price(data_dir: str | Path, candidate: dict[str, Any], allow_r
         raise ValueError(f"close column not found: {price_path}")
 
     raw["trade_date"] = pd.to_datetime(raw["trade_date"])
+    raw = raw.sort_values("trade_date").reset_index(drop=True)
+    if raw["trade_date"].isna().any() or raw["trade_date"].duplicated().any():
+        raise ValueError(f"missing or duplicate trade_date: {price_path}")
     close = pd.to_numeric(raw[close_col], errors="coerce")
+    if not close.map(lambda value: math.isfinite(value) and value > 0).all():
+        raise ValueError(f"close prices must be finite and positive: {price_path}")
 
     factor_source = "none"
     if factor_path.exists():
         factor_frame = pd.read_csv(factor_path)
         if {"trade_date", "hfq_factor"}.issubset(factor_frame.columns):
             factor_frame["trade_date"] = pd.to_datetime(factor_frame["trade_date"])
-            factor_map = factor_frame.set_index("trade_date")["hfq_factor"]
-            factor = raw["trade_date"].map(factor_map).ffill().fillna(1.0)
+            if factor_frame["trade_date"].isna().any() or factor_frame["trade_date"].duplicated().any():
+                raise ValueError(f"missing or duplicate HFQ factor dates: {factor_path}")
+            factor_map = factor_frame.set_index("trade_date")["hfq_factor"].sort_index().ffill()
+            factor = factor_map.reindex(raw["trade_date"], method="ffill").reset_index(drop=True).fillna(1.0)
             factor_source = "sidecar_hfq"
         else:
             raise ValueError(f"invalid HFQ factor file: {factor_path}")
@@ -116,11 +113,28 @@ def load_adjusted_price(data_dir: str | Path, candidate: dict[str, Any], allow_r
     amount = pd.to_numeric(raw[amount_col], errors="coerce").fillna(0.0) if amount_col else pd.Series(0.0, index=raw.index)
     volume = pd.to_numeric(raw[volume_col], errors="coerce").fillna(0.0) if volume_col else pd.Series(0.0, index=raw.index)
 
-    adjusted_values = pd.to_numeric(close, errors="coerce").to_numpy() * pd.Series(factor).to_numpy()
+    factor = pd.to_numeric(factor, errors="raise")
+    if not pd.Series(factor).map(lambda value: math.isfinite(value) and value > 0).all():
+        raise ValueError(f"HFQ factors must be finite and positive: {price_path}")
+    adjusted_values = close.to_numpy() * pd.Series(factor).to_numpy()
     adjusted = pd.Series(adjusted_values, index=raw["trade_date"], name=code).sort_index().dropna()
     amount = pd.Series(amount.to_numpy(), index=raw["trade_date"], name=code).sort_index().reindex(adjusted.index).fillna(0.0)
     volume = pd.Series(volume.to_numpy(), index=raw["trade_date"], name=code).sort_index().reindex(adjusted.index).fillna(0.0)
-    return CandidateData(meta=dict(candidate), price=adjusted, amount=amount, volume=volume, factor_source=factor_source, raw_df=raw)
+    return CandidateData(meta=dict(candidate), price=adjusted, amount=amount, volume=volume, factor_source=factor_source)
+
+
+def load_observable_premium(data_dir: str | Path, code: str, asof: pd.Timestamp) -> pd.DataFrame:
+    script = Path(__file__).resolve().parents[2] / "platform/scripts/read_etf_premium.py"
+    command = [sys.executable, str(script), "--data-dir", str(Path(data_dir).resolve()),
+               "--codes", code, "--asof-date", asof.strftime("%Y-%m-%d")]
+    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", check=False)
+    if result.returncode:
+        raise ValueError(f"QDII 溢价读取失败: {code}；请检查行情及 etf_nav/{code}.csv 后重试。")
+    frame = pd.DataFrame(json.loads(result.stdout)[code])
+    if len(frame) < 2 or "cum_nav" not in frame:
+        raise ValueError(f"QDII 缺少可观测溢价或累计净值历史: {code}")
+    frame["trade_date"] = pd.to_datetime(frame["trade_date"])
+    return frame.set_index("trade_date")
 
 
 def normalize(values: pd.Series) -> pd.Series:
@@ -156,8 +170,13 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
     data_dir = paths.get("data_dir", "platform/data")
     min_history_years = float(selection.get("min_history_years", 3))
     train_end, test_start = sample_split(config)
+    qdii_codes = {str(item["code"]) for item in config.get("candidates", []) if item.get("include", True)
+                 and (item.get("sleeve") == "qdii" or str(item["code"]).startswith("513")
+                      or str(item["code"]) in {"159920", "159941"})}
     candidates: dict[str, CandidateData] = {}
     rows: list[dict[str, Any]] = []
+    latest_dates: dict[str, pd.Timestamp] = {}
+    oldest_allowed = pd.Timestamp(date.today()) - pd.Timedelta(days=7)
 
     for item in config.get("candidates", []):
         if not item.get("include", True):
@@ -165,10 +184,15 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
         code = str(item["code"])
         try:
             data = load_adjusted_price(data_dir, item, allow_raw_prices=allow_raw_prices)
-            candidates[code] = data
-            train_price = until_train(data.price, train_end)
-            train_amount = until_train(data.amount, train_end)
-            train_volume = until_train(data.volume, train_end)
+            latest = data.price.index.max()
+            if pd.isna(latest) or latest < oldest_allowed or latest > pd.Timestamp(date.today()):
+                raise RuntimeError(f"行情过期或无有效行情，需同步全部候选后重试: {code}={latest}")
+            latest_dates[code] = latest
+            if len(set(latest_dates.values())) != 1:
+                raise RuntimeError(f"候选行情未对齐，需同步全部候选后重试: {latest_dates}")
+            train_price = data.price.loc[:train_end]
+            train_amount = data.amount.loc[:train_end]
+            train_volume = data.volume.loc[:train_end]
             returns = train_price.pct_change().dropna()
             observations = len(train_price)
             history_years = observations / 252
@@ -178,33 +202,32 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
             eligible = history_years >= min_history_years
             reason = "" if eligible else f"history_years<{min_history_years}"
 
-            import numpy as np
-            premium_std = np.nan
-            holding_cost = np.nan
-            if item["sleeve"] == "qdii":
-                df = data.raw_df
-                if df is not None and "nav" in df.columns and "acc_nav" in df.columns:
-                    df = df.copy()
-                    df = df[pd.to_datetime(df["trade_date"]) <= train_end]
-                    df['premium'] = df['close'] / df['nav'] - 1
-                    premium_std = float(df['premium'].std())
-                    ter = float(item.get("ter", 0.006))
-                    if "index_close" in df.columns and "fx_rate" in df.columns:
-                        r_nav = np.log(df['acc_nav'] / df['acc_nav'].shift(1))
-                        r_idx_rmb = np.log((df['index_close'] * df['fx_rate']) / (df['index_close'].shift(1) * df['fx_rate'].shift(1)))
-                        td = float((r_nav - r_idx_rmb).dropna().mean() * 252)
-                        holding_cost = ter + abs(td)
-                    else:
-                        holding_cost = ter
-                else:
-                    premium_std = 0.02
-                    holding_cost = float(item.get("ter", 0.006))
+            premium_metrics = {"is_qdii": code in qdii_codes, "premium_std": None, "expense_ratio": None}
+            if code in qdii_codes:
+                history = load_observable_premium(data_dir, code, train_end)
+                market_price = data.price.reindex(history.index)
+                if market_price.isna().any():
+                    raise ValueError(f"QDII 调整后价格与可观测净值未对齐: {code}")
+                if "ter" not in item or not math.isfinite(float(item["ter"])) or float(item["ter"]) < 0:
+                    raise ValueError(f"QDII 需要明确的非负年费率 ter: {code}")
+                intervals = len(history) - 1
+                premium_metrics.update({
+                    "premium_std": float(history["premium"].std()),
+                    "expense_ratio": float(item["ter"]),
+                    "premium_window_start": history.index[0].strftime("%Y-%m-%d"),
+                    "premium_observed_date": history.index[-1].strftime("%Y-%m-%d"),
+                    "premium_start": float(history["premium"].iloc[0]),
+                    "premium_end": float(history["premium"].iloc[-1]),
+                    "market_annualized_return": float((market_price.iloc[-1] / market_price.iloc[0]) ** (252 / intervals) - 1),
+                    "nav_annualized_return": float((history["cum_nav"].iloc[-1] / history["cum_nav"].iloc[0]) ** (252 / intervals) - 1),
+                })
 
             rows.append(
                 {
                     "code": code,
                     "asset_id": item["asset_id"],
                     "name": item.get("name", code),
+                    "asset_type": item.get("asset_type", "etf"),
                     "sleeve": item["sleeve"],
                     "subtype": item.get("subtype", ""),
                     "start_date": train_price.index.min().strftime("%Y-%m-%d") if observations else None,
@@ -221,17 +244,19 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
                     "factor_source": data.factor_source,
                     "eligible": eligible,
                     "reject_reason": reason,
-                    "premium_std": premium_std,
-                    "holding_cost": holding_cost,
+                    **premium_metrics,
                 }
             )
-        except Exception as exc:
+            candidates[code] = data
+        except (OSError, ValueError) as exc:
             rows.append(
                 {
                     "code": code,
                     "asset_id": item.get("asset_id", code),
                     "name": item.get("name", code),
+                    "asset_type": item.get("asset_type", "etf"),
                     "sleeve": item.get("sleeve", ""),
+                    "is_qdii": code in qdii_codes,
                     "subtype": item.get("subtype", ""),
                     "eligible": False,
                     "reject_reason": str(exc),
@@ -241,13 +266,16 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
     frame = pd.DataFrame(rows)
     if frame.empty:
         return frame, {}, candidates
+    if not candidates:
+        frame["sleeve_score"] = 0.0
+        return frame, {}, candidates
 
     eligible_frame = frame[frame["eligible"] == True].copy()
     sleeve_corrs: dict[str, pd.DataFrame] = {}
     frame["peer_representative_corr"] = 0.0
     for sleeve, group in eligible_frame.groupby("sleeve"):
         codes = group["code"].tolist()
-        prices = pd.concat([until_train(candidates[code].price, train_end) for code in codes], axis=1, join="inner")
+        prices = pd.concat([candidates[code].price.loc[:train_end] for code in codes], axis=1, join="inner")
         matrix = corr_matrix(prices)
         sleeve_corrs[str(sleeve)] = matrix
         for code in codes:
@@ -280,17 +308,16 @@ def screen_sleeves(config: dict[str, Any], allow_raw_prices: bool = False) -> tu
         + float(weights.get("volatility_sanity", 0.15)) * frame["volatility_sanity_score"]
     )
     
-    qdii_mask = frame["sleeve"] == "qdii"
+    qdii_mask = (frame["sleeve"] == "qdii") & (frame["eligible"] == True)
     if qdii_mask.any():
         qdii_group = frame[qdii_mask].copy()
-        import numpy as np
-        cost_score = 1.0 - normalize(qdii_group["holding_cost"])
+        cost_score = 1.0 - normalize(qdii_group["expense_ratio"])
         premium_std_score = 1.0 - normalize(qdii_group["premium_std"])
         liquidity_score = normalize(qdii_group["avg_amount_252d"].fillna(0).map(lambda x: math.log1p(float(x))))
         history_score = qdii_group["history_years"].fillna(0).clip(upper=10) / 10.0
         
         qdii_weights = selection.get("scoring", {}).get("sleeve_qdii", {})
-        w_cost = float(qdii_weights.get("holding_cost", 0.30))
+        w_cost = float(qdii_weights.get("expense_ratio", 0.30))
         w_premium = float(qdii_weights.get("premium_std", 0.30))
         w_liquidity = float(qdii_weights.get("liquidity", 0.30))
         w_history = float(qdii_weights.get("history", 0.10))
@@ -329,6 +356,8 @@ def build_baskets(
     ranking: pd.DataFrame,
     candidates: dict[str, CandidateData],
 ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], list[list[str]]]:
+    if ranking.empty:
+        return pd.DataFrame(), {}, []
     selection = config.get("selection", {})
     top_k = int(selection.get("top_k_per_sleeve", 3))
     max_baskets = int(selection.get("max_baskets", 20))
@@ -354,11 +383,11 @@ def build_baskets(
 
     rows: list[dict[str, Any]] = []
     corr_by_basket: dict[str, pd.DataFrame] = {}
-    basket_codes: list[list[str]] = []
     basket_weights = selection.get("scoring", {}).get("basket", {})
+    scores_by_code = ranking.set_index("code")["sleeve_score"]
     for index, option_tuple in enumerate(itertools.product(*(options_by_sleeve[sleeve] for sleeve in required_sleeves)), start=1):
         codes = list(dict.fromkeys(itertools.chain.from_iterable(option_tuple)))
-        prices = pd.concat([until_train(candidates[code].price, train_end) for code in codes], axis=1, join="inner")
+        prices = pd.concat([candidates[code].price.loc[:train_end] for code in codes], axis=1, join="inner")
         if prices.empty:
             continue
         returns = prices.pct_change().dropna()
@@ -374,27 +403,27 @@ def build_baskets(
         weights = inv_vol / inv_vol.sum() if len(inv_vol) else pd.Series(dtype=float)
         hhi = float((weights**2).sum()) if len(weights) else 1.0
         common_years = len(prices) / 252
-        if common_years <= min_common_history_years:
+        if common_years < min_common_history_years:
             continue
-        liquidity = float(pd.Series([until_train(candidates[code].amount, train_end).tail(252).mean() for code in codes]).mean())
-        sleeve_scores = ranking.set_index("code").loc[codes, "sleeve_score"].mean()
+        liquidity = float(pd.Series([candidates[code].amount.loc[:train_end].tail(252).mean() for code in codes]).mean())
+        sleeve_scores = scores_by_code.loc[codes].mean()
         history_score = min(common_years / 10.0, 1.0)
         corr_score = 1 - min(avg_abs_corr, 1.0)
         concentration_score = 1 - min(hhi, 1.0)
         liquidity_score = min(math.log1p(liquidity) / 25.0, 1.0)
-        sleeve_coverage_score = len(required_sleeves) / len(required_sleeves)
         score = (
             float(basket_weights.get("common_history", 0.30)) * history_score
             + float(basket_weights.get("cross_correlation", 0.30)) * corr_score
             + float(basket_weights.get("concentration", 0.20)) * concentration_score
             + float(basket_weights.get("liquidity", 0.10)) * liquidity_score
-            + float(basket_weights.get("sleeve_coverage", 0.10)) * sleeve_coverage_score
+            + float(basket_weights.get("sleeve_coverage", 0.10))
         )
         rows.append(
             {
                 "basket_id": f"basket_{index}",
                 "codes": ",".join(codes),
                 "asset_ids": ",".join(candidates[code].meta["asset_id"] for code in codes),
+                "research_simulation": any(candidates[code].meta.get("asset_type") == "index" for code in codes),
                 "common_start": prices.index.min().strftime("%Y-%m-%d"),
                 "common_end": prices.index.max().strftime("%Y-%m-%d"),
                 "train_end_date": train_end.strftime("%Y-%m-%d"),
@@ -410,8 +439,8 @@ def build_baskets(
                 "inverse_vol_weights": json.dumps({code: float(weights.get(code, 0.0)) for code in codes}, ensure_ascii=False),
             }
         )
-        basket_codes.append(codes)
-
+    if not rows:
+        return pd.DataFrame(), {}, []
     basket_frame = pd.DataFrame(rows).sort_values("basket_score", ascending=False).head(max_baskets)
     keep_ids = set(basket_frame["basket_id"].tolist()) if not basket_frame.empty else set()
     corr_by_basket = {key: value for key, value in corr_by_basket.items() if key in keep_ids}
@@ -420,6 +449,7 @@ def build_baskets(
 
 
 def platform_asset(meta: dict[str, Any]) -> dict[str, Any]:
+    is_etf = meta.get("asset_type", "etf") == "etf"
     return {
         "asset_id": meta["asset_id"],
         "code": str(meta["code"]),
@@ -427,8 +457,8 @@ def platform_asset(meta: dict[str, Any]) -> dict[str, Any]:
         "asset_type": meta.get("asset_type", "etf"),
         "exchange": meta.get("exchange", "SH"),
         "currency": meta.get("currency", "CNY"),
-        "lot_size": int(meta.get("lot_size", 100)),
-        "price_limit_pct": float(meta.get("price_limit_pct", 0.10)),
+        "lot_size": meta.get("lot_size", 100 if is_etf else 1),
+        "price_limit_pct": meta.get("price_limit_pct", 0.10 if is_etf else None),
     }
 
 
@@ -440,14 +470,12 @@ def generate_platform_configs(
 ) -> list[Path]:
     if basket_frame.empty:
         return []
-    base_config = load_yaml(base_config_path)
+    base_config = yaml.safe_load(Path(base_config_path).read_text(encoding="utf-8"))
     output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=False)
     paths: list[Path] = []
     for _, row in basket_frame.iterrows():
         codes = row["codes"].split(",")
-        if float(row.get("common_history_years", 0.0)) <= 3.0:
-            continue
         config = copy.deepcopy(base_config)
         config.setdefault("platform", {})["run_name"] = f"platform_basket_{'_'.join(codes)}"
         config["assets"] = [platform_asset(candidates[code].meta) for code in codes]
@@ -455,12 +483,12 @@ def generate_platform_configs(
         backtest_config = config.setdefault("backtest", {})
         backtest_config["start_date"] = start_date
         backtest_config["end_date"] = row.get("train_end_date", DEFAULT_TRAIN_END_DATE)
-        for segment in config.setdefault("strategies", {}).setdefault("segments", []):
-            segment["start_date"] = start_date
-            segment.setdefault("params", {})["universe"] = [candidates[code].meta["asset_id"] for code in codes]
+        config["strategy"].setdefault("params", {})["universe"] = [candidates[code].meta["asset_id"] for code in codes]
         config["selection_metadata"] = {
             "basket_id": row["basket_id"],
             "codes": codes,
+            "non_tradable_indices": [candidates[code].meta["asset_id"] for code in codes
+                                     if candidates[code].meta.get("asset_type") == "index"],
             "sample_split": {
                 "train_end_date": row.get("train_end_date", DEFAULT_TRAIN_END_DATE),
                 "test_start_date": row.get("test_start_date", DEFAULT_TEST_START_DATE),
@@ -488,6 +516,7 @@ def write_report(
 ) -> None:
     output_dir = Path(output_dir)
     train_end, test_start = sample_split(config or {})
+    output_dir.mkdir(parents=True, exist_ok=False)
     corr_dir = output_dir / "correlations"
     corr_dir.mkdir(parents=True, exist_ok=True)
     ranking.to_csv(output_dir / "sleeve_rankings.csv", index=False)
@@ -516,9 +545,13 @@ def write_report(
         "- 商品袖子优先使用宽基商品 ETF；如果没有合格宽基商品 ETF，可以使用多个单商品 ETF。",
         f"- ETF 筛选、相关性、流动性和篮子评分只使用训练样本，训练样本截止：`{train_end.strftime('%Y-%m-%d')}`。",
         f"- `{test_start.strftime('%Y-%m-%d')}`（含）之后数据保留为最终测试样本，不参与筛选和打分。",
+        "- QDII 溢价经平台发布滞后保护，最近两个交易日的观测不参与评分；年费率仅为披露费率，不代表实际持有成本。",
+        "- QDII 市场价/净值年化收益与端点溢价使用同一可观测配对区间；短样本年化仅作描述，不能视为可执行收益预测。",
         "",
-        "## 袖子内排名",
     ]
+    if "asset_type" in ranking and (ranking["asset_type"] == "index").any():
+        lines.append("- 含发布指数的篮子仅为研究模拟；指数不可直接交易，其成交或流动性不能作为可执行容量证据。")
+    lines.extend(["", "## 袖子内排名"])
     if ranking.empty:
         lines.append("- 没有可评估 ETF。")
     else:
@@ -526,21 +559,24 @@ def write_report(
             lines.append(f"### {sleeve}")
             for _, row in group.sort_values("sleeve_score", ascending=False).iterrows():
                 status = "eligible" if row.get("eligible") else f"rejected: {row.get('reject_reason')}"
-                if sleeve == "qdii":
+                lines.append(
+                    f"- `{row['code']}` {row.get('name', '')} | score={float(row.get('sleeve_score', 0)):.4f} | history={float(row.get('history_years', 0)):.2f}y | peer_corr={float(row.get('peer_representative_corr', 0)):.4f} | {status}"
+                )
+                if row.get("is_qdii") and row.get("eligible"):
                     lines.append(
-                        f"- `{row['code']}` {row.get('name', '')} | score={float(row.get('sleeve_score', 0)):.4f} | history={float(row.get('history_years', 0)):.2f}y | cost={float(row.get('holding_cost', 0.0)):.4f} | premium_std={float(row.get('premium_std', 0.0)):.4f} | {status}"
-                    )
-                else:
-                    lines.append(
-                        f"- `{row['code']}` {row.get('name', '')} | score={float(row.get('sleeve_score', 0)):.4f} | history={float(row.get('history_years', 0)):.2f}y | peer_corr={float(row.get('peer_representative_corr', 0)):.4f} | {status}"
+                        f"  - QDII 配对区间 `{row['premium_window_start']}` ~ `{row['premium_observed_date']}`："
+                        f"市场价年化={row['market_annualized_return']:.2%}，净值年化={row['nav_annualized_return']:.2%}，"
+                        f"起止溢价={row['premium_start']:.2%} / {row['premium_end']:.2%}，"
+                        f"溢价标准差={row['premium_std']:.2%}，披露年费率={row['expense_ratio']:.2%}。"
                     )
     lines.extend(["", "## 候选篮子"])
     if basket_frame.empty:
         lines.append("- 未生成候选篮子。通常原因是某个必需袖子没有合格 ETF，尤其是商品袖子缺少宽基或单商品候选。")
     else:
         for _, row in basket_frame.iterrows():
+            kind = "研究模拟（含不可交易指数）" if row.get("research_simulation", False) else "ETF 候选篮子"
             lines.append(
-                f"- `{row['basket_id']}` {row['codes']} | score={float(row['basket_score']):.4f} | corr={float(row['avg_abs_corr']):.4f} | hhi={float(row['inverse_vol_hhi']):.4f}"
+                f"- `{row['basket_id']}` {row['codes']} | {kind} | score={float(row['basket_score']):.4f} | corr={float(row['avg_abs_corr']):.4f} | hhi={float(row['inverse_vol_hhi']):.4f}"
             )
     if generated_configs:
         lines.extend(["", "## 生成的平台配置"])
@@ -548,26 +584,31 @@ def write_report(
     (output_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def run_platform_experiments(config_paths: list[Path], platform_script: str | Path, repo_root: str | Path) -> list[dict[str, Any]]:
+def run_platform_validation(config_paths: list[Path], platform_script: str | Path, repo_root: str | Path) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     repo_root = Path(repo_root)
     for config_path in config_paths:
-        command = [
-            sys.executable,
-            str(repo_root / platform_script),
-            "--config",
-            str(config_path),
-            "--baseline-config",
-            "configs/baseline_r1_domestic_rolling.yaml",
+        backtest = yaml.safe_load(config_path.read_text(encoding="utf-8")).get("backtest", {})
+        if not backtest.get("start_date") or not backtest.get("end_date"):
+            raise ValueError(f"平台验证需要明确的样本起止日期: {config_path}")
+        window = ["--start-date", str(backtest["start_date"]), "--end-date", str(backtest["end_date"]),
+                  "--slippage-scenario", "standard"]
+        baseline = "configs/domestic_rolling_bond_10y.yaml"
+        sensitivity_script = (repo_root / platform_script).with_name("run_sensitivity.py")
+        jobs = [
+            ("experiment", [sys.executable, str(repo_root / platform_script), "--config", str(config_path),
+                            "--baseline-config", baseline]),
+            ("candidate_sensitivity", [sys.executable, str(sensitivity_script), "--config", str(config_path),
+                                       "--calendar-month-step", "2"]),
+            ("baseline_sensitivity", [sys.executable, str(sensitivity_script), "--config", baseline,
+                                      "--calendar-month-step", "2"]),
         ]
-        completed = subprocess.run(command, cwd=repo_root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
-        results.append(
-            {
-                "config": str(config_path),
-                "command": command,
-                "returncode": completed.returncode,
-                "stdout": completed.stdout,
-                "stderr": completed.stderr,
-            }
-        )
+        for phase, command in jobs:
+            command += window
+            completed = subprocess.run(command, cwd=repo_root, capture_output=True, text=True,
+                                       encoding="utf-8", errors="replace", check=False)
+            results.append({"config": str(config_path), "phase": phase, "command": command,
+                            "returncode": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr})
+            if completed.returncode:
+                return results
     return results
