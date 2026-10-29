@@ -268,10 +268,6 @@ def read_run_table(run_dir: Path, name: str) -> pd.DataFrame:
     return frame
 
 
-def read_run_tables(run_dir: Path) -> dict[str, pd.DataFrame]:
-    return {name: read_run_table(run_dir, name) for name in ("nav", "positions", "orders", "skipped_orders", "trades")}
-
-
 def nav_analytics(nav: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """从 nav.csv 派生多尺度收益视图所需的全部数据框。
 

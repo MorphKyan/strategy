@@ -141,7 +141,8 @@ def render_sensitivity_charts(summary_csv_path: str | Path, output_dir: str | Pa
     styles = {"default": "-", "stress": "--", "dynamic_participation": "-."}
 
     def plot_metric(row_idx, col_name, title_prefix, scale=1.0, is_pct=False):
-        data_all = df[col_name].dropna() * scale
+        valid = df.dropna(subset=[col_name])
+        data_all = valid[col_name] * scale
         if data_all.empty:
             return
         
@@ -156,14 +157,14 @@ def render_sensitivity_charts(summary_csv_path: str | Path, output_dir: str | Pa
         # Line
         if "slippage_scenario" in df.columns and len(scenarios) > 1:
             for sc in scenarios:
-                sub_df = df[df["slippage_scenario"] == sc]
-                sub_data = sub_df[col_name].dropna() * scale
+                sub_df = valid[valid["slippage_scenario"] == sc]
+                sub_data = sub_df[col_name] * scale
                 c = colors.get(sc, "steelblue")
                 ls = styles.get(sc, "-")
                 axes[row_idx, 1].plot(sub_df["start_date"], sub_data, marker='o', markersize=3, linestyle=ls, alpha=0.85, color=c, label=f"滑点场景: {sc}")
             axes[row_idx, 1].legend(loc="best", fontsize=9)
         else:
-            axes[row_idx, 1].plot(df["start_date"], data_all, marker='o', markersize=4, linestyle='-', alpha=0.7, color=["steelblue", "indianred", "seagreen"][row_idx % 3])
+            axes[row_idx, 1].plot(valid["start_date"], data_all, marker='o', markersize=4, linestyle='-', alpha=0.7, color=["steelblue", "indianred", "seagreen"][row_idx % 3])
 
         axes[row_idx, 1].set_title(f"{title_prefix}随起始日变化" + (" (%)" if is_pct else ""))
         axes[row_idx, 1].set_ylabel(title_prefix + (" (%)" if is_pct else ""))

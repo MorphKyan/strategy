@@ -80,9 +80,10 @@ def test_risk_parity_daily_rebalance_frequency_checks_every_trading_day():
         data = Data()
         runtime = {"rebalance_frequency": "daily"}
 
-    assert RiskParityStrategy._is_rebalance_day(Context())
+    from src.platform_core.strategy import Strategy
+    assert Strategy().should_check_rebalance(Context())
     Context.runtime = {"rebalance_frequency": "quarterly"}
-    assert not RiskParityStrategy._is_rebalance_day(Context())
+    assert not Strategy().should_check_rebalance(Context())
 
 
 def test_fee_profile_applies_minimum_fee():

@@ -265,14 +265,6 @@ class TargetPortfolio:
         if total > 1.0 + 1e-9:
             raise ValueError(f"Target weights cannot exceed 100%; got {total:.6f}")
 
-    @classmethod
-    def equal_weight(cls, asset_ids: list[str]) -> "TargetPortfolio":
-        if not asset_ids:
-            return cls({})
-        weight = 1.0 / len(asset_ids)
-        return cls({asset_id: weight for asset_id in asset_ids})
-
-
 @dataclass
 class Order:
     order_id: str

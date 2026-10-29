@@ -37,7 +37,7 @@ class FixedWeightThresholdStrategy(Strategy):
 
     def initialize(self, context: StrategyContext) -> None:
         context.set_cooldown(int(context.params.get("cooldown_days", 0)))
-        context.set_rebalance_frequency("daily")  # 每日检测（不等于每日交易）
+        context.runtime["rebalance_frequency"] = "daily"  # 每日检测（不等于每日交易）
 
     def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         targets = self._target_weights(context)

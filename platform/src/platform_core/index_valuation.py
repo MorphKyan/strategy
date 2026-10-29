@@ -75,9 +75,6 @@ class IndexValuationStore:
         """CN_ETF:512480.SH -> 512480，与行情 CSV / 映射表的代码列对应。"""
         return asset_id.split(":")[-1].split(".")[0]
 
-    def index_code_for(self, asset_id: str) -> str | None:
-        return self.code_to_index.get(self.asset_code(asset_id))
-
     # ---------------------------------------------------------------- 序列
 
     def load_series(self, index_code: str, metric: str) -> pd.Series:
@@ -94,9 +91,9 @@ class IndexValuationStore:
         frame = pd.read_csv(path, usecols=["trade_date", metric])
         frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce").dt.date
         values = pd.to_numeric(frame[metric], errors="coerce")
-        series = pd.Series(values.values, index=frame["trade_date"].values).dropna().sort_index()
+        series = pd.Series(values.values, index=frame["trade_date"].values).dropna()
         # 同日重复（原始导出偶发）保留最后一条，与 ingest 的去重口径一致
-        series = series[~series.index.duplicated(keep="last")]
+        series = series[~series.index.duplicated(keep="last")].sort_index()
         self._series_cache[key] = series
         return series
 
@@ -115,7 +112,7 @@ class IndexValuationStore:
         指数数据缺口）取最近一个历史观测，不向未来借值。窗口内观测不足或没有任何
         历史时返回 None，由调用方按 min_history 决定是否参与选择。
         """
-        index_code = self.index_code_for(asset_id)
+        index_code = self.code_to_index.get(self.asset_code(asset_id))
         if index_code is None:
             return None
         series = self.load_series(index_code, metric)

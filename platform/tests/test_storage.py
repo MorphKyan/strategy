@@ -20,7 +20,7 @@ def test_json_write_creates_parent_and_replaces_snapshot(tmp_path):
     path = tmp_path / "portfolio" / "state.json"
     write_json(path, {"cash": 100})
     write_json(path, {"cash": 200, "name": "组合"})
-    assert json.loads(path.read_text()) == {"cash": 200, "name": "组合"}
+    assert json.loads(path.read_text(encoding="utf-8")) == {"cash": 200, "name": "组合"}
     assert list(path.parent.iterdir()) == [path]
 
 

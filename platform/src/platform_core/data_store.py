@@ -220,6 +220,8 @@ def normalize_market_frame(raw: pd.DataFrame, source: str) -> tuple[pd.DataFrame
             notes.append(f"missing {target}; filled with 0")
         else:
             out[target] = pd.to_numeric(raw[source_col], errors="coerce").fillna(0.0)
+        if (out[target] < 0).any() or not out[target].map(isfinite).all():
+            raise ValueError(f"Market {target} values must be finite and nonnegative; existing history was preserved.")
     out["adjust_factor"] = factor
     out["source"] = source
     out["updated_at"] = datetime.now().isoformat(timespec="seconds")

@@ -29,6 +29,27 @@ def test_factor_before_first_quote_is_retained_without_borrowing_future_factor(t
     assert data.frames["A"]["adj_close"].tolist() == [20, 20]
 
 
+def test_missing_quote_date_is_rejected_before_calendar_construction(tmp_path):
+    pd.DataFrame({"trade_date": ["2024-01-02", None], "close": 10}).to_csv(tmp_path / "A.csv", index=False)
+    with pytest.raises(ValueError, match="Missing trade_date"):
+        LocalCsvBarData(tmp_path, [Asset("A", "A", "A")])
+
+
+def test_calendar_lookups_keep_strict_split_dates_and_suspended_gap_prices(tmp_path):
+    pd.DataFrame({"trade_date": ["2024-01-30", "2024-02-02"], "close": [10, 20], "volume": 100}).to_csv(
+        tmp_path / "A.csv", index=False)
+    data = LocalCsvBarData(tmp_path, [Asset("A", "A", "A")])
+    assert data.first_bar_date_after("A", date(2024, 1, 29)) == date(2024, 1, 30)
+    assert data.first_bar_date_after("A", date(2024, 1, 30)) == date(2024, 2, 2)
+    assert data.first_bar_date_after("A", date(2024, 2, 2)) is None
+    assert not data.bars_on(date(2024, 1, 29))
+    bar = data.bars_on(date(2024, 1, 31))["A"]
+    assert bar.is_suspended and bar.close == 10
+    assert data.is_month_end(date(2024, 1, 30))
+    assert not data.is_month_end(date(2024, 1, 31))
+    assert not data.is_month_end(date(2024, 2, 3))
+
+
 def test_bounded_window_retains_previous_close_for_first_day_limits(tmp_path):
     pd.DataFrame({"trade_date": ["2024-01-02", "2024-01-03"], "close": [10, 11], "volume": 100}).to_csv(
         tmp_path / "A.csv", index=False)
@@ -65,6 +86,15 @@ def test_backtest_rejects_empty_runtime_window_before_writing_results(tmp_path):
 def test_invalid_close_prices_stop_loading(tmp_path, price):
     pd.DataFrame({"trade_date": ["2024-01-01"], "close": [price]}).to_csv(tmp_path / "A.csv", index=False)
     with pytest.raises(ValueError, match="close"):
+        LocalCsvBarData(tmp_path, [Asset("A", "A", "A")])
+
+
+@pytest.mark.parametrize("field", ["amount", "volume"])
+@pytest.mark.parametrize("value", [-1, float("inf")])
+def test_invalid_liquidity_stops_loading(tmp_path, field, value):
+    pd.DataFrame({"trade_date": ["2024-01-01"], "close": [10], field: [value]}).to_csv(
+        tmp_path / "A.csv", index=False)
+    with pytest.raises(ValueError, match=field):
         LocalCsvBarData(tmp_path, [Asset("A", "A", "A")])
 
 

@@ -3,7 +3,6 @@ PyYAML
 pytest
 matplotlib
 seaborn
-tqdm
 finshare
 streamlit
 plotly

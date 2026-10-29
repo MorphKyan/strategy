@@ -71,17 +71,6 @@ from src.platform_core.live import LivePortfolio
 from src.platform_core.notify import send_notification
 
 
-def build_portfolio(args: argparse.Namespace) -> tuple[LivePortfolio, dict]:
-    config_path = (ROOT / args.config).resolve() if not Path(args.config).is_absolute() else Path(args.config)
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    portfolio_id = args.portfolio or f"live_{config_path.stem}"
-    return LivePortfolio(portfolio_id, config, output_root=args.output_root), config
-
-
-def resolve_holdings_path(raw: str) -> Path:
-    return (ROOT / raw).resolve() if not Path(raw).is_absolute() else Path(raw)
-
-
 def notify_and_report(title: str, text: str, config: dict, portfolio: LivePortfolio | None = None) -> bool:
     mail = {}
     if portfolio is not None and (config.get("notify") or {}).get("daily_charts") and title.startswith("组合日报 "):
@@ -112,7 +101,7 @@ def main() -> int:
     common.add_argument("--output-root", help="Override results/live_portfolios root (mainly for tests).")
 
     p_reconcile = sub.add_parser("reconcile", parents=[common], help="Overwrite state from real holdings CSV.")
-    p_reconcile.add_argument("--holdings", required=True, help="CSV with header code,quantity[,cost_basis].")
+    p_reconcile.add_argument("--holdings", type=Path, required=True, help="CSV with header code,quantity[,cost_basis].")
     p_reconcile.add_argument("--cash", required=True, type=float, help="Real account cash balance.")
     p_reconcile.add_argument(
         "--external-flow",
@@ -133,7 +122,7 @@ def main() -> int:
     p_amend.add_argument("--external-flow", required=True, type=float, help="该日正确的申赎金额（申购为正、赎回为负）。")
 
     p_cycle = sub.add_parser("cycle", parents=[common], help="sync -> [reconcile] -> plan -> [notify]; skips non-trading days.")
-    p_cycle.add_argument("--holdings", help="Optional holdings CSV; omit to plan from the last reconciled state.")
+    p_cycle.add_argument("--holdings", type=Path, help="Optional holdings CSV; omit to plan from the last reconciled state.")
     p_cycle.add_argument("--cash", type=float, help="Real cash balance, required together with --holdings.")
     p_cycle.add_argument(
         "--external-flow",
@@ -147,11 +136,14 @@ def main() -> int:
     p_cycle.add_argument("--shadow", help="Shadow sim portfolio id to advance to the plan date (for monthly attribution).")
 
     args = parser.parse_args()
-    portfolio, config = build_portfolio(args)
+    config_path = (ROOT / args.config).resolve() if not Path(args.config).is_absolute() else Path(args.config)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    portfolio_id = args.portfolio or f"live_{config_path.stem}"
+    portfolio = LivePortfolio(portfolio_id, config, output_root=args.output_root)
 
     if args.command == "reconcile":
         result = portfolio.reconcile(
-            resolve_holdings_path(args.holdings),
+            ROOT / args.holdings,
             cash=args.cash,
             asof_date=args.asof_date,
             external_flow=args.external_flow,
@@ -187,7 +179,7 @@ def main() -> int:
         return 0
 
     # cycle
-    holdings = resolve_holdings_path(args.holdings) if args.holdings else None
+    holdings = ROOT / args.holdings if args.holdings else None
     notifier = (lambda title, text: notify_and_report(title, text, config, portfolio)) if args.notify else None
     result = portfolio.cycle(
         asof_date=args.asof_date,

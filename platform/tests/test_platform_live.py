@@ -754,7 +754,7 @@ def test_mark_to_market_freezes_history_once_newer_row_exists(tmp_path: Path):
     assert result["written"] is True
 
 
-def test_historical_valuation_uses_frozen_cash_and_excludes_future_deposits(tmp_path: Path):
+def test_historical_valuation_uses_frozen_cash_and_excludes_future_deposits(tmp_path: Path, monkeypatch):
     portfolio = _make_portfolio(tmp_path)
     holdings = _write_holdings(tmp_path / "h.csv", [])
     portfolio.reconcile(holdings, cash=10000, asof_date="2024-01-29")
@@ -762,6 +762,7 @@ def test_historical_valuation_uses_frozen_cash_and_excludes_future_deposits(tmp_
     _write_holdings(holdings, ["AAA,300,10"])
     portfolio.reconcile(holdings, cash=17000, asof_date="2024-01-31", external_flow=10000)
     state_before, nav_before = portfolio.state_path.read_bytes(), portfolio.real_nav_path.read_bytes()
+    monkeypatch.setattr(portfolio, "_load_data", lambda asof: pytest.fail("历史快照不需要重估行情"))
     historical = portfolio.mark_to_market("2024-01-30")
     assert historical["written"] is False
     assert historical["cash"] == 10000

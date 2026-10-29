@@ -37,7 +37,7 @@ def test_qdii_selection_uses_guarded_platform_cli_and_reports_both_return_bases(
     assert row["expense_ratio"] == 0.006
     assert "holding_cost" not in ranking
     selection.write_report(data_dir / "report", ranking, correlations, pd.DataFrame(), {}, [], config)
-    report = (data_dir / "report/report.md").read_text()
+    report = (data_dir / "report/report.md").read_text(encoding="utf-8")
     assert "市场价年化" in report and "净值年化=0.00%" in report
     assert str(days[-3].date()) in report
 

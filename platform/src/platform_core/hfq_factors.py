@@ -53,66 +53,75 @@ def sync_corporate_action_hfq_factor(code: str, data_dir: str | Path) -> str:
             raise ValueError(f"Invalid existing HFQ factor observations; original preserved: {factor_path}")
         existing_df = raw_existing.sort_values("trade_date_dt").reset_index(drop=True)
 
-    dividend_records: list[dict] = []
-    dividend_path = root / "platform_dividends.csv"
-    if dividend_path.exists():
-        dividends = pd.read_csv(dividend_path, dtype={"code": str})
-        dividends = dividends[dividends["code"].astype(str).str.zfill(6) == str(code).zfill(6)].copy()
-        dividends["event_date"] = pd.to_datetime(dividends["ex_date"], errors="coerce")
-        dividends["amount"] = pd.to_numeric(dividends["dividend_per_share"], errors="coerce")
-        for row in dividends.dropna(subset=["event_date", "amount"]).sort_values("event_date").itertuples():
-            if row.amount > 0:
-                dividend_records.append({"event_date": row.event_date, "amount": float(row.amount)})
+    events: dict[str, list[dict]] = {}
+    for kind, date_column, value_column in (
+        ("dividends", "ex_date", "dividend_per_share"),
+        ("splits", "split_date", "split_ratio"),
+    ):
+        events[kind] = []
+        path = root / f"platform_{kind}.csv"
+        if not path.exists():
+            continue
+        frame = pd.read_csv(path, dtype={"code": str})
+        if not {"code", date_column, value_column}.issubset(frame.columns):
+            raise ValueError(f"Invalid corporate-action columns; original HFQ factor preserved: {path}")
+        frame = frame[frame["code"].str.zfill(6) == str(code).zfill(6)]
+        dates = pd.to_datetime(frame[date_column], errors="raise")
+        values = pd.to_numeric(frame[value_column], errors="raise")
+        if (dates.isna().any() or dates.duplicated().any() or not values.map(isfinite).all()
+                or (values < 0).any() or (kind == "splits" and (values == 0).any())):
+            raise ValueError(f"Invalid or duplicate corporate actions; original HFQ factor preserved: {path}")
+        events[kind] = pd.DataFrame({"event_date": dates, "value": values}).sort_values("event_date").to_dict("records")
 
-    split_records: list[dict] = []
-    split_path = root / "platform_splits.csv"
-    if split_path.exists():
-        splits = pd.read_csv(split_path, dtype={"code": str})
-        splits = splits[splits["code"].astype(str).str.zfill(6) == str(code).zfill(6)].copy()
-        splits["event_date"] = pd.to_datetime(splits["split_date"], errors="coerce")
-        splits["ratio"] = pd.to_numeric(splits["split_ratio"], errors="coerce")
-        for row in splits.dropna(subset=["event_date", "ratio"]).sort_values("event_date").itertuples():
-            if row.ratio > 0:
-                split_records.append({"event_date": row.event_date, "ratio": float(row.ratio)})
-
-    stamp = datetime.now().isoformat(timespec="seconds")
-
-    # Scenario A: An existing factor file exists
+    # 历史因子原样保留；首次生成与增量扩展共用事件计算。
     if existing_df is not None:
         last_factor_date = existing_df["trade_date_dt"].max()
-        # If the existing factor already covers all available market dates, leave untouched
         if last_factor_date >= market_max_date:
             return f"{code}: existing provider/research HFQ factor preserved"
-
-        # Market has newer dates: seamlessly append extension segment
         last_factor_val = float(
             existing_df.loc[existing_df["trade_date_dt"] == last_factor_date, "hfq_factor"].iloc[-1]
         )
-        new_market = market[market["trade_date"] > last_factor_date].copy().reset_index(drop=True)
-        new_factors = pd.Series(last_factor_val, index=new_market.index, dtype=float)
-        applied_new = 0
+        segment = market[market["trade_date"] > last_factor_date].reset_index(drop=True)
+        event_start = last_factor_date
+    else:
+        segment = market
+        last_factor_val = 1.0
+        event_start = market.iloc[0]["trade_date"]
 
-        # Apply new dividends occurring after last_factor_date
-        for div in dividend_records:
-            if div["event_date"] > last_factor_date:
-                eligible = new_market.index[new_market["trade_date"] >= div["event_date"]]
-                if not eligible.empty:
-                    event_idx = eligible[0]
-                    ex_close = float(new_market.at[event_idx, "close"])
-                    if ex_close > 0:
-                        new_factors.loc[event_idx:] *= (ex_close + div["amount"]) / ex_close
-                        applied_new += 1
+    factor = pd.Series(last_factor_val, index=segment.index, dtype=float)
+    applied = 0
+    for div in events["dividends"]:
+        # 既有因子截止日的分红已入账；拆分则在基准日之后生效。
+        due = div["event_date"] > event_start if existing_df is not None else div["event_date"] >= event_start
+        if due and div["value"] > 0:
+            eligible = segment.index[segment["trade_date"] >= div["event_date"]]
+            if not eligible.empty:
+                event_idx = eligible[0]
+                ex_close = float(segment.at[event_idx, "close"])
+                if ex_close > 0:
+                    factor.loc[event_idx:] *= (ex_close + div["value"]) / ex_close
+                    applied += 1
 
-        # Apply new splits taking effect after last_factor_date
-        for spl in split_records:
-            if spl["event_date"] >= last_factor_date:
-                eligible = new_market.index[new_market["trade_date"] > spl["event_date"]]
-                if not eligible.empty:
-                    event_idx = eligible[0]
-                    new_factors.loc[event_idx:] *= spl["ratio"]
-                    applied_new += 1
+    for spl in events["splits"]:
+        if spl["event_date"] >= event_start:
+            eligible = segment.index[segment["trade_date"] > spl["event_date"]]
+            if not eligible.empty:
+                event_idx = eligible[0]
+                factor.loc[event_idx:] *= spl["value"]
+                applied += 1
 
-        # Format historical segment
+    if existing_df is None and applied == 0:
+        return f"{code}: no applicable local corporate actions; HFQ factor skipped"
+
+    output = pd.DataFrame(
+        {
+            "trade_date": segment["trade_date"].dt.strftime("%Y-%m-%d"),
+            "hfq_factor": factor,
+            "source": GENERATED_FACTOR_SOURCE,
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+    )
+    if existing_df is not None:
         existing_df["trade_date"] = existing_df["trade_date_dt"].dt.strftime("%Y-%m-%d")
         if "source" not in existing_df.columns:
             existing_df["source"] = LEGACY_FACTOR_SOURCE
@@ -120,59 +129,12 @@ def sync_corporate_action_hfq_factor(code: str, data_dir: str | Path) -> str:
             existing_df["source"] = existing_df["source"].fillna(LEGACY_FACTOR_SOURCE)
         if "updated_at" not in existing_df.columns:
             existing_df["updated_at"] = ""
-        existing_part = existing_df[["trade_date", "hfq_factor", "source", "updated_at"]]
-
-        # Format new extension segment
-        new_part = pd.DataFrame(
-            {
-                "trade_date": new_market["trade_date"].dt.strftime("%Y-%m-%d"),
-                "hfq_factor": new_factors,
-                "source": GENERATED_FACTOR_SOURCE,
-                "updated_at": stamp,
-            }
-        )
-
-        merged_output = pd.concat([existing_part, new_part], ignore_index=True)
-        changed = write_csv_stable(factor_path, merged_output, key_column="trade_date")
+        output = pd.concat([existing_df[list(output.columns)], output], ignore_index=True)
+    changed = write_csv_stable(factor_path, output, key_column="trade_date")
+    if existing_df is not None:
         action = "extended" if changed else "unchanged"
         return (
             f"{code}: {action} HFQ factor from {last_factor_date.strftime('%Y-%m-%d')} "
-            f"to {market_max_date.strftime('%Y-%m-%d')} ({applied_new} new events)"
+            f"to {market_max_date.strftime('%Y-%m-%d')} ({applied} new events)"
         )
-
-    # Scenario B: No existing factor file exists -> generate from scratch
-    factor = pd.Series(1.0, index=market.index, dtype=float)
-    applied = 0
-    start_market_date = market.iloc[0]["trade_date"]
-
-    for div in dividend_records:
-        if div["event_date"] >= start_market_date:
-            eligible = market.index[market["trade_date"] >= div["event_date"]]
-            if not eligible.empty:
-                event_idx = eligible[0]
-                ex_close = float(market.at[event_idx, "close"])
-                if ex_close > 0:
-                    factor.loc[event_idx:] *= (ex_close + div["amount"]) / ex_close
-                    applied += 1
-
-    for spl in split_records:
-        if spl["event_date"] >= start_market_date:
-            eligible = market.index[market["trade_date"] > spl["event_date"]]
-            if not eligible.empty:
-                event_idx = eligible[0]
-                factor.loc[event_idx:] *= spl["ratio"]
-                applied += 1
-
-    if applied == 0:
-        return f"{code}: no applicable local corporate actions; HFQ factor skipped"
-
-    output = pd.DataFrame(
-        {
-            "trade_date": market["trade_date"].dt.strftime("%Y-%m-%d"),
-            "hfq_factor": factor,
-            "source": GENERATED_FACTOR_SOURCE,
-            "updated_at": stamp,
-        }
-    )
-    changed = write_csv_stable(factor_path, output, key_column="trade_date")
     return f"{code}: corporate-action HFQ factor {'updated' if changed else 'unchanged'} ({applied} events)"

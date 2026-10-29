@@ -366,58 +366,51 @@ class LivePortfolio:
         current_row = next((row for row in rows if row["date"] == date_str(asof)), None)
         if frozen and current_row is None:
             raise ValueError(f"没有 {asof} 的历史净值快照，不能用当前持仓回填历史。")
-        data = self._load_data(asof)
-        if not frozen:
-            self._apply_dividends(state, asof)
-        expected_realized = expected_income(state, self.portfolio_dir / "execution_ledger.csv", asof)
-        if not frozen:
-            write_json(self.state_path, state.to_dict())
-        bars = data.bars_on(asof)
-        prices = {asset_id: bar.close for asset_id, bar in bars.items()}
-
-        positions_value = state.total_value(prices) - state.cash
-        total_value = state.cash + positions_value
-        weights = {
-            asset_id: (position.quantity * prices.get(asset_id, 0.0) / total_value if total_value > 0 else 0.0)
-            for asset_id, position in state.positions.items()
-        }
-
-        # 各持仓当日涨跌幅与盈亏额（对比前一交易日收盘；持仓以上次 reconcile 为准，
-        # 当日已交易未对齐时与真实盈亏有偏差，次日 reconcile 后自愈——与 nav 同一口径）
-        earlier_days = [day for day in data.calendar if day < asof]
-        prev_bars = data.bars_on(max(earlier_days)) if earlier_days else {}
+        prices: dict[str, float] = {}
+        weights: dict[str, float] = {}
         asset_changes: dict[str, dict[str, float]] = {}
-        for asset_id, position in state.positions.items():
-            bar, prev_bar = bars.get(asset_id), prev_bars.get(asset_id)
-            if bar is None or prev_bar is None or prev_bar.close <= 0:
-                continue
-            asset_changes[asset_id] = {
-                "pct": bar.close / prev_bar.close - 1.0,
-                "pnl": position.quantity * (bar.close - prev_bar.close),
-            }
-
-        earlier = [row for row in rows if row["date"] < date_str(asof)]
-        previous_total = float(earlier[-1]["total_value"]) if earlier else None
-        same = [row for row in rows if row["date"] == date_str(asof)]
-        same_day_total = float(same[-1]["total_value"]) if same else None
-
         # 历史行冻结：real_nav 是真实净值台账，一旦出现更新日期的估值，旧日期
         # 不允许被重估值改写（曾发生：数据处于研究中间状态时 --force 重跑，把
         # 已记录的历史行改成了错误值）。需要修正历史请用 reconcile（用户真值）。
         written = not frozen
-        if written:
+        if frozen:
+            state.cash = float(current_row["cash"])
+            positions_value = float(current_row["positions_value"])
+            total_value = float(current_row["total_value"])
+            expected_realized = expected_income(state, self.portfolio_dir / "execution_ledger.csv", asof)
+            logger.warning("已有晚于 %s 的账户或净值状态，返回已保存的历史估值。", date_str(asof))
+        else:
+            data = self._load_data(asof)
+            self._apply_dividends(state, asof)
+            bars = data.bars_on(asof)
+            prices = {asset_id: bar.close for asset_id, bar in bars.items()}
+            total_value = state.total_value(prices)
+            positions_value = total_value - state.cash
+            weights = state.weights(prices)
+
+            # 当日交易尚未对账时，日盈亏仍以上次对账持仓计算。
+            earlier_days = [day for day in data.calendar if day < asof]
+            prev_bars = data.bars_on(max(earlier_days)) if earlier_days else {}
+            for asset_id, position in state.positions.items():
+                bar, prev_bar = bars.get(asset_id), prev_bars.get(asset_id)
+                if bar is not None and prev_bar is not None and prev_bar.close > 0:
+                    asset_changes[asset_id] = {
+                        "pct": bar.close / prev_bar.close - 1.0,
+                        "pnl": position.quantity * (bar.close - prev_bar.close),
+                    }
+
+            same_day_total = float(current_row["total_value"]) if current_row else None
             if same_day_total is not None and same_day_total > 0 and abs(total_value / same_day_total - 1.0) > 0.001:
                 logger.warning(
                     f"real_nav {date_str(asof)} 同日重估值差异 {(total_value / same_day_total - 1.0):+.2%}"
                     f"（{same_day_total:,.2f} → {total_value:,.2f}），已替换；若非当日数据修正请检查数据状态"
                 )
+            expected_realized = expected_income(state, self.portfolio_dir / "execution_ledger.csv", asof)
+            write_json(self.state_path, state.to_dict())
             rows = self._append_real_nav(asof, state.cash, positions_value, total_value)
-        else:
-            state.cash = float(current_row["cash"])
-            positions_value = float(current_row["positions_value"])
-            total_value = float(current_row["total_value"])
-            weights, asset_changes = {}, {}
-            logger.warning("已有晚于 %s 的账户或净值状态，返回已保存的历史估值。", date_str(asof))
+
+        earlier = [row for row in rows if row["date"] < date_str(asof)]
+        previous_total = float(earlier[-1]["total_value"]) if earlier else None
 
         # ---- 份额口径派生（申赎不污染收益率；旧格式档案无 unit_nav 时各字段为 None，
         #      展示层回退 total_value 口径——下一次写盘链会自动回填）

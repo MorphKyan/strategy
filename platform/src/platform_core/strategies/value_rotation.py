@@ -59,7 +59,7 @@ class IndustryValueRotationStrategy(Strategy):
     def initialize(self, context: StrategyContext) -> None:
         self.valuation_store = IndexValuationStore(context.data.data_dir)
         context.set_cooldown(int(context.params.get("cooldown_days", 0)))
-        context.set_rebalance_frequency(context.params.get("rebalance_frequency", "monthly"))
+        context.runtime["rebalance_frequency"] = context.params.get("rebalance_frequency", "monthly")
 
     def should_check_rebalance(self, context: StrategyContext) -> bool:
         """入场约定与基线 monthly_equal_weight 一致：首日即建仓，此后月末检查。
@@ -71,7 +71,7 @@ class IndustryValueRotationStrategy(Strategy):
         """
         if not context.params.get("rebalance_on_start", True) and context.state.last_date is None:
             return False
-        if context.state.last_date is not None and not self._is_rebalance_day(context):
+        if context.state.last_date is not None and not super().should_check_rebalance(context):
             return False
         return True
 

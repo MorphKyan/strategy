@@ -118,6 +118,25 @@ def test_extends_existing_factor_compounding_new_dividend(tmp_path: Path):
     assert "1 new events" in note
 
 
+def test_extension_keeps_cutoff_dividend_and_defers_cutoff_split(tmp_path):
+    days = ["2025-12-01", "2025-12-02", "2025-12-03"]
+    pd.DataFrame({"trade_date": days, "close": [10, 5, 4.5]}).to_csv(tmp_path / "A.csv", index=False)
+    pd.DataFrame({"code": ["A", "A"], "ex_date": [days[0], days[2]],
+                  "dividend_per_share": [3, .5]}).to_csv(tmp_path / "platform_dividends.csv", index=False)
+    pd.DataFrame({"code": ["A"], "split_date": [days[0]], "split_ratio": [2]}).to_csv(
+        tmp_path / "platform_splits.csv", index=False)
+    path = tmp_path / "A_hfq_factor.csv"
+    original = "trade_date,hfq_factor,source,updated_at\n2025-12-01,2.0,legacy_research,original\n"
+    path.write_text(original, encoding="utf-8")
+    sync_corporate_action_hfq_factor("A", tmp_path)
+    frame = pd.read_csv(path)
+    assert frame["hfq_factor"].tolist() == pytest.approx([2, 4, 4 * 5 / 4.5])
+    assert path.read_text(encoding="utf-8").splitlines()[1] == original.splitlines()[1]
+    before = path.read_bytes()
+    sync_corporate_action_hfq_factor("A", tmp_path)
+    assert path.read_bytes() == before
+
+
 @pytest.mark.parametrize("original", [
     "trade_date,legacy_factor\n2025-12-01,9.9\n",
     "trade_date,hfq_factor\nnot-a-date,9.9\n",
@@ -132,6 +151,32 @@ def test_invalid_existing_factor_is_never_rebuilt_over_historical_file(tmp_path,
         tmp_path / "platform_dividends.csv", index=False)
     path = tmp_path / "A_hfq_factor.csv"
     path.write_text(original)
+    before = path.read_bytes()
+    with pytest.raises(ValueError):
+        sync_corporate_action_hfq_factor("A", tmp_path)
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("kind,date_column,value_column", [
+    ("dividends", "ex_date", "dividend_per_share"),
+    ("splits", "split_date", "split_ratio"),
+])
+@pytest.mark.parametrize("invalid", ["nonfinite", "negative", "missing_date", "duplicate"])
+def test_invalid_action_preserves_existing_hfq_history(tmp_path, kind, date_column, value_column, invalid):
+    pd.DataFrame({"trade_date": ["2025-12-01", "2025-12-02"], "close": [10, 9]}).to_csv(
+        tmp_path / "A.csv", index=False)
+    frame = pd.DataFrame({"code": ["A"], date_column: ["2025-12-02"], value_column: [1.]})
+    if invalid == "nonfinite":
+        frame[value_column] = float("inf")
+    elif invalid == "negative":
+        frame[value_column] = -1.
+    elif invalid == "missing_date":
+        frame[date_column] = None
+    else:
+        frame = pd.concat([frame, frame], ignore_index=True)
+    frame.to_csv(tmp_path / f"platform_{kind}.csv", index=False)
+    path = tmp_path / "A_hfq_factor.csv"
+    path.write_text("trade_date,hfq_factor\n2025-12-01,2.0\n", encoding="utf-8")
     before = path.read_bytes()
     with pytest.raises(ValueError):
         sync_corporate_action_hfq_factor("A", tmp_path)

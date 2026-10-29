@@ -1,17 +1,57 @@
 from __future__ import annotations
 
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
+import numpy as np
+import pandas as pd
 
 from src.platform_core.models import Asset, Bar, PortfolioState, Position, TargetPortfolio
 from src.platform_core.strategy import (
     AdaptiveRiskDeviationVolatilityTriggeredStrategy,
     RiskParityStrategy,
+    RiskParityEWMAStrategy,
+    RiskParityEWMADrawdownRecoveryStrategy,
+    Strategy,
     StrategyContext,
     get_strategy_class,
 )
 from src.platform_core.strategies.fixed_weight import FixedWeightThresholdStrategy
+
+
+@pytest.mark.parametrize("current,following,expected", [
+    (date(2024, 3, 29), date(2024, 4, 1), False),
+    (date(2024, 6, 28), date(2024, 7, 1), True),
+    (date(2024, 9, 30), date(2024, 10, 8), False),
+    (date(2024, 12, 31), date(2025, 1, 2), True),
+    (date(2024, 6, 27), date(2024, 6, 28), False),
+])
+def test_semiannual_rebalance_uses_calendar_half_year_end(current, following, expected):
+    context = StrategyContext(current, {}, {}, PortfolioState(1000),
+                              SimpleNamespace(calendar=[current, following]), {},
+                              runtime={"rebalance_frequency": "semiannually"})
+    assert Strategy().should_check_rebalance(context) is expected
+
+
+@pytest.mark.parametrize("strategy_class", [RiskParityEWMAStrategy, RiskParityEWMADrawdownRecoveryStrategy])
+@pytest.mark.parametrize("frequency", ["daily", "weekly", "monthly"])
+@pytest.mark.parametrize("use_nav", [False, True])
+def test_ewma_variants_preserve_frequency_nav_and_volatility_multipliers(strategy_class, frequency, use_nav):
+    dates = pd.bdate_range("2022-01-01", periods=540)
+    price = np.cumprod(np.resize([1.01, .98, 1.03, .99], len(dates)))
+    prices = pd.DataFrame({"A": price, "B": 2 * price}, index=dates)
+
+    def get_prices(universe, end, **kwargs):
+        assert kwargs["use_nav"] is use_nav
+        return prices[universe].copy()
+
+    context = StrategyContext(dates[-1], {}, {}, PortfolioState(1000),
+                              SimpleNamespace(get_price_frame=get_prices),
+                              {"estimation_freq": frequency, "use_nav": use_nav,
+                               "vol_multipliers": {"A": 2}, "dd_penalty_alpha": 0, "dd_recovery_beta": 0})
+    target = strategy_class()._inverse_vol_target(context, ["A", "B"])
+    assert target.weights == pytest.approx({"A": 1 / 3, "B": 2 / 3})
 
 
 def _context(positions: dict[str, tuple[float, float]], cash: float, params: dict) -> StrategyContext:

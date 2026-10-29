@@ -112,6 +112,9 @@ def load_adjusted_price(data_dir: str | Path, candidate: dict[str, Any], allow_r
     volume_col = first_column(raw, ["volume", "vol"])
     amount = pd.to_numeric(raw[amount_col], errors="coerce").fillna(0.0) if amount_col else pd.Series(0.0, index=raw.index)
     volume = pd.to_numeric(raw[volume_col], errors="coerce").fillna(0.0) if volume_col else pd.Series(0.0, index=raw.index)
+    for field, values in (("amount", amount), ("volume", volume)):
+        if (values < 0).any() or not values.map(math.isfinite).all():
+            raise ValueError(f"{field} must be finite and nonnegative: {price_path}")
 
     factor = pd.to_numeric(factor, errors="raise")
     if not pd.Series(factor).map(lambda value: math.isfinite(value) and value > 0).all():
@@ -127,7 +130,7 @@ def load_observable_premium(data_dir: str | Path, code: str, asof: pd.Timestamp)
     script = Path(__file__).resolve().parents[2] / "platform/scripts/read_etf_premium.py"
     command = [sys.executable, str(script), "--data-dir", str(Path(data_dir).resolve()),
                "--codes", code, "--asof-date", asof.strftime("%Y-%m-%d")]
-    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", check=False)
+    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
     if result.returncode:
         raise ValueError(f"QDII 溢价读取失败: {code}；请检查行情及 etf_nav/{code}.csv 后重试。")
     frame = pd.DataFrame(json.loads(result.stdout)[code])
@@ -355,9 +358,9 @@ def build_baskets(
     config: dict[str, Any],
     ranking: pd.DataFrame,
     candidates: dict[str, CandidateData],
-) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], list[list[str]]]:
+) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
     if ranking.empty:
-        return pd.DataFrame(), {}, []
+        return pd.DataFrame(), {}
     selection = config.get("selection", {})
     top_k = int(selection.get("top_k_per_sleeve", 3))
     max_baskets = int(selection.get("max_baskets", 20))
@@ -379,7 +382,7 @@ def build_baskets(
             options_by_sleeve[sleeve] = [[code] for code in codes]
 
     if any(not options_by_sleeve.get(sleeve) for sleeve in required_sleeves):
-        return pd.DataFrame(), {}, []
+        return pd.DataFrame(), {}
 
     rows: list[dict[str, Any]] = []
     corr_by_basket: dict[str, pd.DataFrame] = {}
@@ -440,12 +443,11 @@ def build_baskets(
             }
         )
     if not rows:
-        return pd.DataFrame(), {}, []
+        return pd.DataFrame(), {}
     basket_frame = pd.DataFrame(rows).sort_values("basket_score", ascending=False).head(max_baskets)
-    keep_ids = set(basket_frame["basket_id"].tolist()) if not basket_frame.empty else set()
+    keep_ids = set(basket_frame["basket_id"])
     corr_by_basket = {key: value for key, value in corr_by_basket.items() if key in keep_ids}
-    basket_codes = [row["codes"].split(",") for _, row in basket_frame.iterrows()] if not basket_frame.empty else []
-    return basket_frame, corr_by_basket, basket_codes
+    return basket_frame, corr_by_basket
 
 
 def platform_asset(meta: dict[str, Any]) -> dict[str, Any]:

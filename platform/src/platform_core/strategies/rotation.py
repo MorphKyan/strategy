@@ -50,7 +50,7 @@ class IndustryMomentumRotationStrategy(Strategy):
 
     def initialize(self, context: StrategyContext) -> None:
         context.set_cooldown(int(context.params.get("cooldown_days", 0)))
-        context.set_rebalance_frequency(context.params.get("rebalance_frequency", "monthly"))
+        context.runtime["rebalance_frequency"] = context.params.get("rebalance_frequency", "monthly")
 
     def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         universe = context.params.get("universe") or context.available_asset_ids()

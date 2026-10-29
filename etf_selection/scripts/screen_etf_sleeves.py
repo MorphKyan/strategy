@@ -52,7 +52,7 @@ def main() -> int:
                 command.extend(["--asset", f"{item['code']}.{item.get('exchange', 'SH')}:{item.get('asset_type', 'etf')}"])
         subprocess.run(command, cwd=REPO_ROOT, check=True)
         ranking, sleeve_corrs, candidates = screen_sleeves(config, allow_raw_prices=args.allow_raw_prices)
-    basket_frame, basket_corrs, _ = build_baskets(config, ranking, candidates)
+    basket_frame, basket_corrs = build_baskets(config, ranking, candidates)
     generated_configs = generate_platform_configs(
         base_config_path=resolve_repo_path(paths.get("platform_base_config", "platform/configs/domestic_rolling_bond_10y.yaml")),
         output_dir=generated_dir,

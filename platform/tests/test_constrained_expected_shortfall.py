@@ -43,12 +43,13 @@ def test_constrained_budget_loss_is_invariant_to_return_units():
     assert scaled == pytest.approx(expected, abs=1e-5)
 
 
-def test_return_units_do_not_send_nonsmooth_solver_to_a_different_boundary():
+@pytest.mark.parametrize("scale", [.001, 1000])
+def test_return_units_do_not_send_nonsmooth_solver_to_a_different_boundary(scale):
     returns = np.random.default_rng(12).normal(0, [.01, .02, .03], (100, 3))
     budgets = np.array([.5, .3, .2])
     solve = RiskParityExpectedShortfallFixedBudgetStrategy._solve_constrained_expected_shortfall_risk_budget
     weights = solve(returns, budgets, .95)
-    scaled = solve(returns * .001, budgets, .95)
+    scaled = solve(returns * scale, budgets, .95)
     assert scaled == pytest.approx(weights, abs=2e-3)
     es, gradient = RiskParityExpectedShortfallFixedBudgetStrategy._empirical_es_and_gradient(returns, weights, .95)
     assert np.sum((weights * gradient / es - budgets) ** 2) < .001
@@ -60,6 +61,31 @@ def test_zero_risk_scenarios_cannot_produce_fictitious_risk_budget_weights():
             np.zeros((10, 2)), np.array([.5, .5]), .95)
 
 
+def test_no_loss_scenarios_cannot_be_accepted_as_a_solved_risk_budget():
+    with pytest.raises(RuntimeError, match="positive portfolio tail loss"):
+        RiskParityExpectedShortfallFixedBudgetStrategy._solve_constrained_expected_shortfall_risk_budget(
+            np.full((10, 2), .01), np.array([.5, .5]), .95)
+
+
+def test_constrained_es_gradient_matches_local_loss_change(monkeypatch):
+    from src.platform_core.strategies import expected_shortfall
+
+    def check_gradient(objective, initial, **kwargs):
+        assert kwargs["jac"] is True
+        weights = np.array([.4, .35, .25])
+        _, gradient = objective(weights)
+        step = 1e-7
+        differences = [
+            (objective(weights + direction * step)[0] - objective(weights - direction * step)[0]) / (2 * step)
+            for direction in np.eye(3)
+        ]
+        assert gradient == pytest.approx(differences, rel=1e-5, abs=1e-7)
+        return SimpleNamespace(success=True, x=initial)
+
+    monkeypatch.setattr(expected_shortfall, "minimize", check_gradient)
+    RiskParityExpectedShortfallFixedBudgetStrategy._solve_constrained_expected_shortfall_risk_budget(
+        np.random.default_rng(12).normal(0, [.01, .02, .03], (100, 3)), np.array([.5, .3, .2]), .95,
+        entropy_penalty=.02)
 @pytest.mark.parametrize("lower,upper", [
     ([.5, .1, .1], [.2, .7, .7]), ([0, 0], [1, 1, 1]),
     ([0, 0, 0], [float("nan"), 1, 1]), ([0, 0, 0], [2, 1, 1]),

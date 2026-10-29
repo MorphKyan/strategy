@@ -385,20 +385,22 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         bounds = [(float(min_w[i]), float(max_w[i])) for i in range(assets)]
         constraints = [{"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)}]
 
-        def objective(w: np.ndarray) -> float:
+        def objective(w: np.ndarray) -> tuple[float, np.ndarray]:
             es_val, es_grad = (
                 RiskParityExpectedShortfallFixedBudgetStrategy._empirical_es_and_gradient(
                     returns, w, confidence_level
                 )
             )
             if es_val <= 1e-12:
-                return 1e6
-            rc = w * es_grad
+                return 1e6, np.zeros_like(w)
             # Normalized Euler risk contributions p_i = RC_i / ES(w)
-            p = rc / es_val
-            tracking_loss = float(np.sum((p - budgets) ** 2))
+            p = w * es_grad / es_val
+            error = p - budgets
+            tracking_loss = float(error @ error)
             hhi_loss = float(entropy_penalty * np.sum(w ** 2))
-            return tracking_loss + hhi_loss
+            # 尾部样本固定时 ES 为线性函数；显式梯度避免差分跨过尾部切换点。
+            gradient = 2 * es_grad / es_val * (error - error @ p) + 2 * entropy_penalty * w
+            return tracking_loss + hhi_loss, gradient
 
         with warnings.catch_warnings():
             warnings.filterwarnings(
@@ -409,6 +411,7 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
             solution = minimize(
                 objective,
                 w0,
+                jac=True,
                 method="SLSQP",
                 bounds=bounds,
                 constraints=constraints,
@@ -417,7 +420,11 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
 
         if not solution.success:
             raise RuntimeError(f"Constrained Expected Shortfall solver failed: {solution.message}")
-        return RiskParityExpectedShortfallFixedBudgetStrategy._project_box_simplex(solution.x, min_w, max_w)
+        weights = RiskParityExpectedShortfallFixedBudgetStrategy._project_box_simplex(solution.x, min_w, max_w)
+        es, _ = RiskParityExpectedShortfallFixedBudgetStrategy._empirical_es_and_gradient(returns, weights, confidence_level)
+        if es <= 1e-12:
+            raise RuntimeError("Constrained Expected Shortfall requires a positive portfolio tail loss.")
+        return weights
 
     @staticmethod
     def _project_box_simplex(values: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> np.ndarray:

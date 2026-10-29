@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right
 from datetime import date, timedelta
 from math import isfinite
 from pathlib import Path
@@ -79,6 +80,8 @@ class LocalCsvBarData:
 
             raw["trade_date"] = pd.to_datetime(raw["trade_date"]).dt.date
             raw = raw.sort_values("trade_date").reset_index(drop=True)
+            if raw["trade_date"].isna().any():
+                raise ValueError(f"Missing trade_date rows in {path}")
             if raw["trade_date"].duplicated().any():
                 raise ValueError(f"Duplicate trade_date rows in {path}")
             factor_col = _first_column(raw, ["hfq_factor", "adjust_factor", "qfq_factor"])
@@ -126,6 +129,8 @@ class LocalCsvBarData:
                     self.quality.notes.append(f"{asset.asset_id}: missing {field_name}; filled with 0.")
                 else:
                     normalized[field_name] = pd.to_numeric(raw[source], errors="coerce").fillna(0.0)
+                if (normalized[field_name] < 0).any() or not normalized[field_name].map(isfinite).all():
+                    raise ValueError(f"Invalid {field_name} in {path}; values must be finite and nonnegative.")
 
             normalized = normalized.sort_values("date").dropna(subset=["close"])
             self.real_bar_dates[asset.asset_id] = normalized["date"].tolist()
@@ -190,9 +195,9 @@ class LocalCsvBarData:
                 )
                 continue
 
-            prior = frame[frame.index < current_date]
-            if not prior.empty:
-                last = prior.iloc[-1]
+            prior_index = frame.index.searchsorted(current_date, side="left") - 1
+            if prior_index >= 0:
+                last = frame.iloc[prior_index]
                 close = float(last["close"])
                 adj_close = float(last["adj_close"])
                 bars[asset_id] = Bar(
@@ -218,13 +223,12 @@ class LocalCsvBarData:
         dates = self.real_bar_dates.get(asset_id)
         if not dates:
             return None
-        later = [d for d in dates if d > after_date]
-        return min(later) if later else None
+        index = bisect_right(dates, after_date)
+        return dates[index] if index < len(dates) else None
 
     def is_month_end(self, current_date: date) -> bool:
-        try:
-            idx = self.calendar.index(current_date)
-        except ValueError:
+        idx = bisect_left(self.calendar, current_date)
+        if idx == len(self.calendar) or self.calendar[idx] != current_date:
             return False
         if idx == len(self.calendar) - 1:
             return True

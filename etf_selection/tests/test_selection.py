@@ -92,14 +92,13 @@ def test_sleeve_screening_and_platform_config_generation(tmp_path: Path, monkeyp
     config = config_for(data_dir, base_config, tmp_path / "generated")
     config["candidates"][2]["asset_type"] = "index"
     ranking, sleeve_corrs, candidates = screen_sleeves(config)
-    baskets, basket_corrs, basket_codes = build_baskets(config, ranking, candidates)
+    baskets, basket_corrs = build_baskets(config, ranking, candidates)
     paths = generate_platform_configs(base_config, tmp_path / "generated", baskets, candidates)
 
     assert set(ranking["sleeve"]) == {"gold", "hs300", "bond", "commodity"}
     assert ranking["eligible"].all()
     assert "commodity" in sleeve_corrs
     assert not baskets.empty
-    assert basket_codes
     assert basket_corrs
     assert paths
     generated = yaml.safe_load(paths[0].read_text(encoding="utf-8"))
@@ -112,7 +111,7 @@ def test_sleeve_screening_and_platform_config_generation(tmp_path: Path, monkeyp
     assert index_asset["lot_size"] == 1 and index_asset["price_limit_pct"] is None
     assert generated["selection_metadata"]["non_tradable_indices"] == ["B"]
     selection.write_report(tmp_path / "report", ranking, sleeve_corrs, baskets, basket_corrs, paths, config)
-    assert "研究模拟（含不可交易指数）" in (tmp_path / "report/report.md").read_text()
+    assert "研究模拟（含不可交易指数）" in (tmp_path / "report/report.md").read_text(encoding="utf-8")
 
 
 def test_screening_reports_missing_candidates_without_crashing(tmp_path: Path):
@@ -121,6 +120,18 @@ def test_screening_reports_missing_candidates_without_crashing(tmp_path: Path):
     assert not ranking["eligible"].any()
     assert (ranking["sleeve_score"] == 0).all()
     assert not correlations and not candidates
+
+
+@pytest.mark.parametrize("field", ["amount", "volume"])
+@pytest.mark.parametrize("value", [-1, float("inf")])
+def test_bad_liquidity_rejects_candidate_at_loading(tmp_path, field, value):
+    write_market_data(tmp_path, "A", [10, 11])
+    path = tmp_path / "A.csv"
+    frame = pd.read_csv(path)
+    frame[field] = value
+    frame.to_csv(path, index=False)
+    with pytest.raises(ValueError, match=field):
+        selection.load_adjusted_price(tmp_path, {"code": "A"})
 
 
 def test_generated_yaml_and_reports_do_not_overwrite_existing_artifacts(tmp_path):
@@ -160,9 +171,9 @@ def test_no_valid_baskets_returns_empty_results(tmp_path: Path, empty_ranking: b
     ranking, _, candidates = screen_sleeves(config)
     if empty_ranking:
         ranking = pd.DataFrame()
-    baskets, correlations, codes = build_baskets(config, ranking, candidates)
+    baskets, correlations = build_baskets(config, ranking, candidates)
     assert baskets.empty
-    assert not correlations and not codes
+    assert not correlations
 
 
 def test_stale_candidate_stops_screening(tmp_path):

@@ -142,8 +142,6 @@ class ExecutionEngine:
             trade_plan.append((asset_id, diff_value, price))
 
         for asset_id, _, _ in self._sort_trade_plan(trade_plan):
-            if asset_id not in bars:
-                continue
             asset = assets[asset_id]
             bar = bars[asset_id]
             valuation_price = prices[asset_id]
@@ -196,7 +194,7 @@ class ExecutionEngine:
                 continue
 
             if side == "BUY":
-                buy_cash = self._available_buy_cash(state.cash, state_value)
+                buy_cash = max(0.0, state.cash - cash_buffer * state_value)
                 quantity = self._cap_buy_quantity(quantity, execution_price, buy_cash, asset.lot_size)
                 order.quantity = quantity
             if quantity <= 0:
@@ -284,21 +282,11 @@ class ExecutionEngine:
         bar: Bar | None = None,
         planned_quantity: float = 0.0,
     ) -> float:
-        slippage = self._slippage_rate(asset, bar, planned_quantity, valuation_price)
+        slippage_bps = self._slippage_bps(asset) + self._participation_impact_bps(bar, planned_quantity, valuation_price)
+        slippage = max(0.0, float(slippage_bps)) / 10000.0
         if side == "BUY":
             return valuation_price * (1.0 + slippage)
         return valuation_price * (1.0 - slippage)
-
-    def _slippage_rate(
-        self,
-        asset: Asset,
-        bar: Bar | None = None,
-        planned_quantity: float = 0.0,
-        valuation_price: float = 0.0,
-    ) -> float:
-        slippage_bps = self._slippage_bps(asset)
-        slippage_bps += self._participation_impact_bps(bar, planned_quantity, valuation_price)
-        return max(0.0, float(slippage_bps)) / 10000.0
 
     def _slippage_bps(self, asset: Asset) -> float:
         if self.config.slippage_by_asset_id:
@@ -372,10 +360,6 @@ class ExecutionEngine:
         if intent is not None:
             return intent.signal_date or intent.created_date
         return current_date
-
-    def _available_buy_cash(self, cash: float, state_value: float) -> float:
-        reserve = max(0.0, min(1.0, float(self.config.cash_buffer_pct))) * state_value
-        return max(0.0, cash - reserve)
 
     def _sort_trade_plan(self, trade_plan: list[tuple[str, float, float]]) -> list[tuple[str, float, float]]:
         if self.config.order_priority == "target_gap_desc":

@@ -119,6 +119,8 @@ class PlatformBacktestEngine:
         active_strategy_runtime: dict[str, Any] = {}
         active_strategy_version_id: int | None = None
         identity = {"strategy_name": self.strategy_config["strategy_name"], "params": self.strategy_config.get("params", {})}
+        portfolio = self.config.get("portfolio", {})
+        initial_equity = float(portfolio.get("initial_equity") or portfolio.get("initial_cash") or 1.0)
 
         for current_date in self.data.calendar:
             # 1. Process Splits（在 split_date 后首个真实交易日生效，见 corporate_actions）
@@ -195,7 +197,7 @@ class PlatformBacktestEngine:
             nav_rows.append(
                 {
                     "date": date_str(current_date),
-                    "net_value": total_value / self._initial_equity(),
+                    "net_value": total_value / initial_equity,
                     "total_value": total_value,
                     "cash": state.cash,
                     "pending_intent_count": len(state.pending_intents),
@@ -252,10 +254,6 @@ class PlatformBacktestEngine:
                 raise ValueError(f"Duplicate initial position: {asset_id}")
             positions[asset_id] = Position(asset_id, float(item.get("quantity", 0.0)), float(item.get("cost_basis", 0.0)))
         return PortfolioState(cash=float(portfolio.get("initial_cash", 0.0)), positions=positions)
-
-    def _initial_equity(self) -> float:
-        portfolio = self.config.get("portfolio", {})
-        return float(portfolio.get("initial_equity") or portfolio.get("initial_cash") or 1.0)
 
     def _artifact_provenance(self, config_path: str | Path | None) -> dict[str, Any]:
         common_dates = set.intersection(*(set(days) for days in self.data.real_bar_dates.values()))

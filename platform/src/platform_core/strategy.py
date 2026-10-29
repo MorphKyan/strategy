@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -24,21 +25,12 @@ class StrategyContext:
     def set_cooldown(self, days: int) -> None:
         self.runtime["cooldown_days"] = max(0, int(days))
 
-    def set_rebalance_frequency(self, frequency: str) -> None:
-        self.runtime["rebalance_frequency"] = frequency
-
-    def tradable_asset_ids(self) -> list[str]:
-        return [asset_id for asset_id in self.assets if asset_id in self.bars]
-
     def available_asset_ids(self) -> list[str]:
         return [
             asset_id
-            for asset_id in self.tradable_asset_ids()
-            if asset_id not in self.state.cooldown_pool
+            for asset_id in self.assets
+            if asset_id in self.bars and asset_id not in self.state.cooldown_pool
         ]
-
-    def is_month_end(self) -> bool:
-        return self.data.is_month_end(self.date)
 
 
 
@@ -67,9 +59,6 @@ class Strategy:
 
     def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         raise NotImplementedError
-
-    def should_check_rebalance(self, context: StrategyContext) -> bool:
-        return self._is_rebalance_day(context)
 
     def should_rebalance(self, context: StrategyContext, target: TargetPortfolio) -> bool:
         has_position = any(
@@ -108,13 +97,11 @@ class Strategy:
     def _calendar_index(context: StrategyContext) -> int:
         if context.data is None or not hasattr(context.data, "calendar") or context.data.calendar is None:
             return -1
-        try:
-            return context.data.calendar.index(context.date)
-        except ValueError:
-            return -1
+        calendar = context.data.calendar
+        index = bisect_left(calendar, context.date)
+        return index if index < len(calendar) and calendar[index] == context.date else -1
 
-    @staticmethod
-    def _is_rebalance_day(context: StrategyContext) -> bool:
+    def should_check_rebalance(self, context: StrategyContext) -> bool:
         if context.data is None or not hasattr(context.data, "calendar") or context.data.calendar is None:
             return True
         idx = Strategy._calendar_index(context)
@@ -129,9 +116,7 @@ class Strategy:
         if freq == "daily":
             return True
         if freq == "semiannually":
-            current_q = (current.month - 1) // 3
-            next_q = (next_date.month - 1) // 3
-            return current_q != next_q and current_q in (0, 2)
+            return (current.year, (current.month - 1) // 6) != (next_date.year, (next_date.month - 1) // 6)
         elif freq == "monthly":
             params = context.params if isinstance(context.params, dict) else {}
             anchor_day = params.get("rebalance_anchor_day")
@@ -156,17 +141,18 @@ class MonthlyEqualWeightStrategy(Strategy):
 
     def initialize(self, context: StrategyContext) -> None:
         context.set_cooldown(int(context.params.get("cooldown_days", 0)))
-        context.set_rebalance_frequency("monthly")
+        context.runtime["rebalance_frequency"] = "monthly"
 
     def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         universe = context.params.get("universe") or context.available_asset_ids()
         universe = [asset_id for asset_id in universe if asset_id in context.assets and asset_id not in context.state.cooldown_pool]
-        return TargetPortfolio.equal_weight(universe)
+        weight = 1.0 / len(universe) if universe else 0.0
+        return TargetPortfolio({asset_id: weight for asset_id in universe})
 
     def should_check_rebalance(self, context: StrategyContext) -> bool:
         if not context.params.get("rebalance_on_start", True) and context.state.last_date is None:
             return False
-        if context.state.last_date is not None and not context.is_month_end():
+        if context.state.last_date is not None and not context.data.is_month_end(context.date):
             return False
         return True
 
@@ -192,7 +178,7 @@ class RiskParityStrategy(Strategy):
     def should_check_rebalance(self, context: StrategyContext) -> bool:
         if not bool(context.runtime.get("opened", False)):
             return True
-        return self._is_rebalance_day(context)
+        return super().should_check_rebalance(context)
 
     def generate_theoretical_targets(self, context: StrategyContext) -> TargetPortfolio | None:
         universe = context.params.get("universe") or context.available_asset_ids()
@@ -207,6 +193,30 @@ class RiskParityStrategy(Strategy):
             return target
 
         return self._inverse_vol_target(context, universe)
+
+    @staticmethod
+    def _historical_returns(
+        context: StrategyContext, universe: list[str], default_window: int = 120,
+    ) -> pd.DataFrame | None:
+        """统一估计频率、回望窗口与最小样本数，保留各策略的求解方式。"""
+        window = int(context.params.get("rolling_window", context.params.get("ewma_span", default_window)))
+        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
+        prices = context.data.get_price_frame(
+            universe, context.date, use_nav=bool(context.params.get("use_nav", False)),
+        )
+        if prices is None or prices.empty:
+            return None
+        prices.index = pd.to_datetime(prices.index)
+        frequency = context.params.get("estimation_freq", "daily")
+        if frequency in {"weekly", "monthly"}:
+            divisor = 5 if frequency == "weekly" else 20
+            prices = prices.resample("W" if frequency == "weekly" else pd.offsets.MonthEnd()).last().dropna()
+            window = max(2, int(window / divisor))
+            min_periods = max(2, int(min_periods / divisor))
+        if len(prices) < min_periods + 1:
+            return None
+        returns = prices.pct_change().dropna().tail(window)
+        return returns if len(returns) >= min_periods else None
 
 
 
@@ -225,42 +235,15 @@ class RiskParityStrategy(Strategy):
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         
-        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
-        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
-        use_nav = bool(context.params.get("use_nav", False))
-        estimation_freq = context.params.get("estimation_freq", "daily")
-        
-        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
-        if price_frame is None or price_frame.empty:
+        returns = self._historical_returns(context, universe)
+        if returns is None:
             return None
-            
-        price_frame.index = pd.to_datetime(price_frame.index)
-        
-        if estimation_freq == "weekly":
-            price_frame = price_frame.resample("W").last().dropna()
-            window = max(2, int(rolling_window / 5))
-            min_p = max(2, int(min_periods / 5))
-        elif estimation_freq == "monthly":
-            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
-            window = max(2, int(rolling_window / 20))
-            min_p = max(2, int(min_periods / 20))
-        else:
-            window = rolling_window
-            min_p = min_periods
-
-        if len(price_frame) < min_p + 1:
-            return None
-            
-        returns = price_frame.pct_change().dropna().tail(window)
-        if len(returns) < min_p:
-            return None
-            
         vol_multipliers = context.params.get("vol_multipliers", {})
         if vol_multipliers:
             for col, mult in vol_multipliers.items():
                 if col in returns.columns:
                     returns[col] = returns[col] * float(mult)
-            
+
         X = returns.values
         T, N = X.shape
         if N == 0:
@@ -317,6 +300,18 @@ class RiskParityEWMAStrategy(RiskParityStrategy):
     version = "0.1.0"
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
+        sample = self._volatility_sample(context, universe)
+        if sample is None:
+            return None
+        _, volatility = sample
+        inv_vol = 1.0 / volatility
+        weights = inv_vol / inv_vol.sum()
+        return TargetPortfolio({asset_id: float(weights[asset_id]) for asset_id in universe})
+
+    @staticmethod
+    def _volatility_sample(
+        context: StrategyContext, universe: list[str],
+    ) -> tuple[pd.DataFrame, pd.Series] | None:
         ewma_span = int(context.params.get("ewma_span", 60))
         ewma_min_periods = int(context.params.get("ewma_min_periods", 20))
         use_nav = bool(context.params.get("use_nav", False))
@@ -353,9 +348,7 @@ class RiskParityEWMAStrategy(RiskParityStrategy):
         volatility = volatility[volatility > 0]
         if len(volatility) != len(universe):
             return None
-        inv_vol = 1.0 / volatility
-        weights = inv_vol / inv_vol.sum()
-        return TargetPortfolio({asset_id: float(weights[asset_id]) for asset_id in universe})
+        return price_frame, volatility
 
 
 class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
@@ -363,11 +356,10 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
     version = "0.1.0"
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        ewma_span = int(context.params.get("ewma_span", 60))
-        ewma_min_periods = int(context.params.get("ewma_min_periods", 20))
-        use_nav = bool(context.params.get("use_nav", False))
-        estimation_freq = context.params.get("estimation_freq", "daily")
-        
+        sample = self._volatility_sample(context, universe)
+        if sample is None:
+            return None
+        price_frame, volatility = sample
         alpha = float(context.params.get("dd_penalty_alpha", 1.0))
         beta = float(context.params.get("dd_recovery_beta", 2.0))
         dd_window = int(context.params.get("dd_window", 30))
@@ -375,38 +367,6 @@ class RiskParityEWMADrawdownRecoveryStrategy(RiskParityEWMAStrategy):
         # Nonlinear Threshold parameter
         penalty_threshold = float(context.params.get("dd_penalty_threshold", 0.025))
 
-        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
-        if price_frame is None or price_frame.empty:
-            return None
-            
-        # Convert index to DatetimeIndex for resampling
-        price_frame.index = pd.to_datetime(price_frame.index)
-        
-        if estimation_freq == "weekly":
-            price_frame = price_frame.resample("W").last().dropna()
-            span = max(2, int(ewma_span / 5))
-            min_p = max(2, int(ewma_min_periods / 5))
-        elif estimation_freq == "monthly":
-            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
-            span = max(2, int(ewma_span / 20))
-            min_p = max(2, int(ewma_min_periods / 20))
-        else:
-            span = ewma_span
-            min_p = ewma_min_periods
-
-        if len(price_frame) < min_p + 1:
-            return None
-        returns = price_frame.pct_change()
-        vol_multipliers = context.params.get("vol_multipliers", {})
-        if vol_multipliers:
-            for col, mult in vol_multipliers.items():
-                if col in returns.columns:
-                    returns[col] = returns[col] * float(mult)
-        volatility = returns.ewm(span=span, min_periods=min_p, adjust=False).std().iloc[-1]
-        volatility = volatility[volatility > 0]
-        if len(volatility) != len(universe):
-            return None
-            
         # Calculate adjustments for each asset
         adjusted_vol = {}
         for asset_id in universe:
@@ -472,43 +432,11 @@ class RiskParityLWCovStrategy(RiskParityStrategy):
     version = "0.1.0"
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
-        import numpy as np  # 确保导入 numpy
-        
-        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
-        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
-        use_nav = bool(context.params.get("use_nav", False))
-        estimation_freq = context.params.get("estimation_freq", "daily")
+        returns = self._historical_returns(context, universe)
+        if returns is None:
+            return None
         shrinkage_target = context.params.get("shrinkage_target", "constant_correlation")
-        
-        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
-        if price_frame is None or price_frame.empty:
-            return None
-            
-        # 转换为 DatetimeIndex
-        price_frame.index = pd.to_datetime(price_frame.index)
-        
-        # 处理不同的估计频率
-        if estimation_freq == "weekly":
-            price_frame = price_frame.resample("W").last().dropna()
-            window = max(2, int(rolling_window / 5))
-            min_p = max(2, int(min_periods / 5))
-        elif estimation_freq == "monthly":
-            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
-            window = max(2, int(rolling_window / 20))
-            min_p = max(2, int(min_periods / 20))
-        else:
-            window = rolling_window
-            min_p = min_periods
 
-        if len(price_frame) < min_p + 1:
-            return None
-            
-        # 计算收益率
-        returns = price_frame.pct_change().dropna().tail(window)
-        if len(returns) < min_p:
-            return None
-            
-        # 提取收益率 numpy 数组，大小为 (T, N)
         X = returns.values
         T, N = X.shape
         if N == 0:
@@ -613,40 +541,10 @@ class HierarchicalRiskParityStrategy(RiskParityStrategy):
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         
-        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
-        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
-        use_nav = bool(context.params.get("use_nav", False))
-        estimation_freq = context.params.get("estimation_freq", "daily")
-        
-        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
-        if price_frame is None or price_frame.empty:
+        returns = self._historical_returns(context, universe)
+        if returns is None:
             return None
-            
-        # 转换为 DatetimeIndex
-        price_frame.index = pd.to_datetime(price_frame.index)
-        
-        # 处理不同的估计频率
-        if estimation_freq == "weekly":
-            price_frame = price_frame.resample("W").last().dropna()
-            window = max(2, int(rolling_window / 5))
-            min_p = max(2, int(min_periods / 5))
-        elif estimation_freq == "monthly":
-            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
-            window = max(2, int(rolling_window / 20))
-            min_p = max(2, int(min_periods / 20))
-        else:
-            window = rolling_window
-            min_p = min_periods
 
-        if len(price_frame) < min_p + 1:
-            return None
-            
-        # 计算收益率
-        returns = price_frame.pct_change().dropna().tail(window)
-        if len(returns) < min_p:
-            return None
-            
-        # 提取收益率 numpy 数组
         X = returns.values
         T, N = X.shape
         if N <= 1:
@@ -747,37 +645,12 @@ class RiskParityCVaRDynamicBudgetStrategy(RiskParityLWCovStrategy):
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         
-        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
-        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
-        use_nav = bool(context.params.get("use_nav", False))
+        returns = self._historical_returns(context, universe)
+        if returns is None:
+            return None
         estimation_freq = context.params.get("estimation_freq", "daily")
         cov_estimator = context.params.get("cov_estimator", "ledoit_wolf")
-        
-        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
-        if price_frame is None or price_frame.empty:
-            return None
-            
-        price_frame.index = pd.to_datetime(price_frame.index)
-        
-        if estimation_freq == "weekly":
-            price_frame = price_frame.resample("W").last().dropna()
-            window = max(2, int(rolling_window / 5))
-            min_p = max(2, int(min_periods / 5))
-        elif estimation_freq == "monthly":
-            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
-            window = max(2, int(rolling_window / 20))
-            min_p = max(2, int(min_periods / 20))
-        else:
-            window = rolling_window
-            min_p = min_periods
 
-        if len(price_frame) < min_p + 1:
-            return None
-            
-        returns = price_frame.pct_change().dropna().tail(window)
-        if len(returns) < min_p:
-            return None
-            
         X = returns.values
         T, N = X.shape
         if N == 0:
@@ -1064,42 +937,14 @@ class ClusterRepresentativeDampedRiskParityStrategy(RiskParityLWCovStrategy):
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         
-        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
-        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
-        use_nav = bool(context.params.get("use_nav", False))
-        estimation_freq = context.params.get("estimation_freq", "daily")
+        returns = self._historical_returns(context, universe)
+        if returns is None:
+            return None
         shrinkage_target = context.params.get("shrinkage_target", "constant_correlation")
-        
         top_k = int(context.params.get("top_k_per_sleeve", 1))
         switching_threshold = float(context.params.get("switching_threshold", 0.05))
         sleeve_mapping = context.params.get("sleeve_mapping", None)
-        
-        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
-        if price_frame is None or price_frame.empty:
-            return None
-            
-        price_frame.index = pd.to_datetime(price_frame.index)
-        
-        # 频率调整
-        if estimation_freq == "weekly":
-            price_frame = price_frame.resample("W").last().dropna()
-            window = max(2, int(rolling_window / 5))
-            min_p = max(2, int(min_periods / 5))
-        elif estimation_freq == "monthly":
-            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
-            window = max(2, int(rolling_window / 20))
-            min_p = max(2, int(min_periods / 20))
-        else:
-            window = rolling_window
-            min_p = min_periods
 
-        if len(price_frame) < min_p + 1:
-            return None
-            
-        returns = price_frame.pct_change().dropna().tail(window)
-        if len(returns) < min_p:
-            return None
-            
         X = returns.values
         T, N = X.shape
         if N == 0:
@@ -1262,38 +1107,11 @@ class RiskParityGerberStrategy(RiskParityLWCovStrategy):
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
         
-        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 120)))
-        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
-        use_nav = bool(context.params.get("use_nav", False))
-        estimation_freq = context.params.get("estimation_freq", "daily")
+        returns = self._historical_returns(context, universe)
+        if returns is None:
+            return None
         gerber_c = float(context.params.get("gerber_c", 0.5))  # 阈值比例因子，默认 0.5
-        
-        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
-        if price_frame is None or price_frame.empty:
-            return None
-            
-        price_frame.index = pd.to_datetime(price_frame.index)
-        
-        # 频率调整
-        if estimation_freq == "weekly":
-            price_frame = price_frame.resample("W").last().dropna()
-            window = max(2, int(rolling_window / 5))
-            min_p = max(2, int(min_periods / 5))
-        elif estimation_freq == "monthly":
-            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
-            window = max(2, int(rolling_window / 20))
-            min_p = max(2, int(min_periods / 20))
-        else:
-            window = rolling_window
-            min_p = min_periods
 
-        if len(price_frame) < min_p + 1:
-            return None
-            
-        returns = price_frame.pct_change().dropna().tail(window)
-        if len(returns) < min_p:
-            return None
-            
         X = returns.values
         T, N = X.shape
         if N == 0:
@@ -1378,42 +1196,14 @@ class RiskParityEWMACovStrategy(RiskParityLWCovStrategy):
 
     def _inverse_vol_target(self, context: StrategyContext, universe: list[str]) -> TargetPortfolio | None:
 
-        rolling_window = int(context.params.get("rolling_window", context.params.get("ewma_span", 250)))
-        min_periods = int(context.params.get("min_periods", context.params.get("ewma_min_periods", 20)))
-        use_nav = bool(context.params.get("use_nav", False))
-        estimation_freq = context.params.get("estimation_freq", "daily")
-        # EWMA 协方差的有效记忆跨度（span），span 越小越偏向近端观测
+        returns = self._historical_returns(context, universe, default_window=250)
+        if returns is None:
+            return None
         ewma_cov_span = int(context.params.get("ewma_cov_span", context.params.get("ewma_span", 90)))
-        # 对角收缩强度，保证 Σ 的数值正定与稳定（0 表示不收缩）
         shrinkage = float(context.params.get("ewma_cov_shrinkage", 0.1))
-
-        price_frame = context.data.get_price_frame(universe, context.date, use_nav=use_nav)
-        if price_frame is None or price_frame.empty:
-            return None
-
-        price_frame.index = pd.to_datetime(price_frame.index)
-
-        if estimation_freq == "weekly":
-            price_frame = price_frame.resample("W").last().dropna()
-            window = max(2, int(rolling_window / 5))
-            min_p = max(2, int(min_periods / 5))
-            span = max(2, int(ewma_cov_span / 5))
-        elif estimation_freq == "monthly":
-            price_frame = price_frame.resample(pd.offsets.MonthEnd()).last().dropna()
-            window = max(2, int(rolling_window / 20))
-            min_p = max(2, int(min_periods / 20))
-            span = max(2, int(ewma_cov_span / 20))
-        else:
-            window = rolling_window
-            min_p = min_periods
-            span = ewma_cov_span
-
-        if len(price_frame) < min_p + 1:
-            return None
-
-        returns = price_frame.pct_change().dropna().tail(window)
-        if len(returns) < min_p:
-            return None
+        frequency = context.params.get("estimation_freq", "daily")
+        divisor = {"weekly": 5, "monthly": 20}.get(frequency)
+        span = max(2, int(ewma_cov_span / divisor)) if divisor else ewma_cov_span
 
         X = returns.values
         T, N = X.shape

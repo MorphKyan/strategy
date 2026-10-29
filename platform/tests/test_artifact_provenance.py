@@ -77,4 +77,4 @@ def test_published_index_virtual_fills_are_marked_as_research_simulation(tmp_pat
     assert result.metrics["trade_count"] == 1
     manifest = json.loads((result.output_dir / "manifest.json").read_text())
     assert manifest["instrument_semantics"] == {"research_simulation": True, "non_tradable_indices": ["INDEX"]}
-    assert "研究模拟" in (result.output_dir / "report.md").read_text()
+    assert "研究模拟" in (result.output_dir / "report.md").read_text(encoding="utf-8")

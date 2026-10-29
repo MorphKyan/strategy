@@ -32,7 +32,6 @@ from src.platform_dashboard.artifacts import (
     read_sim_run_table,
     read_ticket_orders,
     read_run_table,
-    read_run_tables,
     read_corporate_actions,
     read_market_history,
     portfolio_risk_analysis,
@@ -132,9 +131,10 @@ def test_discover_runs_and_read_tables(tmp_path: Path) -> None:
 
     runs = discover_runs(tmp_path)
     assert [run.run_id for run in runs] == ["sample_run"]
-    tables = read_run_tables(run_dir)
-    assert tables["nav"]["drawdown"].tolist() == pytest.approx([0.0, -0.1])
-    assert latest_positions(tables["positions"])["asset_id"].tolist() == ["B", "A"]
+    nav = read_run_table(run_dir, "nav")
+    positions = read_run_table(run_dir, "positions")
+    assert nav["drawdown"].tolist() == pytest.approx([0.0, -0.1])
+    assert latest_positions(positions)["asset_id"].tolist() == ["B", "A"]
 
 
 def test_filter_runs_matches_multiple_metadata_terms(tmp_path: Path) -> None:

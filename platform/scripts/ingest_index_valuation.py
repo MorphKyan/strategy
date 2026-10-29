@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.platform_core.data_store import merge_observations, write_csv_stable
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -68,7 +70,6 @@ def load_raw_valuation(source_dir: Path) -> pd.DataFrame:
     frames = []
     for path in paths:
         frame = pd.read_csv(path, usecols=lambda c: c in {"S_INFO_WINDCODE", *COLUMN_MAP})
-        frame["__source"] = path.name
         frames.append(frame)
         print(f"  读取 {path.name}: {len(frame):,} 行")
     return pd.concat(frames, ignore_index=True)
@@ -86,7 +87,7 @@ def ingest(source_dir: Path, data_dir: Path, output_dir: Path) -> pd.DataFrame:
     calendar_set = set(calendar)
     rows = []
     for index_code, group in raw.groupby("index_code"):
-        group = group.sort_values("trade_date").drop_duplicates("trade_date", keep="last")
+        group = group.drop_duplicates("trade_date", keep="last").sort_values("trade_date")
         raw_rows = len(group)
         # 权威交易日历过滤（不用 turnover 空值这一启发式，仅用它做交叉校验）
         kept = group[group["trade_date"].isin(calendar_set)].copy()
@@ -97,7 +98,9 @@ def ingest(source_dir: Path, data_dir: Path, output_dir: Path) -> pd.DataFrame:
 
         kept = kept[OUTPUT_COLUMNS].copy()
         kept["trade_date"] = kept["trade_date"].dt.strftime("%Y-%m-%d")
-        kept.to_csv(output_dir / f"{index_code}.csv", index=False, encoding="utf-8")
+        output_path = output_dir / f"{index_code}.csv"
+        merged = merge_observations(output_path, kept)
+        write_csv_stable(output_path, merged, key_column="trade_date")
 
         rows.append({
             "index_code": index_code,

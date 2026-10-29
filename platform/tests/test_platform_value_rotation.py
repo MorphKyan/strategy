@@ -58,6 +58,14 @@ def test_percentile_uses_only_history_up_to_asof(tmp_path: Path) -> None:
     assert at_end.observations == 20
 
 
+def test_valuation_duplicates_keep_last_input_before_sorting(tmp_path: Path):
+    _build_store(tmp_path, {"512800": [1., 2.]})
+    pd.DataFrame({"trade_date": ["2024-01-01", "2024-01-02"] * 16,
+                  "pb_lf": range(32)}).to_csv(tmp_path / "index_valuation/IDX512800.CSI.csv", index=False)
+    store = IndexValuationStore(tmp_path)
+    assert store.load_series("IDX512800.CSI", "pb_lf").tolist() == [30, 31]
+
+
 def test_percentile_window_and_missing_mapping(tmp_path: Path) -> None:
     values = [float(i) for i in range(1, 21)]  # 1..20 递增
     _build_store(tmp_path, {"512800": values})

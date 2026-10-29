@@ -186,7 +186,10 @@ def test_csv_replace_failure_preserves_old_file_and_cleans_temp(tmp_path: Path, 
     assert list(tmp_path.iterdir()) == [path]
 
 
-@pytest.mark.parametrize("field,value", [("close", 0), ("close", float("inf")), ("adjust_factor", float("inf"))])
+@pytest.mark.parametrize("field,value", [
+    ("close", 0), ("close", float("inf")), ("adjust_factor", float("inf")),
+    ("amount", -1), ("amount", float("inf")), ("volume", -1), ("volume", float("inf")),
+])
 def test_invalid_provider_values_do_not_overwrite_valid_history(tmp_path, field, value):
     original = _bars([("2026-07-09", 4.8)])
     bad = original.copy()

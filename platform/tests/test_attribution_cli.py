@@ -16,9 +16,9 @@ def test_repeated_monthly_report_preserves_original_file(tmp_path):
                "--live-id", "account", "--shadow-id", "model", "--month", "2024-06",
                "--live-root", str(tmp_path / "live"), "--sim-root", str(tmp_path / "sim"),
                "--report-root", str(reports)]
-    subprocess.run(command, capture_output=True, text=True, check=True)
+    subprocess.run(command, capture_output=True, text=True, errors="replace", check=True)
     path = reports / "2024-06_account_attribution.md"
     before = path.read_bytes()
-    second = subprocess.run(command, capture_output=True, text=True, check=False)
+    second = subprocess.run(command, capture_output=True, text=True, errors="replace", check=False)
     assert second.returncode != 0 and "FileExistsError" in second.stderr
     assert path.read_bytes() == before

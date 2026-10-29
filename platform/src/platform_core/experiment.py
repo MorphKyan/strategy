@@ -41,11 +41,6 @@ def strategy_name(config: dict[str, Any]) -> str:
     return str(config.get("platform", {}).get("run_name", "platform_strategy"))
 
 
-def run_name(config: dict[str, Any], label: str) -> str:
-    base = config.get("platform", {}).get("run_name") or strategy_name(config)
-    return f"{base}_{label}"
-
-
 def run_backtest(
     config: dict[str, Any],
     label: str,
@@ -54,7 +49,9 @@ def run_backtest(
     render_charts: bool = True,
 ) -> ExperimentRun:
     runtime_config = copy.deepcopy(config)
-    runtime_config.setdefault("platform", {})["run_name"] = run_name(runtime_config, label)
+    platform = runtime_config.setdefault("platform", {})
+    base_name = platform.get("run_name") or strategy_name(runtime_config)
+    platform["run_name"] = f"{base_name}_{label}"
     output_root = Path(raw_root) / strategy_name(runtime_config)
     result = PlatformBacktestEngine(config=runtime_config, store=store, output_dir=output_root).run()
     metrics = build_platform_metrics(result.output_dir)

@@ -47,14 +47,13 @@ def read_csv_or_empty(path: str | Path) -> pd.DataFrame:
 def _filter_by_date(frame: pd.DataFrame, start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame:
     if frame.empty or "date" not in frame.columns:
         return frame.copy()
-    out = frame.copy()
-    dates = pd.to_datetime(out["date"], errors="coerce")
+    dates = pd.to_datetime(frame["date"], errors="coerce")
     mask = dates.notna()
     if start_date is not None:
         mask &= dates >= pd.Timestamp(start_date)
     if end_date is not None:
         mask &= dates <= pd.Timestamp(end_date)
-    return out.loc[mask].copy()
+    return frame.loc[mask].copy()
 
 
 def _empty_metrics(
@@ -174,6 +173,7 @@ def compute_period_metrics(
         average_cash_weight = safe_float((cash / total_value).dropna().mean())
 
     max_position_count = 0
+    active_positions = pd.DataFrame()
     if not positions.empty and {"date", "quantity"}.issubset(positions.columns):
         active_positions = positions[pd.to_numeric(positions["quantity"], errors="coerce").fillna(0) > 0]
         if not active_positions.empty:
@@ -208,12 +208,10 @@ def compute_period_metrics(
             trade_dates = pd.to_datetime(trades[trade_date_col], errors="coerce").dropna()
             if not trade_dates.empty:
                 first_active_date = trade_dates.min()
-    if not positions.empty and {"date", "quantity"}.issubset(positions.columns):
-        pos_qty = positions[pd.to_numeric(positions["quantity"], errors="coerce").fillna(0) > 0]
-        if not pos_qty.empty:
-            first_position_date = pd.to_datetime(pos_qty["date"], errors="coerce").min()
-            if first_active_date is None or first_position_date < first_active_date:
-                first_active_date = first_position_date
+    if not active_positions.empty:
+        first_position_date = pd.to_datetime(active_positions["date"], errors="coerce").min()
+        if first_active_date is None or first_position_date < first_active_date:
+            first_active_date = first_position_date
 
     if first_active_date is not None and not pd.isna(first_active_date):
         active_nav = nav[nav["date"] >= first_active_date]

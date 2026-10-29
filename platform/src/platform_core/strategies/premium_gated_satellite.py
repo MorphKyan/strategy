@@ -88,7 +88,7 @@ class PremiumGatedSatelliteStrategy(FixedWeightThresholdStrategy):
         """闸门状态：按 gate_eval 频率重估，其余日期沿用记忆值。"""
         mode = str(context.params.get("gate_eval", "month_end")).lower()
         remembered = context.runtime.get(_GATE_STATE_KEY)
-        if mode == "daily" or remembered is None or context.is_month_end():
+        if mode == "daily" or remembered is None or context.data.is_month_end(context.date):
             state = self._evaluate_gate(context)
             context.runtime[_GATE_STATE_KEY] = state
             return state
