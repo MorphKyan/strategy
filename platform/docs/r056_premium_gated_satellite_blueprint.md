@@ -4,7 +4,7 @@
 > 撰写者：Claude Opus 5
 > 阅读顺序：`AGENTS.md` → `next_phase_blueprint.md` → 本文
 > 前置：R038（核心仓阈值带，实盘默认）、R050（行业卫星，Passed 但边际贡献为负）、
-> R056 阶段审计（`reports/r056_qdii_premium_feasibility_audit.md`）
+> R056 阶段审计（`reports/R056-A_qdii_premium_feasibility/20261101/report.md`）
 
 ---
 
@@ -23,7 +23,7 @@
 **定性：这次是同一课题内部的"简单 vs 复杂"对照——加了机制的臂 Failed，
 什么都不做的臂通过。** 与 R038（阈值带赢日历）、R050（等权赢轮动）同构。
 
-完整结果见 `platform/reports/r056_premium_gated_satellite_report.md`。
+完整结果见 `platform/reports/R056-B_premium_gated_satellite/20261101/report.md`。
 
 ---
 

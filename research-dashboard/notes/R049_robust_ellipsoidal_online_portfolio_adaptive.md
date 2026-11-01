@@ -39,4 +39,4 @@
 - 训练命令：`.\env\python.exe platform\scripts\run_platform_experiment.py --config configs\r049_robust_ellipsoidal_online_portfolio_adaptive.yaml --baseline-config configs\r8_permanent_real_fixed_weight_threshold.yaml --experiment-name r049_training_vs_fixed_weight --start-date 2019-01-18 --end-date 2025-06-30 --no-charts --slippage-scenario all`。
 - 三个场景的候选 Sharpe 为 `0.0868`、`-0.2299`、`-0.2379`，主基线为 `1.1715`、`1.1682`、`1.1643`；候选年化换手为 `19.7465`、`19.7750`、`19.5461`，主基线为 `0.1024`、`0.1025`、`0.0997`。候选交易数为 `410/420/418`，主基线均为 `24`。
 - 三滑点下 Sharpe、收益和最大回撤同时显著退化，且换手与订单数违反预冻结硬门槛。因此停止研究；不运行机制基线、起点敏感性或最终测试，且不读取 `2025-07-01` 之后结果。
-- 候选策略源码、注册、配置和测试已清理；原始 artifacts 与标准化报告保留。详见 `platform/reports/r049_relp_adap_failed_report.md`。
+- 候选策略源码、注册、配置和测试已清理；原始 artifacts 与标准化报告保留。详见 `platform/reports/R049_relp_adap_failed/20261101/report.md`。

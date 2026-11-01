@@ -44,6 +44,7 @@ def test_experiment_cli_defaults_to_two_scenarios(tmp_path, monkeypatch):
 
     def run(**kwargs):
         calls.append(kwargs["slippage_scenario"])
+        assert kwargs["report_root"] == module.ROOT / "results/temporary_backtests/experiments/summaries"
         return SimpleNamespace(report_dir=tmp_path, candidate=SimpleNamespace(output_dir=tmp_path), baseline=None)
 
     monkeypatch.setattr(module, "run_platform_experiment", run)
@@ -58,6 +59,7 @@ def test_experiment_cli_defaults_to_two_scenarios(tmp_path, monkeypatch):
 ])
 def test_sensitivity_defaults_to_two_calendar_months_and_two_scenarios(tmp_path, monkeypatch, step, expected_days):
     module = _script("run_sensitivity", monkeypatch)
+    monkeypatch.setattr(module, "ROOT", tmp_path)
     path = tmp_path / "config.yaml"
     path.write_text(yaml.safe_dump({"platform": {}, "strategy": {"strategy_name": "monthly_equal_weight"}}))
     dates = ["2024-01-02", "2024-01-03", "2024-03-04", "2024-05-06", "2024-06-28"]
@@ -75,12 +77,14 @@ def test_sensitivity_defaults_to_two_calendar_months_and_two_scenarios(tmp_path,
 
     monkeypatch.setattr(module, "run_backtest", run)
     arguments = ["run", "--config", str(path), "--raw-root", str(tmp_path / "raw"),
-                 "--report-root", str(tmp_path / "reports"), "--start-date", "2024-01-02", "--end-date", "2024-06-28"]
+                 "--start-date", "2024-01-02", "--end-date", "2024-06-28"]
     if step is not None:
         arguments += ["--step", str(step)]
     monkeypatch.setattr(sys, "argv", arguments)
     assert module.main() == 0
     assert calls == [(scenario, day) for scenario in ("default", "stress") for day in expected_days]
+    assert len(list((tmp_path / "results/sensitivity/summaries").rglob("manifest.json"))) == 1
+    assert not (tmp_path / "reports").exists()
 
 
 def test_sim_cli_resumes_existing_portfolio_without_resetting_checkpoint(tmp_path, monkeypatch):

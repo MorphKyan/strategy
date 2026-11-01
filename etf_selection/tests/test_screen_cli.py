@@ -35,14 +35,15 @@ def test_stale_screening_syncs_all_candidates_and_stops_on_failure(tmp_path, mon
 
     monkeypatch.setattr(module, "screen_sleeves", screen)
     monkeypatch.setattr(module.subprocess, "run", sync)
-    monkeypatch.setattr(module, "write_report", lambda *args, **kwargs: reports.append(1))
+    monkeypatch.setattr(module, "write_report", lambda report_dir, *args, **kwargs: reports.append(report_dir))
     if failure:
         with pytest.raises(subprocess.CalledProcessError if failure == "sync" else RuntimeError):
             module.main()
         assert not reports
     else:
         assert module.main() == 0
-        assert reports == [1]
+        assert len(reports) == 1
+        assert reports[0].parent == module.REPO_ROOT / "etf_selection/results/screening"
     assert len(calls) == (1 if failure == "sync" else 2)
     assert len(syncs) == 1
     command, options = syncs[0]

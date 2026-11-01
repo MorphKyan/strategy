@@ -3,7 +3,7 @@
 **状态：research-only，未注册（R039 v1 验收 Failed，2026-07-12）。**
 训练样本（2020-03-16 ~ 2025-06-30）上相对行业等权基线年化落后 10.5pp，
 起始日敏感性 32 个起点仅 1 个为正（中位数年化 -8.2%），三滑点场景一致。
-详见 platform/reports/r039_industry_rotation_report.md 与
+详见 platform/reports/R039_industry_rotation/20261101/report.md 与
 research-dashboard/notes/R039_industry_momentum_rotation.md。
 若按蓝图 D2（拥挤度否决）继续迭代，需在 strategy.py 尾部重新注册本类，
 并重建候选配置（基线配置 baseline_r9_industry_equal_weight.yaml 仍在库）。

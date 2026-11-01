@@ -8,8 +8,8 @@
 - 创建时间：2026-07-11 Asia/Shanghai
 - 状态：`Failed`
 - 关联看板项：`research-dashboard/research_backlog.md` R043
-- 标准实验报告：`platform/reports/r043_gerber_duration_trend_report.md`
-- 证据附录：`platform/reports/r043_evidence_appendix.md`
+- 标准实验报告：`platform/reports/R043_gerber_duration_trend/20261101/report.md`
+- 证据附录：`platform/reports/R043_gerber_duration_trend/20261101/appendix.md`
 
 ## 假设与来源
 

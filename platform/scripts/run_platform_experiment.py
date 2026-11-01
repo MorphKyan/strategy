@@ -24,7 +24,7 @@ def main() -> int:
         default="results/temporary_backtests/experiments",
         help="Root for raw platform experiment artifacts.",
     )
-    parser.add_argument("--report-root", default="reports/experiments", help="Root for standardized experiment reports.")
+    parser.add_argument("--report-root", default="results/temporary_backtests/experiments/summaries", help="Root for standardized experiment reports.")
     parser.add_argument("--skip-baseline", action="store_true", help="Run candidate only.")
     parser.add_argument("--no-charts", action="store_true", help="Skip chart rendering.")
     parser.add_argument("--start-date", help="Runtime backtest start date for candidate and baseline, YYYY-MM-DD.")

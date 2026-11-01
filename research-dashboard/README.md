@@ -5,8 +5,9 @@
 本目录不保存原始回测结果、标准实验报告或平台配置。那些 artifact 仍按系统边界写入：
 
 - 平台原始结果：`platform/results/`
-- 平台标准报告：`platform/reports/`
-- ETF 筛选结果：`etf_selection/reports/` 和 `etf_selection/generated_configs/`
+- 平台最终报告：[报告索引](../platform/reports/README.md)，按课题、发布日期直接归档
+- ETF 最终报告：[报告索引](../etf_selection/reports/README.md)
+- ETF 筛选明细与生成配置：`etf_selection/results/screening/` 和 `etf_selection/generated_configs/`
 
 ## 文件说明
 
@@ -21,6 +22,6 @@ Harness prompt 只保存在 `.agents/agents/*/agent.json`，本目录不保留�
 
 1. 根目录 `AGENTS.md` 是最高优先级规则来源，本目录不能引入冲突规则。
 2. 新课题先进入 `research_backlog.md`，再由研究 agent 认领。
-3. 每个正式研究应使用 `research_note_template.md` 生成一份研究笔记，并在标准实验报告中回链。
+3. 每个正式研究使用 `research_note_template.md` 保存过程笔记，最终报告汇总各阶段结论并回链笔记；看板指向最终报告。
 4. 已完成、失败和 research-only 课题不得从看板或历史摘要中删除；如需压缩，只能改写为更短的可检索摘要并保留 ID、主题、结论和报告链接。
 5. 失败、research-only 或探索性结论不得留下已注册策略或新的平台 baseline 配置。

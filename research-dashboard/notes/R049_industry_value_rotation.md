@@ -1,7 +1,7 @@
 # R049 行业 ETF 估值分位轮动（左侧价值）
 
 - **状态**：Failed / research-only（2026-07-25 当日立项、当日验收）
-- **完整报告**：`platform/reports/r049_value_rotation_report.md`
+- **完整报告**：`platform/reports/R049_value_rotation/20261101/report.md`
 - **蓝图**：`platform/docs/r049_value_rotation_blueprint.md`
 - **前作**：R039 行业动量轮动（同池，同样 Failed）
 

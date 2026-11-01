@@ -10,7 +10,7 @@
 - 创建时间：
 - 状态：`Todo` / `In Progress` / `Frozen` / `Approved` / `Failed` / `Research-Only`
 - 关联看板项：
-- 标准实验报告：
+- 最终报告：
 
 ## 假设与来源
 

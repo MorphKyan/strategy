@@ -39,7 +39,7 @@ def main() -> int:
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     paths = config.get("paths", {})
-    report_dir = resolve_repo_path(paths.get("report_dir", "etf_selection/reports")) / timestamp
+    report_dir = resolve_repo_path(paths.get("report_dir", "etf_selection/results/screening")) / timestamp
     generated_dir = resolve_repo_path(paths.get("generated_config_dir", "etf_selection/generated_configs")) / timestamp
 
     try:

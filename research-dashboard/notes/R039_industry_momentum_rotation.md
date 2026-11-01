@@ -2,8 +2,8 @@
 
 - 日期：2026-07-12
 - 蓝图：`platform/docs/r039_rotation_blueprint.md`（立项动机、文献依据、参数先验、验收标准、D1–D4 迭代路线）
-- 详细报告：`platform/reports/r039_industry_rotation_report.md`
-- 实验产物：`platform/reports/experiments/r039_industry_rotation_{default,stress,dynamic_participation}/20260712_*`；敏感性 `platform/reports/sensitivity/industry_momentum_rotation/20260712_031736`、`.../monthly_equal_weight/20260712_031853`
+- 详细报告：`platform/reports/R039_industry_rotation/20261101/report.md`
+- 实验产物：`platform/results/temporary_backtests/experiments/summaries/r039_industry_rotation_{default,stress,dynamic_participation}/20260712_*`；敏感性 `platform/results/sensitivity/summaries/industry_momentum_rotation/20260712_031736`、`.../monthly_equal_weight/20260712_031853`
 
 ## 假设
 

@@ -1,6 +1,6 @@
 # 论文精读与学术指南：Thierry Roncalli 风险预算与 Expected Shortfall 资产配置理论
 
-- **论文文件**: [`Roncalli_Risk_Parity_arXiv.pdf`](file:///d:/strategy/doc/Roncalli_Risk_Parity_arXiv.pdf)
+- **论文文件**: [`Roncalli_Risk_Parity_arXiv.pdf`](Roncalli_Risk_Parity_arXiv.pdf)
 - **作者**: Thierry Roncalli (Amundi Asset Management & University of Paris-Dauphine)
 - **存储路径**: `d:/strategy/doc/`
 

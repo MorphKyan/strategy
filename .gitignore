@@ -92,7 +92,7 @@ docs/_build/
 Thumbs.db
 
 # Local generated research outputs at repository root.
-# Standard experiment artifacts should live under results/ and reports/.
+# Final reports live under reports/; generated run artifacts live under results/.
 /*.csv
 /*.png
 /*.txt
@@ -103,8 +103,7 @@ Thumbs.db
 /platform/data/platform_fundamentals/
 data_manifest.json
 
-# Reproducible raw run artifacts. Keep standardized experiment reports under
-# reports/experiments/ tracked for auditability.
+# Reproducible raw run artifacts and automated summaries.
 /platform/results/
 /platform/results/platform/
 /platform/results/backtests/
@@ -125,7 +124,7 @@ data_manifest.json
 /platform/results/**/checkpoints/
 
 # Standalone ETF selection generated artifacts.
-/etf_selection/reports/
+/etf_selection/results/
 /etf_selection/generated_configs/
 
 # Temporary bond research raw run artifacts
@@ -138,7 +137,7 @@ data_manifest.json
 /.claude/
 
 # Personal live-portfolio attribution reports (contain real account values)
-/platform/reports/live/
+/platform/results/live_reports/
 
 # Licensed vendor data (Wind/WDS exports carry per-account watermarks).
 # Raw dumps and the cleaned per-index files both hold verbatim vendor values,

@@ -108,7 +108,7 @@ def discover_configs(root: Path | None = None) -> list[ConfigRecord]:
 
 # 不属于"回测 run 列表"的 results/ 子目录：
 # - sensitivity_raw / backtest_cache：研究内部产物，单次敏感性就有数百个目录，
-#   全部进看板会把启动拖到分钟级，结论看 reports/sensitivity 汇总即可；
+#   全部进看板会把启动拖到分钟级，结论看 results/sensitivity/summaries 汇总即可；
 # - sim_portfolios / live_portfolios：模拟/实盘组合的推进产物（nav 口径也不同，
 #   sim 用 total_value 而非 net_value），属于将来的组合页（蓝图 B3/B4），混进
 #   回测列表会出现无数据的空行。

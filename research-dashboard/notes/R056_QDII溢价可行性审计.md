@@ -1,7 +1,7 @@
 # R056 QDII 场内溢价可行性审计（跨市场卫星仓前置门）
 
 - **状态**：阶段 A/B 通过，阶段 C **不通过**（2026-07-29 当日立项、当日审计）
-- **完整报告**：`platform/reports/r056_qdii_premium_feasibility_audit.md`
+- **完整报告**：`platform/reports/R056-A_qdii_premium_feasibility/20261101/report.md`
 - **背景**：R039 行业动量、R049 行业估值双双 Failed，R050 行业等权+阈值带虽 Passed 但边际贡献为负；
   卫星仓改找低相关的跨市场资产，本审计是其前置门。
 - **未回测**：本课题未运行任何平台回测，无 turnover / trade_count / rejection_count 产出。

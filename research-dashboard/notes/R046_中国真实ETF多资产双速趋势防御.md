@@ -7,7 +7,7 @@
 - 创建时间：2026-07-11 Asia/Shanghai
 - 状态：`Failed`
 - 关联看板项：R046
-- 标准实验报告：`platform/reports/r046_china_dual_speed_trend_defensive_failed_report.md`
+- 标准实验报告：`platform/reports/R046_china_dual_speed_trend_defensive_failed/20261101/report.md`
 
 ## 假设与冻结
 

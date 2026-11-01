@@ -103,4 +103,4 @@ Researcher 需在读取 `2025-07-01` 以后任何表现前完成并记录下列�
 
 ## 2026-07-11 数据与依赖预检结论
 
-**状态：`Failed`。** 数据字段、共同历史和新鲜度检查通过，且已安装并验证 `scipy==1.15.3`、`cvxpy==1.7.5`。候选以离散 1-Wasserstein 球的运输对偶求解最坏情形对数增长，但三种训练滑点下均选择 100% 现金、没有成交，Sharpe 均为 `0`，相对 `risk_parity_lw_cov` 的 Sharpe 差为 `-1.9188~-1.9398`。按平均现金上限和训练 Sharpe 门槛立即失败；未运行敏感性或最终测试，候选源码、注册和研究专用配置已清理。完整审计见 `platform/reports/r047_wasserstein_robust_log_growth_feasibility_audit.md`。
+**状态：`Failed`。** 数据字段、共同历史和新鲜度检查通过，且已安装并验证 `scipy==1.15.3`、`cvxpy==1.7.5`。候选以离散 1-Wasserstein 球的运输对偶求解最坏情形对数增长，但三种训练滑点下均选择 100% 现金、没有成交，Sharpe 均为 `0`，相对 `risk_parity_lw_cov` 的 Sharpe 差为 `-1.9188~-1.9398`。按平均现金上限和训练 Sharpe 门槛立即失败；未运行敏感性或最终测试，候选源码、注册和研究专用配置已清理。完整审计见 `platform/reports/R047_wasserstein_robust_log_growth_feasibility_audit/20261101/report.md`。

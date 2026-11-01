@@ -11,7 +11,7 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 - `scripts/run_sensitivity.py`: start-date sensitivity analysis.
 - `scripts/run_dashboard.py`: launch the local read-only browser dashboard (port defaults to 8501, override with the `PORT` environment variable).
 - `scripts/run_live_cycle.py`: live-mirror portfolio entry — `reconcile` overwrites state from real holdings, `plan` renders the next-day order ticket, `cycle` chains sync/reconcile/plan/daily-valuation/notify and skips non-trading days (Task Scheduler command in the docstring). Each trading day the real holdings are marked to market into `real_nav.csv`, notifications are split into a markdown daily digest plus a separate ticket message when a rebalance triggers, and `--shadow` advances a shadow sim portfolio for attribution.
-- `scripts/report_live_attribution.py`: monthly live-vs-shadow NAV attribution (cumulative diff, annualized tracking error, cash-drag vs execution-residual split; record-only). Reports land in `reports/live/`, which is gitignored because it contains real account values.
+- `scripts/report_live_attribution.py`: monthly live-vs-shadow NAV attribution (cumulative diff, annualized tracking error, cash-drag vs execution-residual split; record-only). Reports land in `results/live_reports/`, which is gitignored because it contains real account values.
 - `scripts/validate_hfq_data.py`: compare platform adjusted close against the research HFQ chain.
 - `src/platform_core/`: platform engine package.
   - `models.py`: assets, bars, positions, orders, trades, portfolio state.
@@ -72,7 +72,7 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 
 - Daily event loop with per-day checkpoints.
 - Raw (unadjusted) price-based valuation and trade execution engine, which eliminates implicit compounding and cash drag.
-- Corporate action modeling: share splits take effect on the first real bar date after `split_date` (prices reflect the split only from that day; see `corporate_actions.py` and `reports/split_effective_date_fix_report.md`), and cash dividends are recorded as `dividend_receivables` on `ex_date` and paid out on `payment_date`.
+- Corporate action modeling: share splits take effect on the first real bar date after `split_date` (prices reflect the split only from that day; see `corporate_actions.py`), and cash dividends are recorded as `dividend_receivables` on `ex_date` and paid out on `payment_date`.
 - Single target-weight strategy configuration per platform config (strategies calculate signals on smooth `adj_close`).
 - Cash, position, cost-basis, pending-intent, and cooldown state.
 - Fee, lot-size, suspension, limit-up, and limit-down execution checks.
@@ -80,7 +80,7 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 - Built-in equal-weight, fundamental-filtered equal-weight, risk-parity, and EWMA risk-parity strategies.
 - Point-in-time fundamental filtering where local fundamental data exists.
 - SQLite metadata for strategy versions, backtests, checkpoints, simulated portfolios, and references.
-- Standardized experiment reports with optional baseline comparison under `reports/experiments/`.
+- Standardized experiment reports with optional baseline comparison under `results/temporary_backtests/experiments/summaries/`.
 - Research-grade metrics: annualized return, volatility, max drawdown, Sharpe, turnover, trade/order counts, rejection counts, pending-intent pressure, and cash drag.
 - CSV-only visualization module for NAV/drawdown, position weights, cash/pending-intent effects, and rejected-order reasons.
 - Local Streamlit dashboard with four pages: overview, run analysis (net-value/return display with trailing-window rebasing, benchmark overlay and excess-return curve, monthly return heatmap, yearly returns, rolling volatility/Sharpe, training vs frozen-sample table, positions with cash layer, orders and trades), run comparison (2-5 runs re-normalized at the selected window start), and strategy configs.
@@ -92,12 +92,12 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 - Fixed-config full-common-history backtests: `results/backtests/<run_id>/`
 - Temporary direct backtests: `results/temporary_backtests/direct/<run_id>/`
 - Raw standardized experiments: `results/temporary_backtests/experiments/<experiment>/<timestamp>/<strategy>/<run_id>/`
-- Standardized experiment reports: `reports/experiments/<experiment>/<timestamp>/`
+- Standardized experiment reports: `results/temporary_backtests/experiments/summaries/<experiment>/<timestamp>/`
 - Sensitivity raw runs: `results/sensitivity/<strategy>/<timestamp>/` (never loaded by Streamlit)
-- Sensitivity reports: `reports/sensitivity/<strategy>/<timestamp>/`
-- Data validation reports: `reports/data_validation/<timestamp>/`
+- Sensitivity reports: `results/sensitivity/summaries/<strategy>/<timestamp>/`
+- Data validation reports: `results/data_validation/<timestamp>/`
 
-Raw run directories contain execution-level artifacts. Report directories contain decision-level summaries, metrics, config copies, and pointers back to raw paths.
+`reports/README.md` 是研究报告索引，课题直接放在 `reports/<课题键>/<发布日期>/`。研究发布保留报告与可执行的脚本或配置，报告注明代码、依赖和基础数据版本。执行入口一次生成所需配置、数据、图表和汇总；中间产物在 `results/` 临时生成，完成报告并验证可重建后清理，不长期存档。
 The Streamlit dashboard loads only fixed-config backtests by default. Its global sidebar option can additionally load temporary backtests. Training, final-test, experiment, sensitivity, generated-config, partial-window, and ad hoc runs must never be written to the fixed-config directory.
 
 Direct runs record `artifact_provenance` in their manifest. A run enters `results/backtests/` only when its source matches a fixed config and its actual window matches the full common history. Older runs without this proof remain available through the temporary-backtest option; historical files are not moved or rewritten.

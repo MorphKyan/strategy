@@ -7,7 +7,7 @@
 - Owner：`codex-r041-20260625-094349`
 - 创建时间：`2026-06-25 09:43:49 +08:00`
 - 状态：`Failed`
-- 标准实验报告：`platform/reports/r041_min_torsion_enb_failed_report.md`
+- 标准实验报告：`platform/reports/R041_min_torsion_enb_failed/20261101/report.md`
 
 ## 冻结条件
 

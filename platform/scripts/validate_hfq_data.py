@@ -21,11 +21,11 @@ def main() -> int:
     parser.add_argument("--platform-data-dir", default="data", help="Platform data directory.")
     parser.add_argument("--start", help="Optional start date, YYYY-MM-DD.")
     parser.add_argument("--end", help="Optional end date, YYYY-MM-DD.")
-    parser.add_argument("--output-dir", help="Output directory. Defaults to reports/data_validation/<timestamp>.")
+    parser.add_argument("--output-dir", help="Output directory. Defaults to results/data_validation/<timestamp>.")
     args = parser.parse_args()
 
     platform_data_dir = (ROOT / args.platform_data_dir).resolve() if not Path(args.platform_data_dir).is_absolute() else Path(args.platform_data_dir)
-    output_dir = Path(args.output_dir) if args.output_dir else ROOT / "reports" / "data_validation" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    output_dir = Path(args.output_dir) if args.output_dir else ROOT / "results" / "data_validation" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     if not output_dir.is_absolute():
         output_dir = ROOT / output_dir
 

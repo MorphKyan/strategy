@@ -1032,7 +1032,8 @@ def test_hfq_validation_matches_research_chain(tmp_path: Path):
     assert detail["platform_close"].tolist() == [20, 22]
 
 
-def test_platform_experiment_runner_writes_standard_report(tmp_path: Path):
+def test_platform_experiment_runner_writes_standard_report(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     (data_dir / "AAA.csv").write_text(
@@ -1068,7 +1069,6 @@ def test_platform_experiment_runner_writes_standard_report(tmp_path: Path):
         baseline_config_path=config_path,
         db_path=tmp_path / "platform.sqlite3",
         raw_root=tmp_path / "raw",
-        report_root=tmp_path / "reports",
         render_charts=False,
         start_date="2024-01-30",
         end_date="2024-01-31",
@@ -1076,6 +1076,8 @@ def test_platform_experiment_runner_writes_standard_report(tmp_path: Path):
 
     assert result.metrics_path.exists()
     assert result.report_path.exists()
+    assert result.report_dir.is_relative_to(Path("results/temporary_backtests/experiments/summaries"))
+    assert not (tmp_path / "reports").exists()
     payload = json.loads(result.metrics_path.read_text(encoding="utf-8"))
     assert payload["candidate"]["start_date"] == "2024-01-30"
     assert payload["candidate"]["end_date"] == "2024-01-31"

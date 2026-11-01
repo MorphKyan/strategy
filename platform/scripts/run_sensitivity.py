@@ -64,7 +64,7 @@ def main() -> int:
         default="results/sensitivity",
         help="Root for raw sensitivity run artifacts.",
     )
-    parser.add_argument("--report-root", default="reports/sensitivity", help="Root for sensitivity summary reports.")
+    parser.add_argument("--report-root", default="results/sensitivity/summaries", help="Root for sensitivity summary reports.")
     parser.add_argument("--charts", action="store_true", help="Render per-run charts. Off by default because sensitivity can produce many runs.")
     parser.add_argument("--end-date", help="Runtime sensitivity end date, YYYY-MM-DD. Use 2025-06-30 for training-sample research.")
     parser.add_argument("--start-date", help="Runtime sensitivity start date, YYYY-MM-DD.")

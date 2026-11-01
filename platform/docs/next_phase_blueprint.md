@@ -202,13 +202,13 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 - 归因核心在 `platform/src/platform_core/attribution.py`（可测试的纯函数），CLI 为 `scripts/report_live_attribution.py`（默认出上个自然月，`--month` 指定，`--notify` 推送）；
 - 影子接线：`run_live_cycle.py cycle --shadow <sim_id>` 每交易日把影子模拟组合增量推进到 plan 日（新增 `SimPortfolio.load()` 从持久化状态恢复，区别于回到 checkpoint 重放）；影子失败只提示、不阻断日报环路；
 - 归因粗拆口径：现金拖累差 =（真实平均现金权重 − 模型平均现金权重）× 模型区间收益（近似），其余归入"执行与结构差异"残差——真实侧无逐笔费用明细，再细拆是伪精度；收益观测 < 5 判"样本不足仅存档"；
-- **报告含真实账户金额，`platform/reports/live/` 已 gitignore 不入库**；
+- **报告含真实账户金额，`platform/results/live_reports/` 已 gitignore 不入库**；
 - 建议配套：每月 1 日 20:00 的任务计划（注册命令见脚本 docstring）。
 
 原规格：
 
 - 输入：`real_nav.csv`（真实） vs 同期纸面 `SimPortfolio` 的 `nav.csv`（模型）。
-- 输出：`platform/reports/live/<YYYY-MM>_attribution.md`（中文），内容：两条净值曲线对比、月度 tracking error（bp）、差异归因粗拆（手续费差/成交价差/现金拖累），**只记录，不据此改持仓或改参数**。
+- 输出：`platform/results/live_reports/<YYYY-MM>_attribution.md`（中文），内容：两条净值曲线对比、月度 tracking error（bp）、差异归因粗拆（手续费差/成交价差/现金拖累），**只记录，不据此改持仓或改参数**。
 - 前提是同一 checkpoint 起点同时维护一个纸面 sim 组合作为影子——`run_live_cycle.py cycle` 里顺带 `SimPortfolio.advance()` 推进影子组合即可。
 
 ### A6. 资金出入份额化（已完成，2026-07-18）
@@ -302,7 +302,7 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 - 与核心仓在**组合层**隔离（独立 `sim_r9_*`/`live_r9_*` 命名空间），不动摇 §4 五条架构契约。
 - 信号选型依据 2026-07-12 文献调研：A 股个股月频动量失效（Liu-Stambaugh-Yuan 2019）但行业动量存活；舆情/热点不做买入信号（日频动量一周内反转），其可交易本质由拥挤度代理（D2 迭代）。
 
-**竣工说明（as-built，2026-07-12）**：D1 当日完成实现+全套验收，训练样本相对行业等权基线年化落后 10.5pp、32 个起点仅 1 个为正，判 **Failed / research-only**（详见 r039 蓝图头部判定与 `reports/r039_industry_rotation_report.md`）。策略已撤销注册（代码与 pytest 保留）；沉淀资产：16 只行业 ETF 全量数据链（sina 行情 + 事件驱动 hfq 因子 + 分红/拆分事件表扩容）、可复用基线 `domestic_industry_equal_weight.yaml`、`MarketDataStore` 历史收缩保护。卫星仓诉求仍在，下一个候选建议"行业池等权 + Swedroe 阈值带"（新编号立项）。
+**竣工说明（as-built，2026-07-12）**：D1 当日完成实现+全套验收，训练样本相对行业等权基线年化落后 10.5pp、32 个起点仅 1 个为正，判 **Failed / research-only**（详见 r039 蓝图头部判定与 `reports/R039_industry_rotation/20261101/report.md`）。策略已撤销注册（代码与 pytest 保留）；沉淀资产：16 只行业 ETF 全量数据链（sina 行情 + 事件驱动 hfq 因子 + 分红/拆分事件表扩容）、可复用基线 `domestic_industry_equal_weight.yaml`、`MarketDataStore` 历史收缩保护。卫星仓诉求仍在，下一个候选建议"行业池等权 + Swedroe 阈值带"（新编号立项）。
 
 ---
 
@@ -339,6 +339,6 @@ code, quantity            # 可选第三列 cost_basis，缺省则沿用估算
 2. ~~A3+A4：notify + cycle + 任务计划~~ **已完成（2026-07-05）**：`notify.py`（Server酱/SMTP，环境变量零配置自动发现）+ `cycle` 子命令（非交易日自动跳过）。任务计划命令已写进脚本 docstring，由用户设好推送密钥后自行注册。
 3. ~~B1：收益多尺度视图~~ **已完成（2026-07-05）**：净值/收益率双模式（收益率按区间首日归零）、区间选择、对数坐标、基准对比与超额曲线、月度收益热力图、年度收益、日收益分布、月度序列、滚动波动与滚动 Sharpe，持仓面积图含现金层。派生计算在 `artifacts.py`（`nav_analytics`/`rebase_benchmark`/`window_start_date`），测试在 `test_platform_dashboard.py`。
 4. ~~B3+B4：sim/实盘组合页 + 组合总览列表~~ **已完成（2026-07-15）**：`discover_portfolios`/`read_portfolio_nav`/`trailing_returns`/`business_days_behind` 等读取层 + "组合总览"/"组合详情"两页，测试在 `test_platform_dashboard.py`。**主线 B（看板升级）全部竣工。**
-5. ~~A5：月度归因报告~~ **已完成（2026-07-11）**：attribution.py + report_live_attribution.py + cycle --shadow 影子跟跑；reports/live/ 因含真实账户金额已 gitignore。**主线 A（实战环路）全部竣工。**
+5. ~~A5：月度归因报告~~ **已完成（2026-07-11）**：attribution.py + report_live_attribution.py + cycle --shadow 影子跟跑；results/live_reports/ 因含真实账户金额已 gitignore。**主线 A（实战环路）全部竣工。**
 6. ~~B2：多回测对比页~~ **已完成（2026-07-05）**：`align_navs` 对齐重叠区间、在所选区间首日归一叠加（净值/收益率双模式）+ 回撤叠加 + 指标对照表，控件与回测分析页统一。
 7. C1 流程文档化 + C2（真要做个股时再启动）

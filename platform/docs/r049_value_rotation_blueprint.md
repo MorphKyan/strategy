@@ -17,7 +17,7 @@
 
 处置：策略按 Hard Rule 3 撤销注册（代码留 `strategies/value_rotation.py` research-only + pytest），
 候选配置删除；基线、行业 ETF 数据链、**估值数据链全部保留**。
-完整结果见 `platform/reports/r049_value_rotation_report.md`。
+完整结果见 `platform/reports/R049_value_rotation/20261101/report.md`。
 
 **过程中修复的两个平台级缺陷（比策略本身更有价值）**：
 ① `execution.py` 份额折算后清仓超卖导致仓位永远清不掉（影响所有策略，含实盘）；

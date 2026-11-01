@@ -8,7 +8,7 @@
 - 创建时间：`2026-06-24 23:49`
 - 状态：`Failed`
 - 关联看板项：`research-dashboard/research_backlog.md`
-- 标准实验报告：`platform/reports/r037_half_life_adaptive_rebalance_report.md`
+- 标准实验报告：`platform/reports/R037_half_life_adaptive_rebalance/20261101/report.md`
 
 ## 假设与来源
 
@@ -72,4 +72,4 @@
 - 推荐：`Failed`
 - 理由：训练样本 Sharpe 和最大回撤均未通过，起点敏感性不降反升，交易笔数显著增加；年化换手小幅下降不足以补偿收益和回撤退化。
 - 后续动作：不合入、不保留候选策略注册、不新增平台 baseline 配置。
-- 已更新文件：`research-dashboard/research_backlog.md`、`research-dashboard/research_history_summary.md`、`platform/reports/r037_half_life_adaptive_rebalance_report.md`
+- 已更新文件：`research-dashboard/research_backlog.md`、`research-dashboard/research_history_summary.md`、`platform/reports/R037_half_life_adaptive_rebalance/20261101/report.md`

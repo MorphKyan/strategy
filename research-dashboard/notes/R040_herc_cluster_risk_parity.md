@@ -33,7 +33,7 @@ HERC 思路尝试先按 sleeve 聚合资产，再在簇间做等风险贡献，�
 
 ## 日历起点敏感性
 
-指标来自 `platform/reports/r040_calendar_sensitivity/20260625_093633/sensitivity_stats.csv`：
+指标来自 `platform/results/sensitivity/summaries/R040_calendar/20260625_093633/sensitivity_stats.csv`：
 
 | 标签 | runs | Sharpe mean | Sharpe std | MaxDD mean | MaxDD std | Turnover mean | trade_count mean | order_count mean | rejected_order_count mean |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

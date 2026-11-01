@@ -12,7 +12,7 @@
 
 D1（纯动量+缓冲带）当日完成实现与全套验收：训练样本相对行业等权基线年化落后 10.5pp，
 起始日敏感性 32 个起点仅 1 个为正（中位数 −8.2%/年），三滑点场景一致，冻结样本未触碰。
-败因是鞭打与 V 型反转（非费用），详见 `platform/reports/r039_industry_rotation_report.md`
+败因是鞭打与 V 型反转（非费用），详见 `platform/reports/R039_industry_rotation/20261101/report.md`
 与 `research-dashboard/notes/R039_industry_momentum_rotation.md`。
 
 处置：策略撤销注册（代码留 `strategies/rotation.py` research-only + pytest）；候选配置删除，

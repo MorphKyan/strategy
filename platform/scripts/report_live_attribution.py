@@ -10,7 +10,7 @@
   ... --month 2026-07
 
 前置：影子组合需每日跟跑（run_live_cycle.py cycle --shadow <sim_id>）。
-报告写入 platform/reports/live/<YYYY-MM>_<live_id>_attribution.md
+报告写入 platform/results/live_reports/<live_id>_attribution_<YYYY-MM>/<发布日期>/report.md
 （含个人财务数据，该目录已 gitignore 不入库）。
 每月 1 日定时运行的注册示例：
 
@@ -21,7 +21,7 @@
 import argparse
 import os
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -50,7 +50,7 @@ def main() -> int:
     parser.add_argument("--month", help="YYYY-MM. Defaults to the previous calendar month.")
     parser.add_argument("--live-root", default="results/live_portfolios")
     parser.add_argument("--sim-root", default="results/sim_portfolios")
-    parser.add_argument("--report-root", default="reports/live")
+    parser.add_argument("--report-root", default="results/live_reports")
     parser.add_argument("--notify", action="store_true", help="Push the report via configured channels.")
     args = parser.parse_args()
 
@@ -62,9 +62,10 @@ def main() -> int:
     result = build_live_attribution(real_rows, shadow_rows, start, end)
     report = render_attribution_md(result, args.live_id, args.shadow_id, month)
 
-    report_dir = Path(args.report_root)
+    publication = datetime.now(timezone(timedelta(hours=8))).strftime("%Y%m%d")
+    report_dir = Path(args.report_root) / f"{args.live_id}_attribution_{month}" / publication
     report_dir.mkdir(parents=True, exist_ok=True)
-    report_path = report_dir / f"{month}_{args.live_id}_attribution.md"
+    report_path = report_dir / "report.md"
     with report_path.open("x", encoding="utf-8") as handle:
         handle.write(report + "\n")
 

@@ -12,7 +12,7 @@ Use `.\env\Scripts\python.exe` for venv/uv layouts, or substitute `.\env\python.
 .\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
 ```
 
-3. Review reports under `etf_selection/reports/<timestamp>/`.
+3. 自动摘要和明细写入 `etf_selection/results/screening/<运行ID>/`；最终报告见 [报告索引](reports/README.md)，按课题、发布日期直接归档。
 4. Generated platform configs are written under `etf_selection/generated_configs/<timestamp>/`.
 5. Optional: run generated configs through the platform:
 

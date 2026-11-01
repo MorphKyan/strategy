@@ -18,7 +18,7 @@
 1. 平台回测使用日频事件驱动引擎，入口是 `platform/scripts/run_platform_backtest.py`。
 2. 策略只返回目标权重；订单生成、费用、lot size、涨跌停、停牌、未成交重试和交易记录由执行层负责。
 3. 回测估值和交易执行使用无复权原始价格；策略信号可以读取平滑后的 `adj_close`。
-4. 企业行为在平台内显式建模：份额拆分在 `split_date`（基准日）之后该资产**首个真实行情日**生效（数据源价格届时才除权，基准日常停牌或价格未除权；共享逻辑在 `corporate_actions.py`，背景见 `reports/split_effective_date_fix_report.md`）；现金分红在 `ex_date` 记入 `dividend_receivables`，在 `payment_date` 转入现金。
+4. 企业行为在平台内显式建模：份额拆分在 `split_date`（基准日）之后该资产**首个真实行情日**生效（数据源价格届时才除权，基准日常停牌或价格未除权；共享逻辑在 `corporate_actions.py`）；现金分红在 `ex_date` 记入 `dividend_receivables`，在 `payment_date` 转入现金。
 5. checkpoint 保存完整组合状态，包括现金、持仓、成本、待执行意图、冷却池、策略状态、最后处理日期和应收分红。
 6. 旧 `run_strategy(df, config)` 接口不迁移；平台策略必须实现 `Strategy.generate_targets(context)`。
 
@@ -42,7 +42,7 @@
 - 平台市场数据同步入口。行情快照随 git 版本管理，同步采用**稳定写盘**：未变行保留原 `updated_at`、volume/amount 在 1% 容差内视为主备源噪音不算变化、保留文件原有行尾、内容一致时不写盘——`git diff` 只反映真实数据变化（共享函数 `data_store.write_csv_stable`，合成 3X 生成器同用）。**注意：只应在收盘后同步/提交快照**——盘中同步会把半日 K 线写进快照（曾发生），晚间同步会以小 diff 形式自动修正。
 - 分红/拆分事件表是**只增不删的账本**（`corporate_actions.merge_event_table`）：上游返回缺失或键冲突时保留本地已验证事件并打警告；新拆分事件必须先通过价格交叉验证（拆后首日价 ≈ 拆前价 ÷ 比例，±15%）才会入表——曾拦下上游把 510500 两条已验证拆分替换成错误 1:0.01 的事故。
 - 实盘镜像组合闭环（`platform/src/platform_core/live.py` + `notify.py` + `scripts/run_live_cycle.py`）：`reconcile` 导入真实持仓+现金覆盖组合状态并记录真实净值（mark-to-real，误差每日清零不累积）；`plan` 用真实权重+最新数据算目标，对执行引擎做 dry-run（整手取整/现金上限/费用与回测同口径）产出人可照做的"明日下单票"（`tickets/ticket_<date>.csv/.txt`），绝不模拟成交；`cycle` 一键编排 sync→reconcile→plan→每日估值→notify（非交易日自动跳过），推送支持 Server酱/SMTP（环境变量 `RQ_SERVERCHAN_KEY` 或 `RQ_SMTP_*` 零配置启用，失败不中断主流程）。每个交易日按收盘价对真实持仓 mark-to-market 并追加进 `real_nav.csv`（真实净值日频序列，供月度归因与组合列表页使用）；推送分两条——markdown 组合日报（总值/日变动/现金/各资产权重/阈值带状态）交易日必发，触发调仓时下单票作为独立第二条。产物在 `results/live_portfolios/<id>/`。`cycle --shadow <sim_id>` 可让影子模拟组合每交易日增量跟跑（`SimPortfolio.load()` 从持久化状态恢复）。
-- 实盘月度归因（`platform/src/platform_core/attribution.py` + `scripts/report_live_attribution.py`）：对齐真实 `real_nav.csv` 与影子组合净值，输出区间收益差、年化 tracking error 与粗拆（现金拖累差 + 执行/结构残差），**只记录不改持仓**；收益观测不足 5 个判"样本不足仅存档"。报告写入 `reports/live/`（含真实账户金额，已 gitignore 不入库）。
+- 实盘月度归因（`platform/src/platform_core/attribution.py` + `scripts/report_live_attribution.py`）：对齐真实 `real_nav.csv` 与影子组合净值，输出区间收益差、年化 tracking error 与粗拆（现金拖累差 + 执行/结构残差），**只记录不改持仓**；收益观测不足 5 个判"样本不足仅存档"。报告写入 `results/live_reports/`（含真实账户金额，已 gitignore 不入库）。
 - 实盘策略运行状态保存在 `portfolio_state.json` 的 `strategy_state._live_strategy_runtime`，每天重启与持仓对账后继续恢复；旧账户没有快照时，已有真实持仓视为已完成首次建仓。同日重跑从当日计算前的状态重放；策略名称或参数变化时重新初始化运行状态。
 - 回测 checkpoint 与模拟组合通过 `strategy_state._strategy_runtime` 保存策略身份和运行状态，模拟重启后继续恢复；宏观因子策略的平滑系数矩阵也纳入该状态。模拟和实盘共用日历边界补齐，避免每日增量运行被误判为月末。历史出票不得回退较新的账户或运行状态；同日改为无操作时移除原订单 CSV。
 - 模拟推进在状态副本中计算，运行文件完成且最新状态原子保存成功后才更新内存；失败后可在原实例重试。新运行的 manifest 标记 `requires_state_commit`，状态文件的 `committed_run_ids` 记录已提交运行，归因跳过未提交的候选产物。补齐的日历边界仅供信号判断，不作为可成交日期。新组合保留原始 checkpoint 来源，恢复不会把它改成当前状态文件。
@@ -147,9 +147,9 @@ ETF 股息率使用 `data/platform_dividends.csv` 中同一 ETF 的每份分红�
 - 截短区间、生成配置或来源无法证明的直接回测：`platform/results/temporary_backtests/direct/<run_id>/`
 - 标准实验原始结果：`platform/results/temporary_backtests/experiments/<experiment>/<timestamp>/<strategy>/<run_id>/`
 - manifest 的 `artifact_provenance` 记录配置来源及实际/共同区间；无来源证明的旧产物仅在看板启用临时回测选项后显示，历史文件不改写。
-- 标准实验报告：`platform/reports/experiments/<experiment>/<timestamp>/`
+- 标准实验报告：`platform/results/temporary_backtests/experiments/summaries/<experiment>/<timestamp>/`
 - 敏感性原始结果：`platform/results/sensitivity_raw/<strategy>/<timestamp>/`
-- 敏感性报告：`platform/reports/sensitivity/<strategy>/<timestamp>/`
-- 数据校验报告：`platform/reports/data_validation/<timestamp>/`
+- 敏感性报告：`platform/results/sensitivity/summaries/<strategy>/<timestamp>/`
+- 数据校验报告：`platform/results/data_validation/<timestamp>/`
 
-原始结果目录保存执行级 artifact；报告目录保存决策级摘要、指标、配置副本和原始路径引用。
+`reports/` 保存最终报告和可执行的脚本或配置，按需附图与附录；入口见 `reports/README.md`。执行入口应从报告注明的基础数据及代码版本重新生成所需产物，中间结果在 `results/` 临时生成，验证后清理，不长期存档。历史报告未补齐入口或未实际重跑时，不视为已验证可复现。

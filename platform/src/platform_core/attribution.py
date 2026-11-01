@@ -15,7 +15,7 @@ tracking error 并做粗拆，作为月度体检记录。
 - 其余差异归入"执行与结构差异"残差项（含手续费差、成交价差、整手取整
   造成的权重差），不再往下细拆——真实侧没有逐笔费用明细，细拆是伪精度。
 
-个人财务数据落在 `reports/live/`（已 gitignore，不入库）。
+个人财务数据落在 `results/live_reports/`（已 gitignore，不入库）。
 """
 
 from __future__ import annotations

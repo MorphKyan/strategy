@@ -8,7 +8,10 @@ This directory owns ETF universe screening and basket construction. It may read 
 - Main config: `config/etf_universe.yaml`
 - Entry: `.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml`
 - Generated configs: `generated_configs/<timestamp>/`
-- Reports: `reports/<timestamp>/`
+- 最终研究及筛选报告：`reports/<课题键>/<发布版本>/report.md`。
+- 自动筛选结果与运行摘要：`results/screening/<运行ID>/`。
+
+最终报告布局见根 `AGENTS.md` 的“产物目录”；自动筛选与平台验证摘要默认写入所属子系统的 `results/`。
 
 Use `.\env\python.exe` instead when that is the project's actual Python layout.
 
@@ -25,7 +28,7 @@ Use `.\env\python.exe` instead when that is the project's actual Python layout.
 2. Screen candidates inside each sleeve, then check within-sleeve representative correlation.
 3. Build cross-sleeve baskets and evaluate common history, cross-sleeve correlation, inverse-volatility concentration, liquidity, and data quality.
 4. Use the history and research window specified by the user or config. Disclose short or uneven common history rather than silently changing the window.
-5. Write generated configs and Chinese reports under timestamped directories without overwriting prior outputs.
+5. 生成配置写入 `generated_configs/<运行ID>/`，排名、相关性和篮子明细写入 `results/screening/<运行ID>/`。最终报告与可重建筛选和验证的脚本或配置放入 `reports/`；确认能够重新生成后清理中间产物，不长期存档。
 6. When platform validation is requested, use the root research mode: user-directed research runs `default` + `stress` and two-month start-date sensitivity; autonomous research follows `$run-autonomous-quant-research`.
 
 ## Default Sleeve Semantics

@@ -5,7 +5,7 @@
 但**冻结样本（2025-07-01 起）累计 -8.80% vs 基线 +20.49%，跑输 29.29pp**，Sharpe -0.54。
 败因是价值陷阱 + 成长行情：涨幅前三的 5G通信(+160.7%)、半导体(+113.2%)、科技(+95.4%)
 因 PB 分位偏高被系统性回避，实际持有的消费(-17.4%)、白酒(-24.6%)持续变得更便宜。
-详见 platform/reports/r049_value_rotation_report.md 与
+详见 platform/reports/R049_value_rotation/20261101/report.md 与
 research-dashboard/notes/R049_industry_value_rotation.md。
 复研时需在 strategy.py 尾部重新注册本类并重建候选配置。
 

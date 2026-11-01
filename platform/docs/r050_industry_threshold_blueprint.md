@@ -13,7 +13,7 @@
 **换手降 26%（33.88%→25.20%）、交易笔数少 62%（891→342）、费用拖累减半、拒单归零**；
 起始日敏感性 32 个起点**换手 32/32 全部更低**、超额中位 +0.03%（全域仅 -0.4~+0.6pp）；
 冻结样本累计 20.06% vs 基线 20.49%（-0.43pp，噪声级），换手仍低 7.38pp、交易少 34%。
-三滑点场景结论一致。完整结果见 `platform/reports/r050_industry_threshold_report.md`。
+三滑点场景结论一致。完整结果见 `platform/reports/R050_industry_threshold/20261101/report.md`。
 
 处置：配置 `configs/r9_industry_equal_weight_threshold.yaml` 保留可用；
 策略 `fixed_weight_threshold` 本就已注册（R038 课题产物），无需新增注册。

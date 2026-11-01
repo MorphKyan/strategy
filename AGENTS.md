@@ -25,10 +25,19 @@ Read the closest subsystem `AGENTS.md` before working below that directory. User
 ## Workspace Rules
 
 1. On Windows, use the project Python: prefer `.\env\Scripts\python.exe`; use `.\env\python.exe` when that is the environment's actual layout.
-2. Do not overwrite historical results, reports, generated configs, checkpoints, or raw execution artifacts unless the user explicitly requests it.
-3. Delete agent-created temporary scripts before completion. Retained scripts must be reusable and parameterized rather than task-specific.
+2. Protect final reports, source market data, live/sim portfolio state, and recovery checkpoints. Regenerable research intermediates are temporary: clean them after report completion and reproduction verification, rather than archiving them.
+3. Delete agent-created temporary scripts before completion. Retained tools must be parameterized; a report's reproduction script is a permanent deliverable.
 4. Write newly generated Markdown reports, research notes, dashboards, and summaries in Chinese. Preserve exact commands, paths, identifiers, and metric keys where needed.
 5. Read metrics from actual artifacts, preferably `metrics.json`; do not reconstruct results from memory.
+
+## 产物目录
+
+- 各子系统的 `reports/` 只放研究，课题直接使用 `reports/<课题键>/<YYYYMMDD>/report.md`，不再分 `research`、`engineering`、`live` 或 `screening` 层。课题键使用研究 ID 加主题，无 ID 时直接用主题；同日正式修订加 `_02`。
+- 每次发布保留 `report.md` 和一个可执行的复现入口：脚本或配置即可，不强制同时提供脚本、配置目录和 manifest。必要配图与附录可随报告保留；试跑不创建报告版本。
+- 执行入口应一次生成报告所需的运行配置、中间数据、图表和汇总，覆盖候选、对照及正式验证情景，不依赖上次保留的中间结果。报告写明执行命令、代码与依赖版本、基础数据来源及版本。
+- 中间配置、CSV、日志、缓存和试跑结果仅在 `results/` 或生成目录临时产生，完成报告并确认能重新生成后清理，不长期存档。基础行情、账户状态与恢复检查点按原有职责保存，不作为研究中间文件清理。
+- `reports/README.md` 是研究报告索引；看板链接同一份报告。实盘展示输出放 `results/live_reports/`，不进入研究报告目录或 Git。
+- 整理时直接更新引用，不保留旧路径副本或转发文件。复现必须实际运行核验；历史脚本或输入缺失时明确标注，不能只凭文件齐全宣称可复现。
 
 ## Market Data Preconditions
 
@@ -81,4 +90,4 @@ For conclusions that depend on a QDII ETF (`513*`, `159920`, `159941`, and equiv
 - state the premium at the intended entry point for live recommendations;
 - obtain decision inputs through `platform/src/platform_core/etf_premium.py` and its publication-lag guard, never a raw same-day price/NAV ratio.
 
-NAV data are written by `platform/scripts/fetch_etf_nav.py` under `platform/data/etf_nav/`. See `platform/reports/r056_qdii_premium_feasibility_audit.md` for the rationale and measured contamination example.
+NAV data are written by `platform/scripts/fetch_etf_nav.py` under `platform/data/etf_nav/`. See `platform/reports/R056-A_qdii_premium_feasibility/20261101/report.md` for the rationale and measured contamination example.

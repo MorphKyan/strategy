@@ -36,7 +36,7 @@ paths:
   data_dir: platform/data
   platform_base_config: platform/configs/domestic_rolling_bond_10y.yaml
   generated_config_dir: etf_selection/generated_configs
-  report_dir: etf_selection/reports
+  report_dir: etf_selection/results/screening
   platform_experiment_script: platform/scripts/run_platform_experiment.py
 candidates:
 - asset_id: CN_ETF:518880.SH
