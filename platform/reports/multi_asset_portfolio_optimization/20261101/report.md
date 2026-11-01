@@ -96,7 +96,7 @@
 *   **回测指标**：年化收益率 **8.31%**，年化波动率 **4.02%**，最大回撤 **-3.08%**，夏普比率 **2.0640**。
 *   **理论合理性**：
     这是最纯粹、最经典的桥水全天候宏观框架。它**拒绝引入任何局部的风格因子（如红利）**，从而彻底避免了对近期红利因子牛市的过拟合。由于不包含重叠的股票资产，其资产间的相关性块结构最为纯净，使得风险平价算法能够将稳定仓位留给十年国债。此组合结构最简单、稳定性最高，在未来的牛熊转换中对宏观环境的适应能力最强。
-*   **配置文件**：`platform/configs/generated/platform_opt_portfolio_decentralized_core.yaml`
+*   **配置文件**：`platform/reports/multi_asset_portfolio_optimization/20261101/configs/platform_opt_portfolio_decentralized_core.yaml`
 
 ### 方案二：“全球风格优化全天候”（Global Style-Optimized Weather）— 推荐追求高收益的资金
 *   **资产配置**：
@@ -108,7 +108,7 @@
 *   **回测指标**：年化收益率 **9.04%**，年化波动率 **4.51%**，最大回撤 **-3.98%**，夏普比率 **2.0028**。
 *   **理论合理性**：
     此方案基于“结构替换与杠铃配置”。在国内宏观经济转型期，宽基沪深300由于包含较多受宏观调控的传统行业，表现受到压制，而红利低波具有更强的防御属性和安全边际。同时，在境外，通过“标普+纳指”的杠铃组合，既捕获了传统实体经济，又吸收了AI革命的技术Beta。该组合通过牺牲少许最大回撤，换取了全场第二高的收益率（9.04%），且保持了 2.0 左右的超高夏普。
-*   **配置文件**：`platform/configs/generated/platform_opt_portfolio_global_defensive.yaml`
+*   **配置文件**：`platform/reports/multi_asset_portfolio_optimization/20261101/configs/platform_opt_portfolio_global_defensive.yaml`
 
 ### 方案三：“稳健中盘杠铃全天候”（Robust Mid-Cap Barbell）— 推荐追求弹性的配置
 *   **资产配置**：
@@ -120,7 +120,7 @@
 *   **回测指标**：年化收益率 **8.39%**，年化波动率 **4.30%**，最大回撤 **-3.38%**，夏普比率 **1.9521**，年化换手率仅 **85.77%**。
 *   **理论合理性**：
     中证500指数成分股多为高成长、高弹性的中盘股，与代表稳定成熟期红利大盘的红利低波相关性较低（仅 0.4241）。在国内股票内部，使用这两个指数构成强弱互补的“杠铃”。当中盘成长股大幅波动时，风险平价会自动压缩其分配权重，而放大小波动高股息红利低波的权重，从而在保持高成长弹性的同时，使换手率和回撤依然维持在极低的水平。
-*   **配置文件**：`platform/configs/generated/platform_opt_portfolio_midcap_barbell.yaml`
+*   **配置文件**：`platform/reports/multi_asset_portfolio_optimization/20261101/configs/platform_opt_portfolio_midcap_barbell.yaml`
 
 ---
 
@@ -132,3 +132,15 @@
     30年国债ETF在 2024-2026 年的表现极为夺目，但由于其成立历史仅 1.97 年，为了维持回测的严肃性，本轮未将其作为主仓。未来随着数据积累，应将其与 10 年国债进行久期混合，在利率下行期利用长久期放大组合防守端的收益弹性。
 3.  **宏观指标驱动的动态风险预算 (Macro-Driven Risk Budgeting)**：
     根据当下的宏观因子（如 PPI、社会融资规模增速、中美利差）动态调升或调降对应袖子（如商品或境外权益）的风险预算，从静态全天候走向动态自适应。
+
+## 配置保全与复现状态（2026-11-01 整理）
+
+本次随报告原样保留 3 份历史 YAML 输入，未修改策略参数、交易成本或检查点设置，也未重新运行历史研究。迁移逐文件校验 SHA-256，当前仅确认文件完整和 YAML 可解析；完整复现尚未验证。
+
+原运行代码、依赖版本及行情快照尚未逐项核实，保留配置不代表已验证当前引擎能够复现原指标。后续重跑仍须先完成行情新鲜度与对齐检查，并按报告窗口执行所需滑点场景和起点敏感性。
+
+保留的输入：
+
+- [configs/platform_opt_portfolio_decentralized_core.yaml](configs/platform_opt_portfolio_decentralized_core.yaml)
+- [configs/platform_opt_portfolio_global_defensive.yaml](configs/platform_opt_portfolio_global_defensive.yaml)
+- [configs/platform_opt_portfolio_midcap_barbell.yaml](configs/platform_opt_portfolio_midcap_barbell.yaml)

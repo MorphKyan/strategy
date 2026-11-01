@@ -13,6 +13,7 @@ from src.platform_core.storage import InMemoryStore
 
 @pytest.mark.parametrize("case,formal", [
     ("fixed", True), ("scenario", True), ("bounded", False), ("generated", False),
+    ("report_config", False), ("legacy_generated", False),
     ("unproven", False), ("changed_params", False), ("dated_config", False), ("uneven_history", False),
 ])
 def test_only_proven_fixed_full_history_runs_use_formal_root(tmp_path, monkeypatch, case, formal):
@@ -33,7 +34,11 @@ def test_only_proven_fixed_full_history_runs_use_formal_root(tmp_path, monkeypat
     }
     if case == "dated_config":
         original["backtest"] = {"start_date": "2024-01-01"}
-    config_path = tmp_path / "configs" / ("generated/sample.yaml" if case == "generated" else "sample.yaml")
+    config_path = tmp_path / {
+        "generated": "results/configs/test/20261101/sample.yaml",
+        "report_config": "reports/test/20261101/configs/sample.yaml",
+        "legacy_generated": "configs/generated/sample.yaml",
+    }.get(case, "configs/sample.yaml")
     config_path.parent.mkdir(parents=True)
     config_path.write_text(yaml.safe_dump(original))
     config = copy.deepcopy(original)

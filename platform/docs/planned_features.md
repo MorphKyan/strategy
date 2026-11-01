@@ -21,7 +21,7 @@ ETF 筛选属于 `etf_selection/`，平台只负责执行生成后的平台配�
 
 待完善：
 
-- 固化 `etf_selection/generated_configs/<timestamp>/` 到 `platform/configs/` 可执行配置的契约。
+- 固化 `etf_selection/results/configs/<课题键>/<运行ID>/` 到 `platform/configs/` 可执行配置的契约。
 - 增加生成配置的校验：资产代码、共同历史、数据新鲜度、训练样本长度和平台 schema。
 - 在平台实验报告中记录 ETF 篮子来源、生成时间、输入 universe 和冻结参数。
 - 保持平台内核不依赖 `etf_selection/` 源码。

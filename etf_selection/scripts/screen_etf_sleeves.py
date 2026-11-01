@@ -30,7 +30,7 @@ def resolve_repo_path(value: str | Path) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Screen mainland ETF sleeves and build platform risk-parity basket configs.")
-    parser.add_argument("--config", default="etf_selection/config/etf_universe.yaml", help="ETF selection YAML config path.")
+    parser.add_argument("--config", default="etf_selection/configs/etf_universe.yaml", help="ETF selection YAML config path.")
     parser.add_argument("--allow-raw-prices", action="store_true", help="Allow ETFs without HFQ sidecar factors.")
     parser.add_argument("--run-experiments", action="store_true", help="运行同窗口平台对比实验及候选/基线的两个月起点敏感性验证。")
     args = parser.parse_args()
@@ -40,7 +40,7 @@ def main() -> int:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     paths = config.get("paths", {})
     report_dir = resolve_repo_path(paths.get("report_dir", "etf_selection/results/screening")) / timestamp
-    generated_dir = resolve_repo_path(paths.get("generated_config_dir", "etf_selection/generated_configs")) / timestamp
+    generated_dir = resolve_repo_path(paths.get("generated_config_dir", "etf_selection/results/configs/etf_sleeves")) / timestamp
 
     try:
         ranking, sleeve_corrs, candidates = screen_sleeves(config, allow_raw_prices=args.allow_raw_prices)

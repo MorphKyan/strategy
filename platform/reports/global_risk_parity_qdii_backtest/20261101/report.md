@@ -47,7 +47,7 @@
 *   **流动性与历史长度**：依然使用 252 天平均成交额的对数以及可用历史年数。
 
 ### 权重配置
-在 `etf_selection/config/etf_universe.yaml` 中配置 `sleeve_qdii` 的评分权重为：
+在 `etf_selection/configs/etf_universe.yaml` 中配置 `sleeve_qdii` 的评分权重为：
 *   总持有成本 (`holding_cost`)：30%
 *   折溢价标准差 (`premium_std`)：30%
 *   流动性 (`liquidity`)：30%
@@ -56,7 +56,7 @@
 ### 筛选结果
 通过运行筛选脚本：
 ```powershell
-.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
+.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\configs\etf_universe.yaml
 ```
 得出 4 只候选 QDII ETF 的筛选得分与数据：
 
@@ -122,3 +122,17 @@
     由于跨境 ETF 直接暴露于外汇波动，未来需要深入研究人民币对美元汇率升贴水对收益的系统性贡献。可以研究加入外汇套期保值或通过汇率合成资产来优化跨币种头寸。
 3.  **基于超高频或时区校正的协方差估算**：
     尽管日频 NAV 表现优异，但 NAV 数据比二级市场 close 晚一天公布（T+1），在实盘决策中存在一天滞后。未来可以尝试基于 Lead-Lag（领先-滞后）效应的时区校正方法，利用当天的 Close 以及海外前一交易日的实际收盘，通过 Hayashi-Yoshida 等高级非同步估算器重建协方差矩阵。
+
+## 配置保全与复现状态（2026-11-01 整理）
+
+本次随报告原样保留 5 份历史 YAML 输入，未修改策略参数、交易成本或检查点设置，也未重新运行历史研究。迁移逐文件校验 SHA-256，当前仅确认文件完整和 YAML 可解析；完整复现尚未验证。
+
+原运行代码、依赖版本及行情快照尚未逐项核实，保留配置不代表已验证当前引擎能够复现原指标。后续重跑仍须先完成行情新鲜度与对齐检查，并按报告窗口执行所需滑点场景和起点敏感性。
+
+保留的输入：
+
+- [configs/platform_research_global.yaml](configs/platform_research_global.yaml)
+- [configs/platform_research_global_all_weather_commodity.yaml](configs/platform_research_global_all_weather_commodity.yaml)
+- [configs/platform_research_global_all_weather_commodity_ewma.yaml](configs/platform_research_global_all_weather_commodity_ewma.yaml)
+- [configs/platform_research_global_dividend.yaml](configs/platform_research_global_dividend.yaml)
+- [configs/platform_research_global_dividend_ewma.yaml](configs/platform_research_global_dividend_ewma.yaml)

@@ -28,7 +28,7 @@
 | `platform/src/platform_core/strategy.py` | 文件尾 import 并注册进 `BUILTIN_STRATEGIES` |
 | `platform/configs/r8_permanent_real_fixed_weight_threshold.yaml` | 候选配置（abs_band=0.05, rel_band=0.25） |
 | `platform/configs/r8_permanent_real_equal_weight_monthly.yaml` | 同篮同费月度等权对照基线 |
-| `platform/configs/generated/r8_permanent_real_fixed_weight_threshold_ckpt.yaml` | checkpoint 开启版（组合落地用） |
+| `platform/reports/R038_fixed_weight_threshold/20261101/configs/r8_permanent_real_fixed_weight_threshold_ckpt.yaml` | checkpoint 开启版（组合落地用） |
 | `platform/tests/test_platform_strategies.py` | 6 个单元测试（注册 / 空仓建仓 / 带内不动 / 绝对带触发 / 相对带触发 / 显式权重归一） |
 
 ## 四、数据新鲜度与样本隔离
@@ -107,7 +107,7 @@
 .\env\Scripts\python.exe platform\scripts\run_sensitivity.py --config configs\r8_permanent_real_equal_weight_monthly.yaml --end-date 2025-06-30 --step 41 --slippage-scenario all
 .\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\r8_permanent_real_fixed_weight_threshold.yaml --baseline-config configs\r8_permanent_real_equal_weight_monthly.yaml --experiment-name r038_fixed_weight_threshold_finaltest --start-date 2025-07-01 --end-date 2026-07-09 --slippage-scenario all
 .\env\Scripts\python.exe platform\scripts\run_platform_experiment.py --config configs\r8_permanent_real_fixed_weight_threshold.yaml --baseline-config configs\r8_permanent_real_equal_weight_monthly.yaml --experiment-name r038_fixed_weight_threshold_recent5y --start-date 2021-07-09 --end-date 2026-07-09 --slippage-scenario all
-.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config configs\generated\r8_permanent_real_fixed_weight_threshold_ckpt.yaml --start-date 2019-01-18 --end-date 2026-07-09 --slippage-scenario default
+.\env\Scripts\python.exe platform\scripts\run_platform_backtest.py --config reports\R038_fixed_weight_threshold\20261101\configs\r8_permanent_real_fixed_weight_threshold_ckpt.yaml --start-date 2019-01-18 --end-date 2026-07-09 --slippage-scenario default
 ```
 
 ## 十一、边界与建议
@@ -115,3 +115,13 @@
 1. **运行时起始日必须 ≥ 篮子共同起始日（2019-01-18）**：更早起点下 512890 无数据，目标权重含无法成交的幽灵配置（敏感性统计已按此剔除非法起点）。策略保持简单未做自动降级，属于纪律约束而非代码约束。
 2. 阈值带（5/25）为先验常数。若未来想调带宽，必须按本协议重新走全流程（训练对比 + 敏感性 + 冻结测试），不得直接在实盘配置上改。
 3. 建议实盘跟投使用候选配置；若更看重理论 Sharpe 而不在乎操作频率，月度等权基线同样合格（两者差异在噪音级）。
+
+## 配置保全与复现状态（2026-11-01 整理）
+
+本次随报告原样保留 1 份历史 YAML 输入，未修改策略参数、交易成本或检查点设置，也未重新运行历史研究。迁移逐文件校验 SHA-256，当前仅确认文件完整和 YAML 可解析；完整复现尚未验证。
+
+原运行代码、依赖版本及行情快照尚未逐项核实，保留配置不代表已验证当前引擎能够复现原指标。后续重跑仍须先完成行情新鲜度与对齐检查，并按报告窗口执行所需滑点场景和起点敏感性。
+
+保留的输入：
+
+- [configs/r8_permanent_real_fixed_weight_threshold_ckpt.yaml](configs/r8_permanent_real_fixed_weight_threshold_ckpt.yaml)

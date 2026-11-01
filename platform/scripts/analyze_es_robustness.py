@@ -5,7 +5,7 @@ from __future__ import annotations
 The tool compares raw historical simulation with EWMA-filtered historical
 simulation, rolling-window choices, moving-block bootstrap weight intervals,
 single-worst-scenario deletion sensitivity, and ES risk-contribution budget
-errors. It can also generate reusable matrix configs under configs/generated.
+errors. It also generates temporary matrix configs under results/configs.
 """
 
 import argparse
@@ -58,7 +58,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--generated-config-dir",
-        default="configs/generated/es_robustness",
+        default="results/configs/es_robustness",
+        help="Temporary config root; each run creates a timestamp subdirectory.",
     )
     return parser.parse_args()
 

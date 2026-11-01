@@ -47,23 +47,52 @@
 - `basket_17` 518880,510310,159980,159981,511260,513500 | score=0.6477 | corr=0.2256 | hhi=0.4169
 
 ## 生成的平台配置
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159985_159981_511260_513500.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159985_159981_511260_513100.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159980_159985_159981_511260_513500.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159980_159985_159981_511260_513100.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159985_159981_511260_513500.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159985_159981_511260_513100.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159980_159985_511260_513500.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159980_159985_511260_513100.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159980_159985_159981_511260_513500.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159980_159985_511260_513500.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159980_159985_159981_511260_513100.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159985_159981_511260_159920.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159980_159985_511260_513100.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159980_159985_159981_511260_159920.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159980_159981_511260_513500.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159980_159981_511260_513100.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159985_159981_511260_159920.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159980_159985_159981_511260_159920.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510300_159980_159985_511260_159920.yaml`
-- `D:\strategy\etf_selection\generated_configs\20260531_231347\platform_basket_518880_510310_159980_159981_511260_513500.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159985_159981_511260_513500.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159985_159981_511260_513100.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159980_159985_159981_511260_513500.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159980_159985_159981_511260_513100.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159985_159981_511260_513500.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159985_159981_511260_513100.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159980_159985_511260_513500.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159980_159985_511260_513100.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159980_159985_159981_511260_513500.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159980_159985_511260_513500.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159980_159985_159981_511260_513100.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159985_159981_511260_159920.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159980_159985_511260_513100.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159980_159985_159981_511260_159920.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159980_159981_511260_513500.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159980_159981_511260_513100.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159985_159981_511260_159920.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159980_159985_159981_511260_159920.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510300_159980_159985_511260_159920.yaml`
+- `D:\strategy\etf_selection\reports\etf_sleeves\20260531\configs\platform_basket_518880_510310_159980_159981_511260_513500.yaml`
+
+## 配置保全与复现状态（2026-11-01 整理）
+
+本次随报告原样保留 20 份历史 YAML 输入，未修改策略参数、交易成本或检查点设置，也未重新运行历史研究。迁移逐文件校验 SHA-256，当前仅确认文件完整和 YAML 可解析；完整复现尚未验证。
+
+这些输入使用旧版 `strategies.segments` 格式，当前平台要求单一 `strategy` 映射，因此不能直接传给当前回测入口。原运行代码、依赖版本与行情快照未核实；恢复复现时须先确认原版本语义，再显式迁移，不能把格式改写视为原结果复现。
+
+保留的输入：
+
+- [configs/platform_basket_518880_510300_159980_159981_511260_513100.yaml](configs/platform_basket_518880_510300_159980_159981_511260_513100.yaml)
+- [configs/platform_basket_518880_510300_159980_159981_511260_513500.yaml](configs/platform_basket_518880_510300_159980_159981_511260_513500.yaml)
+- [configs/platform_basket_518880_510300_159980_159985_159981_511260_159920.yaml](configs/platform_basket_518880_510300_159980_159985_159981_511260_159920.yaml)
+- [configs/platform_basket_518880_510300_159980_159985_159981_511260_513100.yaml](configs/platform_basket_518880_510300_159980_159985_159981_511260_513100.yaml)
+- [configs/platform_basket_518880_510300_159980_159985_159981_511260_513500.yaml](configs/platform_basket_518880_510300_159980_159985_159981_511260_513500.yaml)
+- [configs/platform_basket_518880_510300_159980_159985_511260_159920.yaml](configs/platform_basket_518880_510300_159980_159985_511260_159920.yaml)
+- [configs/platform_basket_518880_510300_159980_159985_511260_513100.yaml](configs/platform_basket_518880_510300_159980_159985_511260_513100.yaml)
+- [configs/platform_basket_518880_510300_159980_159985_511260_513500.yaml](configs/platform_basket_518880_510300_159980_159985_511260_513500.yaml)
+- [configs/platform_basket_518880_510300_159985_159981_511260_159920.yaml](configs/platform_basket_518880_510300_159985_159981_511260_159920.yaml)
+- [configs/platform_basket_518880_510300_159985_159981_511260_513100.yaml](configs/platform_basket_518880_510300_159985_159981_511260_513100.yaml)
+- [configs/platform_basket_518880_510300_159985_159981_511260_513500.yaml](configs/platform_basket_518880_510300_159985_159981_511260_513500.yaml)
+- [configs/platform_basket_518880_510310_159980_159981_511260_513500.yaml](configs/platform_basket_518880_510310_159980_159981_511260_513500.yaml)
+- [configs/platform_basket_518880_510310_159980_159985_159981_511260_159920.yaml](configs/platform_basket_518880_510310_159980_159985_159981_511260_159920.yaml)
+- [configs/platform_basket_518880_510310_159980_159985_159981_511260_513100.yaml](configs/platform_basket_518880_510310_159980_159985_159981_511260_513100.yaml)
+- [configs/platform_basket_518880_510310_159980_159985_159981_511260_513500.yaml](configs/platform_basket_518880_510310_159980_159985_159981_511260_513500.yaml)
+- [configs/platform_basket_518880_510310_159980_159985_511260_513100.yaml](configs/platform_basket_518880_510310_159980_159985_511260_513100.yaml)
+- [configs/platform_basket_518880_510310_159980_159985_511260_513500.yaml](configs/platform_basket_518880_510310_159980_159985_511260_513500.yaml)
+- [configs/platform_basket_518880_510310_159985_159981_511260_159920.yaml](configs/platform_basket_518880_510310_159985_159981_511260_159920.yaml)
+- [configs/platform_basket_518880_510310_159985_159981_511260_513100.yaml](configs/platform_basket_518880_510310_159985_159981_511260_513100.yaml)
+- [configs/platform_basket_518880_510310_159985_159981_511260_513500.yaml](configs/platform_basket_518880_510310_159985_159981_511260_513500.yaml)

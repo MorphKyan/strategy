@@ -20,7 +20,7 @@ def test_stale_screening_syncs_all_candidates_and_stops_on_failure(tmp_path, mon
                        {"code": "518880", "include": False}],
     }))
     monkeypatch.setattr(sys, "argv", ["screen", "--config", str(path)])
-    calls, syncs, reports = [], [], []
+    calls, syncs, reports, configs = [], [], [], []
 
     def screen(*args, **kwargs):
         calls.append(1)
@@ -36,14 +36,18 @@ def test_stale_screening_syncs_all_candidates_and_stops_on_failure(tmp_path, mon
     monkeypatch.setattr(module, "screen_sleeves", screen)
     monkeypatch.setattr(module.subprocess, "run", sync)
     monkeypatch.setattr(module, "write_report", lambda report_dir, *args, **kwargs: reports.append(report_dir))
+    monkeypatch.setattr(module, "generate_platform_configs", lambda **kwargs: configs.append(kwargs["output_dir"]) or [])
     if failure:
         with pytest.raises(subprocess.CalledProcessError if failure == "sync" else RuntimeError):
             module.main()
         assert not reports
+        assert not configs
     else:
         assert module.main() == 0
         assert len(reports) == 1
         assert reports[0].parent == module.REPO_ROOT / "etf_selection/results/screening"
+        assert configs[0].parent == module.REPO_ROOT / "etf_selection/results/configs/etf_sleeves"
+        assert configs[0].name == reports[0].name
     assert len(calls) == (1 if failure == "sync" else 2)
     assert len(syncs) == 1
     command, options = syncs[0]

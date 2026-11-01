@@ -203,7 +203,7 @@ P3 在方法论上最贴合本仓库的铁律（不预测、只设纪律），�
 
 - 非 generated（10 个）：`global_ewma.yaml`、`global_dividend_ewma.yaml`、`global_nasdaq_all_weather_ewma.yaml`、
   `global_cluster_representative_damped.yaml`、`global_user_holdings.yaml`、`us_blend_ewma.yaml` 等
-- `generated/`（16 个）：`platform_overseas_nasdaq_ewma.yaml`、`platform_opt_r2a_global_blend_ewma.yaml` 等
+- 历史生成集合（原审计计 16 个）：`platform_overseas_nasdaq_ewma.yaml`、`platform_opt_r2a_global_blend_ewma.yaml` 现保存在 `platform/reports/china_etf_risk_parity_optimization/20261101/configs/`；其他现存输入按所属报告保留，原审计集合未重新核验。
 
 这些配置在**任何跨越溢价水平变化的窗口上**（尤其 2020 年、2024 年至今）都存在同类失真。
 历史上以这些配置得出的跨境组合结论（含 R022 QDII 折溢价轮动之外的部分），

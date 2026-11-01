@@ -96,7 +96,7 @@ ETF 股息率使用 `data/platform_dividends.csv` 中同一 ETF 的每份分红�
 
 ## ES 稳健性诊断工具
 
-`scripts/analyze_es_robustness.py` 复用平台行情与复权入口，分别读取两份配置的数据目录，并检查新鲜度与跨代理末日对齐。它输出纯权重/风险预算诊断；交易成本和执行结果仍由实际回测提供。配置矩阵使用本次的置信水平，写入 `--generated-config-dir/<timestamp>/`；诊断输出和配置都不允许覆盖旧产物。
+`scripts/analyze_es_robustness.py` 复用平台行情与复权入口，分别读取两份配置的数据目录，并检查新鲜度与跨代理末日对齐。它输出纯权重/风险预算诊断；交易成本和执行结果仍由实际回测提供。配置矩阵使用本次的置信水平，默认写入 `results/configs/es_robustness/<运行ID>/`，可用 `--generated-config-dir` 指定课题目录；诊断输出和配置都不允许覆盖旧产物。
 
 `scripts/summarize_es_robustness.py` 从 `metrics.json` 或回测 manifest 的已保存 `metrics` 读取绩效，无交易的运行输出空执行诊断。敏感性默认保留全部满足观测数的起点，`--start-date` 可显式筛选；`--diagnostics-csv` 显式提供权重比较输入，不从输出目录父级猜文件。输出目录必须新建。
 

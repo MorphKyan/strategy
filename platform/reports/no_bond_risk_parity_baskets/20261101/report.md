@@ -4,7 +4,7 @@
 在不引入债券、国债、政金债、信用债、可转债或现金类 ETF 的前提下，使用黄金和商品袖替代债券防御袖，可能提高收益弹性，但需要验证其回撤、波动和换手是否仍可接受。
 
 ## 数据与筛选边界
-- 来源 universe：`etf_selection/config/etf_universe.yaml`。
+- 来源 universe：`etf_selection/configs/etf_universe.yaml`。
 - 排除：`bond` sleeve，以及名称/子类含债券、国债、政金债、信用债、可转债、现金、货币的 ETF。
 - 当前 universe 剔除债券后只有 `510300`、`510310`、`518880`、`159980`、`159981`、`159985`；没有红利、低波或跨市场权益 ETF，所以本轮没有擅自扩大覆盖。
 - `research/data` 原本缺少 3 个商品 ETF。因当前 Python 环境无 `finshare`，已把 `platform/data` 中现有本地文件转换为 research 需要的 `close_price` 与 `hfq_factor` schema；价格调整来源是原文件 `adjust_factor`，未改 common-history 处理。
@@ -56,3 +56,6 @@ Baseline 默认篮子：`510300, 518880, 511260`；窗口 2017-08-24 至 2026-05
 - 已确认 3 个候选 raw artifacts 写入 `research/results/risk_parity/<timestamp>/`。
 - 已确认 3 个候选标准 artifacts 写入 `research/results/temporary_backtests/experiments/summaries/risk_parity/<timestamp>/`，并从各自 `metrics.json` 读取指标。
 - 首次运行 `20260531_010507` 因缺少 `seaborn` 失败；安装 `seaborn` 后重跑成功，该失败目录保留为环境诊断记录。
+
+
+> 历史输入缺失：正文旧命令中引用的 generated 候选配置在本次整理前已不存在，未找到可核实的替代输入。这些命令仅保留为历史记录，当前不能直接执行，完整复现尚未验证。

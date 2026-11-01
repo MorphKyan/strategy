@@ -106,3 +106,6 @@ D:\strategy\env\python.exe platform/scripts/run_platform_experiment.py --config 
   1. **不合入或修改现有的基准配置文件**（不修改 `platform/configs/` 中的 baseline yaml 默认策略，保持当前的 LW Cov 协方差收缩和普通风险平价配置以防基准池冗余）。
   2. **保留代码**：`platform/src/platform_core/strategy.py` 中的 `RiskParityTurnoverConstrainedStrategy` 依然作为可选策略类保留在主干中，方便未来需要硬性换手约束（如高滑点或小微盘资产）的定制策略配置调用。
   3. 将非基线研究成果记录在公共研究汇总文件 `platform/reports/non_baseline_research_history_summary/20261101/report.md` 和看板 `research_history_summary.md` 中。
+
+
+> 历史输入缺失：正文旧命令中引用的 generated 候选配置在本次整理前已不存在，未找到可核实的替代输入。这些命令仅保留为历史记录，当前不能直接执行，完整复现尚未验证。

@@ -2,7 +2,7 @@
 
 ## 目标
 
-基于 `etf_selection/config/etf_universe.yaml` 当前 ETF universe 做一轮风险平价篮子筛选，只保留 2-3 个结构差异明显的候选组合，不做参数搜索，并用 research 标准实验与 `configs/risk_parity.yaml` 比较。
+基于 `etf_selection/configs/etf_universe.yaml` 当前 ETF universe 做一轮风险平价篮子筛选，只保留 2-3 个结构差异明显的候选组合，不做参数搜索，并用 research 标准实验与 `configs/risk_parity.yaml` 比较。
 
 ## 假设
 
@@ -10,7 +10,7 @@
 
 ## 本轮输入与来源
 
-- ETF universe：`etf_selection/config/etf_universe.yaml`
+- ETF universe：`etf_selection/configs/etf_universe.yaml`
 - ETF selection 筛选输出：`etf_selection/results/screening/20260531_010055/`
 - Research baseline config：`research/configs/risk_parity.yaml`
 - Research 标准实验脚本：`research/scripts/run_experiment.py`
@@ -21,7 +21,7 @@
 先运行 ETF selection 袖子筛选：
 
 ```powershell
-.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
+.\env\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\configs\etf_universe.yaml
 ```
 
 当前 universe 中合格袖子如下：
@@ -126,3 +126,6 @@ ETF selection 生成 8 个完整篮子。本轮排除仅替换 `510300`/`510310`
 2. 做一次同起点诊断：用 2020-01-17 至 2026-05-19 对 baseline 和 `agri_energy` 切片比较，避免当前标准实验候选和 baseline 起点不同造成解释偏差。
 3. 检查 `agri_energy` 的权重路径和交易明细，重点确认 `511260` 逆波动权重长期集中是否可接受，以及商品袖子是否只是短样本收益贡献。
 4. 如果同起点诊断仍成立，再考虑一个低复杂度约束：商品袖子总权重或单 ETF 权重上限。该步骤应作为新的 additive variant 或 config 实验单独记录，不在本轮结果中混入。
+
+
+> 历史输入缺失：正文旧命令中引用的 generated 候选配置在本次整理前已不存在，未找到可核实的替代输入。这些命令仅保留为历史记录，当前不能直接执行，完整复现尚未验证。

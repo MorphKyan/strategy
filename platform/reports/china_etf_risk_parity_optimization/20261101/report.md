@@ -93,3 +93,21 @@
    国内 QDII ETF 常常受制于外汇额度，在二级市场上产生高达 5%~10% 的高溢价。溢价买入会带来额外的潜在回撤。需设计一种配置算法：当溢价率超过阈值时，自动寻找高股息国内蓝筹或黄金作为平价替代品。
 3. **结合宏观基本面体制转移的动态风险预算**：
    在纯价格波动的风险平价中引入通胀趋势和增长动能指标。在通胀趋势上行时，主动分配更多风险预算至大宗商品和黄金，进一步增强全天候策略在滞胀环境下的表现。
+
+## 配置保全与复现状态（2026-11-01 整理）
+
+本次随报告原样保留 9 份历史 YAML 输入，未修改策略参数、交易成本或检查点设置，也未重新运行历史研究。迁移逐文件校验 SHA-256，当前仅确认文件完整和 YAML 可解析；完整复现尚未验证。
+
+原运行代码、依赖版本及行情快照尚未逐项核实，保留配置不代表已验证当前引擎能够复现原指标。后续重跑仍须先完成行情新鲜度与对齐检查，并按报告窗口执行所需滑点场景和起点敏感性。
+
+保留的输入：
+
+- [configs/platform_opt_r2a_global_blend_ewma.yaml](configs/platform_opt_r2a_global_blend_ewma.yaml)
+- [configs/platform_opt_r2b_global_complete_ewma.yaml](configs/platform_opt_r2b_global_complete_ewma.yaml)
+- [configs/platform_opt_r3b_global_aw_commodity_ewma.yaml](configs/platform_opt_r3b_global_aw_commodity_ewma.yaml)
+- [configs/platform_opt_r3c_global_nasdaq_aw_commodity_ewma.yaml](configs/platform_opt_r3c_global_nasdaq_aw_commodity_ewma.yaml)
+- [configs/platform_overseas_broad_global_ewma.yaml](configs/platform_overseas_broad_global_ewma.yaml)
+- [configs/platform_overseas_germany_ewma.yaml](configs/platform_overseas_germany_ewma.yaml)
+- [configs/platform_overseas_hk_ewma.yaml](configs/platform_overseas_hk_ewma.yaml)
+- [configs/platform_overseas_nasdaq_ewma.yaml](configs/platform_overseas_nasdaq_ewma.yaml)
+- [configs/platform_overseas_us_blend_ewma.yaml](configs/platform_overseas_us_blend_ewma.yaml)

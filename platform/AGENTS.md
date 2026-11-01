@@ -35,13 +35,13 @@ Use `.\env\python.exe` instead when that is the project's actual Python layout. 
 ## Config and Script Rules
 
 - A reusable config under `configs/` must encode one strategy and one portfolio, use one `strategy` mapping, and contain no fixed `start_date` or `end_date`. Provide bounded windows at runtime.
-- Keep temporary or generated research configs under `configs/generated/` or the owning research subsystem; do not overwrite baselines.
+- 临时及生成研究配置统一放在所属子系统的 `results/configs/<课题键>/<运行ID>/`；不得写入正式 `configs/` 或覆盖基线。历史报告必需且暂时无法重建的原始配置随报告放在 `configs/` 附件目录，并标记完整复现未验证。
 - Only reusable parameterized tools with a stable CLI belong under `scripts/`. Do not retain hardcoded config matrices, one-off report generators, or task-specific sweep scripts.
 - 报告保留足以重建研究的脚本或配置，不要求两者都提供；运行时生成的配置和明细是临时产物，不注册为平台基线。
 
 ## Artifact Provenance
 
-- Fixed configs are YAML files under `configs/`, excluding `configs/generated/`.
+- 正式配置是 `configs/` 下的可复用 YAML；`results/configs/` 及报告附件中的配置均属于研究输入，其回测结果归类为临时。旧 generated 目录不再使用。
 - Only a fixed config's full-common-history run may be written under `results/backtests/`. The window must cover the earliest through latest trading dates shared by all configured assets, and the latest date must pass the root freshness rule.
 - Generated/non-fixed configs, bounded windows, experiments, training/final-test runs, and ad hoc setups belong under `results/temporary_backtests/`.
 - Use `results/temporary_backtests/direct/` for temporary direct runs and `results/temporary_backtests/experiments/` for standardized experiments.

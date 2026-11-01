@@ -7,7 +7,7 @@
 - 平台原始结果：`platform/results/`
 - 平台最终报告：[报告索引](../platform/reports/README.md)，按课题、发布日期直接归档
 - ETF 最终报告：[报告索引](../etf_selection/reports/README.md)
-- ETF 筛选明细与生成配置：`etf_selection/results/screening/` 和 `etf_selection/generated_configs/`
+- 两个子系统的生成配置：各自 `results/configs/<课题键>/<运行ID>/`；ETF 筛选明细：`etf_selection/results/screening/`。
 
 ## 文件说明
 

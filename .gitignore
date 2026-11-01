@@ -125,7 +125,6 @@ data_manifest.json
 
 # Standalone ETF selection generated artifacts.
 /etf_selection/results/
-/etf_selection/generated_configs/
 
 # Temporary bond research raw run artifacts
 /platform/results/temp_bond_research/

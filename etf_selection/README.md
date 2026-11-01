@@ -4,20 +4,20 @@ This directory owns ETF screening and basket construction. It is intentionally s
 
 ## Workflow
 
-1. Define ETF candidates by sleeve in `config/etf_universe.yaml`.
+1. Define ETF candidates by sleeve in `configs/etf_universe.yaml`.
 2. Run sleeve screening:
 Use `.\env\Scripts\python.exe` for venv/uv layouts, or substitute `.\env\python.exe` when the local environment exposes Python there.
 
 ```powershell
-.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
+.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\configs\etf_universe.yaml
 ```
 
 3. 自动摘要和明细写入 `etf_selection/results/screening/<运行ID>/`；最终报告见 [报告索引](reports/README.md)，按课题、发布日期直接归档。
-4. Generated platform configs are written under `etf_selection/generated_configs/<timestamp>/`.
+4. 生成的平台运行配置写入 `etf_selection/results/configs/<课题键>/<运行ID>/`，默认课题为 `etf_sleeves`。正式配置、临时配置和历史保全输入的规则见 [配置说明](configs/README.md)。
 5. Optional: run generated configs through the platform:
 
 ```powershell
-.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml --run-experiments
+.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\configs\etf_universe.yaml --run-experiments
 ```
 
 筛选会检查已加载候选的最新有效行情是否在最近 7 个自然日内、末日是否一致。命令行遇到过期或不对齐时，会调用平台同步工具更新全部启用候选并复查；同步或复查失败时停止，不写筛选结果。

@@ -187,6 +187,27 @@ FHS相较HS的主要代价是换手：120日从71%增至126%，252日从30%增�
 - 同窗回测汇总：`results/temporary_backtests/es_robustness/20260812_index_etf_comparison/summary/backtest_performance.csv`
 - 实际风险贡献：`results/temporary_backtests/es_robustness/20260812_index_etf_comparison/summary/execution_risk_budget_diagnostics.csv`
 - 起点敏感性汇总：`results/temporary_backtests/es_robustness/20260812_index_etf_comparison/summary/sensitivity_matched_summary.csv`
-- 生成配置：`configs/generated/es_robustness/`
+- 生成配置：`results/configs/es_robustness/<运行ID>/`；本报告历史参数输入见本版本 `configs/` 附件
 
 本报告不覆盖既有R059结论和历史产物；所有新回测均位于temporary/sensitivity路径。
+
+## 配置保全与复现状态（2026-11-01 整理）
+
+本次随报告原样保留 12 份历史 YAML 输入，未修改策略参数、交易成本或检查点设置，也未重新运行历史研究。迁移逐文件校验 SHA-256，当前仅确认文件完整和 YAML 可解析；完整复现尚未验证。
+
+原运行代码、依赖版本及行情快照尚未逐项核实，保留配置不代表已验证当前引擎能够复现原指标。后续重跑仍须先完成行情新鲜度与对齐检查，并按报告窗口执行所需滑点场景和起点敏感性。
+
+保留的输入：
+
+- [configs/es_robustness_etf_511090_w120_filtered.yaml](configs/es_robustness_etf_511090_w120_filtered.yaml)
+- [configs/es_robustness_etf_511090_w120_historical.yaml](configs/es_robustness_etf_511090_w120_historical.yaml)
+- [configs/es_robustness_etf_511090_w252_filtered.yaml](configs/es_robustness_etf_511090_w252_filtered.yaml)
+- [configs/es_robustness_etf_511090_w252_historical.yaml](configs/es_robustness_etf_511090_w252_historical.yaml)
+- [configs/es_robustness_etf_511090_w500_filtered.yaml](configs/es_robustness_etf_511090_w500_filtered.yaml)
+- [configs/es_robustness_etf_511090_w500_historical.yaml](configs/es_robustness_etf_511090_w500_historical.yaml)
+- [configs/es_robustness_index_cba21801_w120_filtered.yaml](configs/es_robustness_index_cba21801_w120_filtered.yaml)
+- [configs/es_robustness_index_cba21801_w120_historical.yaml](configs/es_robustness_index_cba21801_w120_historical.yaml)
+- [configs/es_robustness_index_cba21801_w252_filtered.yaml](configs/es_robustness_index_cba21801_w252_filtered.yaml)
+- [configs/es_robustness_index_cba21801_w252_historical.yaml](configs/es_robustness_index_cba21801_w252_historical.yaml)
+- [configs/es_robustness_index_cba21801_w500_filtered.yaml](configs/es_robustness_index_cba21801_w500_filtered.yaml)
+- [configs/es_robustness_index_cba21801_w500_historical.yaml](configs/es_robustness_index_cba21801_w500_historical.yaml)

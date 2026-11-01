@@ -98,3 +98,6 @@
   1. 已使用 `git restore` 彻底回滚并擦除了 `platform/src/platform_core/strategy.py` 中的所有代码修改，仓库不留存该策略实现；
   2. 未新增任何平台 yaml 配置文件；
   3. 将所有的研究参数、回测指标及被拒原因详细地记录于非基线研究历史汇总表 `platform/reports/non_baseline_research_history_summary/20261101/report.md` 和成果历史登记表 `agy-research/research_history_summary.md` 中。
+
+
+> 历史输入缺失：正文旧命令中引用的 generated 候选配置在本次整理前已不存在，未找到可核实的替代输入。这些命令仅保留为历史记录，当前不能直接执行，完整复现尚未验证。

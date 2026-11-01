@@ -54,7 +54,7 @@ Use the same Python path convention as above.
 
 ```powershell
 # Screen ETF sleeves and construct candidate portfolios
-.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\config\etf_universe.yaml
+.\env\Scripts\python.exe etf_selection\scripts\screen_etf_sleeves.py --config etf_selection\configs\etf_universe.yaml
 ```
 
 ETF selection is intentionally independent from the platform engine. It can generate platform configs and optionally call platform experiments, but it owns its own agent instructions, config, reports, and generated configs.
