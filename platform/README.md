@@ -36,6 +36,8 @@ This directory contains the newer daily event-driven platform runtime. It is sep
 - `docs/`: current platform documentation and planned features.
 - `reports/`: platform reports.
 - `results/`: platform raw run artifacts.
+
+运行结果的目录和保留约定见 [运行产物目录](results/README.md)。
 - `tests/`: platform unit and integration tests.
 
 ## Commands

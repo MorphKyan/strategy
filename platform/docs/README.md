@@ -1,6 +1,6 @@
 # Platform 文档索引
 
-本目录只保留当前仍可指导 `platform/` 开发和研究验收的内容。旧版路线图、旧 `research/` 对比说明和 ADR 形式的历史记录已清理；其中仍有效的结论已合并到下列文档。
+本目录说明 `platform/` 的现有能力、开发方向和研究验收要求。
 
 - [current_platform.md](current_platform.md)：当前有效的平台边界、架构决策、已实现能力、运行入口和研究验收规则。
 - [next_phase_blueprint.md](next_phase_blueprint.md)：下一阶段施工蓝图——实战环路（下单票/mark-to-real/通知/调度）、看板升级、策略扩展的优先级、模块规格、数据契约和明确不做清单。**接手建设新功能前先读它。**

@@ -88,7 +88,41 @@ def test_failed_optimization_preserves_last_successful_factor_state(monkeypatch)
     strategy._inverse_vol_target(context, list(context.assets))
     previous = copy.deepcopy(context.runtime)
     monkeypatch.setattr(macro_factor_es, "minimize", lambda *args, **kwargs: SimpleNamespace(
-        success=False, x=np.full(3, 1 / 3)))
+        success=False, x=np.full(3, 1 / 3), message="injected failure"))
     with pytest.raises(RuntimeError, match="solver failed"):
         strategy._inverse_vol_target(context, list(context.assets))
     assert context.runtime == previous
+
+
+def test_factor_es_decomposition_uses_joint_loss_tail_and_preserves_negative_contributions():
+    # 相同尾部同时决定所有资产的贡献，不能分别取每列的最差收益。
+    returns = np.array([[-.10, .04], [-.02, -.08], [.03, .01], [.05, .02]])
+    weights = np.array([.8, .2])
+    es, asset, factor, residual = RiskParityMacroFactorStrategy._risk_contributions(
+        returns, weights, np.eye(2), .75)
+    assert es == pytest.approx(.072)
+    assert asset == pytest.approx([.08, -.008])
+    assert factor == pytest.approx(asset)
+    assert asset.sum() == pytest.approx(es)
+    assert factor.sum() + residual == pytest.approx(es)
+
+
+def test_unexplained_factor_tail_risk_is_not_dropped():
+    returns = np.array([[-.10, -.02], [.03, .01], [.05, .02], [-.01, .04]])
+    es, asset, factor, residual = RiskParityMacroFactorStrategy._risk_contributions(
+        returns, np.array([.5, .5]), np.array([[1.], [0.]]), .75)
+    assert factor == pytest.approx([.05])
+    assert residual == pytest.approx(.01)
+    assert asset.sum() == pytest.approx(es)
+
+
+def test_factor_optimizer_cannot_read_future_prices():
+    context = _context()
+    context.date = context.data.get_price_frame().index[-5]
+    strategy = RiskParityMacroFactorStrategy()
+    first = strategy._inverse_vol_target(context, list(context.assets))
+    original = context.data.get_price_frame()
+    original.loc[original.index > context.date] *= 10
+    context.data = SimpleNamespace(get_price_frame=lambda *args, **kwargs: original.copy())
+    context.runtime.clear()
+    assert strategy._inverse_vol_target(context, list(context.assets)).weights == pytest.approx(first.weights)

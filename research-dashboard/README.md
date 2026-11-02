@@ -9,6 +9,8 @@
 - ETF 最终报告：[报告索引](../etf_selection/reports/README.md)
 - 两个子系统的生成配置：各自 `results/configs/<课题键>/<运行ID>/`；ETF 筛选明细：`etf_selection/results/screening/`。
 
+- 2026-11-02：[配置整理与历史修复结论复核](../platform/reports/refactor_conclusion_validation/20261102_02/report.md)，包含版本对照、起点敏感性和未验证项。
+
 ## 文件说明
 
 - `research_backlog.md`：研究看板，包含当前待办、进行中、完成和失败课题；历史课题必须保留，用于去重和避免重复研究。
@@ -25,3 +27,5 @@ Harness prompt 只保存在 `.agents/agents/*/agent.json`，本目录不保留�
 3. 每个正式研究使用 `research_note_template.md` 保存过程笔记，最终报告汇总各阶段结论并回链笔记；看板指向最终报告。
 4. 已完成、失败和 research-only 课题不得从看板或历史摘要中删除；如需压缩，只能改写为更短的可检索摘要并保留 ID、主题、结论和报告链接。
 5. 失败、research-only 或探索性结论不得留下已注册策略或新的平台 baseline 配置。
+
+- 2026-11-02：[R059 ES 修正与配置合并](../platform/reports/R059_cba21801_index_substitution_sensitivity_analysis/20261102/report.md)：832 次场景任务通过，旧论文优势结论撤回，Black-Litterman 撤销。

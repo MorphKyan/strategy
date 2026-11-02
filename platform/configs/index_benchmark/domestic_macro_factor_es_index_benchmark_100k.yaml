@@ -1,3 +1,4 @@
+# PCA 价格代理因子的经验 ES；不代表经济宏观变量的 PIT 因子模型。
 platform:
   run_name: domestic_macro_factor_es_index_benchmark_100k
 data:

@@ -1,5 +1,8 @@
 # ETF 组合执行优化复跑报告
 
+> **2026-11-02 复核更新**：当前原窗口最优候选排序变化，“暂不替换 baseline”结论保留；原文数字为历史发表值。 [查看复核与明细](../../../../platform/reports/refactor_conclusion_validation/20261102_02/report.md)。
+
+
 生成时间：2026-05-31
 
 ## 优化内容
@@ -51,6 +54,8 @@
 - 优化版平台报告根目录：`D:\strategy\platform\results\temporary_backtests\experiments\summaries\etf_selection_20260531_000612_execopt_v2`
 - 优化版配置目录：`D:\strategy\etf_selection\reports\platform_execution_validation\20260531\configs\optimized_execution`
 
+> 2026-11-02 合并更新：16 份同参基线已按费用口径合并为两份，当前保留 18 份输入。合并后四个成本场景已实际重跑，最大指标差 `4.89e-15`；以下 32 份记录描述整理当日的历史范围。
+
 ## 配置保全与复现状态（2026-11-01 整理）
 
 本次随报告保留 32 份历史 YAML 输入，仅更新其中 16 份对照配置的 `aligned_to_candidate_config` 路径引用，未修改策略参数、交易成本或检查点设置，也未重新运行历史研究。迁移前后先逐文件校验 SHA-256，再确认路径更新只涉及元数据引用；当前仅确认文件完整和 YAML 可解析；完整复现尚未验证。
@@ -59,22 +64,8 @@
 
 保留的输入：
 
-- [configs/aligned_baselines/baseline_aligned_for_518880_510300_159980_159981_511260.yaml](configs/aligned_baselines/baseline_aligned_for_518880_510300_159980_159981_511260.yaml)
-- [configs/aligned_baselines/baseline_aligned_for_518880_510300_159980_159985_159981_511260.yaml](configs/aligned_baselines/baseline_aligned_for_518880_510300_159980_159985_159981_511260.yaml)
-- [configs/aligned_baselines/baseline_aligned_for_518880_510300_159980_159985_511260.yaml](configs/aligned_baselines/baseline_aligned_for_518880_510300_159980_159985_511260.yaml)
-- [configs/aligned_baselines/baseline_aligned_for_518880_510300_159985_159981_511260.yaml](configs/aligned_baselines/baseline_aligned_for_518880_510300_159985_159981_511260.yaml)
-- [configs/aligned_baselines/baseline_aligned_for_518880_510310_159980_159981_511260.yaml](configs/aligned_baselines/baseline_aligned_for_518880_510310_159980_159981_511260.yaml)
-- [configs/aligned_baselines/baseline_aligned_for_518880_510310_159980_159985_159981_511260.yaml](configs/aligned_baselines/baseline_aligned_for_518880_510310_159980_159985_159981_511260.yaml)
-- [configs/aligned_baselines/baseline_aligned_for_518880_510310_159980_159985_511260.yaml](configs/aligned_baselines/baseline_aligned_for_518880_510310_159980_159985_511260.yaml)
-- [configs/aligned_baselines/baseline_aligned_for_518880_510310_159985_159981_511260.yaml](configs/aligned_baselines/baseline_aligned_for_518880_510310_159985_159981_511260.yaml)
-- [configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510300_159980_159981_511260.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510300_159980_159981_511260.yaml)
-- [configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510300_159980_159985_159981_511260.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510300_159980_159985_159981_511260.yaml)
-- [configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510300_159980_159985_511260.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510300_159980_159985_511260.yaml)
-- [configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510300_159985_159981_511260.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510300_159985_159981_511260.yaml)
-- [configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510310_159980_159981_511260.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510310_159980_159981_511260.yaml)
-- [configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510310_159980_159985_159981_511260.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510310_159980_159985_159981_511260.yaml)
-- [configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510310_159980_159985_511260.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510310_159980_159985_511260.yaml)
-- [configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510310_159985_159981_511260.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned_for_518880_510310_159985_159981_511260.yaml)
+- [configs/aligned_baselines/baseline_aligned.yaml](configs/aligned_baselines/baseline_aligned.yaml)
+- [configs/optimized_execution/aligned_baselines/baseline_aligned.yaml](configs/optimized_execution/aligned_baselines/baseline_aligned.yaml)
 - [configs/optimized_execution/platform_basket_518880_510300_159980_159981_511260.yaml](configs/optimized_execution/platform_basket_518880_510300_159980_159981_511260.yaml)
 - [configs/optimized_execution/platform_basket_518880_510300_159980_159985_159981_511260.yaml](configs/optimized_execution/platform_basket_518880_510300_159980_159985_159981_511260.yaml)
 - [configs/optimized_execution/platform_basket_518880_510300_159980_159985_511260.yaml](configs/optimized_execution/platform_basket_518880_510300_159980_159985_511260.yaml)

@@ -1,5 +1,9 @@
 # 研究报告索引
 
+2026-11-02 最新：[R059 ES 修正与配置合并](R059_cba21801_index_substitution_sensitivity_analysis/20261102/report.md)。原 R059 的论文优势/PIT 结论已撤回，Black-Litterman 已撤销。
+
+2026-11-02 配置与历史结论复核已完成，详见 [复核报告](refactor_conclusion_validation/20261102_02/report.md)。报告分别列出结果一致、收益或排序变化、指标口径变化及无法验证的历史输入。
+
 生成配置与历史保全输入的去向见 [配置目录说明](../configs/README.md)；随报告保存 YAML 不代表已经验证完整复现。
 
 报告按课题和发布日期直接归档；保留最终报告与可重建结果的脚本或配置，中间产物按需生成。
@@ -8,13 +12,13 @@
 
 | 课题 | 版本 | 报告 |
 | --- | --- | --- |
+| refactor_conclusion_validation | 20261102_02 | [重构后配置与研究结论验证](refactor_conclusion_validation/20261102_02/report.md) |
 | ablation_analysis | 20261101 | [自适应回撤恢复算法消融实验评估与最优组合研究报告](ablation_analysis/20261101/report.md) |
 | agri_energy_same_start_20260531 | 20261101 | [agri_energy 同起点诊断报告](agri_energy_same_start_20260531/20261101/report.md) |
 | backtest_matrix_optimal | 20261101 | [策略组合交叉回测矩阵与最优策略分析报告](backtest_matrix_optimal/20261101/report.md) |
 | baseline_analysis | 20261101 | [平台基线策略回测诊断与多维度交叉分析报告 (最新2026-06-01版)](baseline_analysis/20261101/report.md) |
 | basket_top3 | 20261101 | [Expanded China ETF Basket Top 3 Comparison](basket_top3/20261101/report.md) |
 | bond_replacement_backtest | 20261101 | [国债 ETF 独立替代横向对比研究报告 (10y vs. 511090 vs. 511130)](bond_replacement_backtest/20261101/report.md) |
-| bond_replacement_feasibility | 20261101 | [十年国债替换为30年模拟国债期货及低初始资金可行性回测研究报告](bond_replacement_feasibility/20261101/report.md) |
 | china_etf_risk_parity_optimization | 20261101 | [实验报告：基于中国大陆 ETF 的跨境配置与全天候策略深度优化与归因研究](china_etf_risk_parity_optimization/20261101/report.md) |
 | drawdown_recovery_algorithm_full_comparison | 20261101 | [自适应回撤恢复系数风险平价算法全量对比测试与优化方向报告](drawdown_recovery_algorithm_full_comparison/20261101/report.md) |
 | drawdown_recovery_experiment | 20261101 | [自适应回撤恢复系数风险平价策略实验与评估报告](drawdown_recovery_experiment/20261101/report.md) |
@@ -52,37 +56,19 @@
 | R025_huber_shrinkage_risk_parity | 20261101 | [基于 Huber M-估计稳健协方差与自适应收缩的风险平价策略实验报告 (R025)](R025_huber_shrinkage_risk_parity/20261101/report.md) |
 | R026_l2_turnover_risk_parity | 20261101 | [基于 L2 正则化权重偏差惩罚与交易成本感知的换手优化风险平价策略实验报告 (R026)](R026_l2_turnover_risk_parity/20261101/report.md) |
 | R027_shrunk_ewma_risk_parity | 20261101 | [R027: 基于收缩指数加权移动平均 (Shrunk EWMA) 协方差估计的稳健风险平价策略实验报告](R027_shrunk_ewma_risk_parity/20261101/report.md) |
-| R028_asymmetric_hysteresis | 20261101 | [R028: 基于非对称磁滞区间与系统波动触发的换手约束风险平价策略实验报告](R028_asymmetric_hysteresis/20261101/report.md) |
 | R029_ica_risk_parity | 20261101 | [R029: 基于独立成分分析 (ICA) 与独立成分风险平价 (ICRP) 的非正态多资产配置策略实验报告](R029_ica_risk_parity/20261101/report.md) |
-| R030_nonlinear_shrinkage | 20261101 | [R030: 基于非线性收缩 (Non-linear Shrinkage) 协方差估计的稳健风险平价策略实验报告](R030_nonlinear_shrinkage/20261101/report.md) |
 | R031_garch_midas_risk_budget | 20261101 | [实验报告：结合宏观状态识别与 GARCH-MIDAS 混频波动率估计的动态风险预算策略 (R031)](R031_garch_midas_risk_budget/20261101/report.md) |
-| R032_regime_switching_risk_parity | 20261101 | [R032: 基于马尔可夫机制切换 (Markov Regime Switching) 的动态风险预算与时变协方差估计风险平价策略实验报告](R032_regime_switching_risk_parity/20261101/report.md) |
-| R033_kernel_ncm_risk_parity | 20261101 | [R033: 基于高斯核收缩与近邻相关矩阵 (NCM) 投影的稳健风险平价策略实验报告](R033_kernel_ncm_risk_parity/20261101/report.md) |
-| R034_dynamic_te_cost_amortized | 20261101 | [基于动态跟踪误差限制与交易成本摊销的换手优化风险平价策略实验报告 (R034)](R034_dynamic_te_cost_amortized/20261101/report.md) |
-| R035_gerber_lw_shrinkage_risk_parity | 20261101 | [R035 实验研究报告：基于 Gerber 稳健相关性与 Ledoit-Wolf 混合收缩协方差估计的风险平价策略](R035_gerber_lw_shrinkage_risk_parity/20261101/report.md) |
-| R036_garch_ewma_ccb_risk_parity | 20261101 | [R036 实验研究报告：基于 GARCH-EWMA 混合滤波与成分风险贡献限额的自适应风险平价策略](R036_garch_ewma_ccb_risk_parity/20261101/report.md) |
-| R037_half_life_adaptive_rebalance | 20261101 | [R037 基于波动率半衰期衰减动态阈值触发的自适应再平衡风险平价策略报告](R037_half_life_adaptive_rebalance/20261101/report.md) |
-| R038_ewma_full_covariance_risk_parity | 20261101 | [R038 实验研究报告：基于 EWMA 指数加权全协方差矩阵的风险平价策略](R038_ewma_full_covariance_risk_parity/20261101/report.md) |
 | R038_fixed_weight_threshold | 20261101 | [R038：固定权重 + 5/25 阈值带再平衡（永久组合式）研究报告](R038_fixed_weight_threshold/20261101/report.md) |
 | R039_industry_rotation | 20261101 | [R039 行业 ETF 动量轮动（卫星仓）研究报告 —— 判定：Failed（research-only）](R039_industry_rotation/20261101/report.md) |
-| R040_herc_cluster_risk_parity_failed | 20261101 | [R040 HERC 簇级风险预算风险平价研究报告](R040_herc_cluster_risk_parity_failed/20261101/report.md) |
 | R041_min_torsion_enb_failed | 20261101 | [R041 基于最小扭转有效押注数约束的风险预算拥挤度控制研究报告](R041_min_torsion_enb_failed/20261101/report.md) |
-| R042_virtual_30y_permanent_portfolio | 20261101 | [R042：虚拟 30 年国债中国永久组合研究报告](R042_virtual_30y_permanent_portfolio/20261101/report.md) |
-| R043_gerber_duration_trend | 20261101 | [R043：Gerber 风险平价的长久期趋势保护策略研究报告](R043_gerber_duration_trend/20261101/report.md) |
-| R044_macro_shock_factor_parity_data_audit | 20261101 | [R044 中国宏观冲击复制与因子风险均衡：阶段 A 数据可行性审计](R044_macro_shock_factor_parity_data_audit/20261101/report.md) |
-| R045_ewma_boundary_no_trade | 20261101 | [R045：风险平价 5/25 阈值触发后的无交易区边界回归执行](R045_ewma_boundary_no_trade/20261101/report.md) |
 | R046_china_dual_speed_trend_defensive_failed | 20261101 | [R046：中国真实 ETF 多资产双速趋势防御策略——失败报告](R046_china_dual_speed_trend_defensive_failed/20261101/report.md) |
 | R047_wasserstein_robust_log_growth_feasibility_audit | 20261101 | [R047 Wasserstein 分布稳健对数增长全天候组合：数据与数值可行性审计](R047_wasserstein_robust_log_growth_feasibility_audit/20261101/report.md) |
-| R048_ewma_dual_band_reset_failed | 20261101 | [R048：EWMA 风险平价外带触发、内带复位的双边界脉冲再平衡](R048_ewma_dual_band_reset_failed/20261101/report.md) |
 | R049_relp_adap_failed | 20261101 | [R049 椭球稳健自适应在线组合选择（RELP-Adap）失败报告](R049_relp_adap_failed/20261101/report.md) |
 | R049_value_rotation | 20261101 | [R049 行业 ETF 估值分位轮动（左侧价值）验收报告](R049_value_rotation/20261101/report.md) |
 | R050_industry_threshold | 20261101 | [R050 行业池等权 + Swedroe 阈值带 验收报告](R050_industry_threshold/20261101/report.md) |
-| R052_virtual_30y_proxy_semantics_audit | 20261101 | [R052 固定 3× 十年国债虚拟 30 年代理审计报告](R052_virtual_30y_proxy_semantics_audit/20261101/report.md) |
-| R054_real_30y_all_config_external_test | 20261101 | [R054 虚拟 30Y 配置迁移真实 30Y ETF 全历史外部检验](R054_real_30y_all_config_external_test/20261101/report.md) |
 | R055_10y_vs_30y_capital_efficiency | 20261101 | [R055 真实 10Y 与真实 30Y 的资金效率比较](R055_10y_vs_30y_capital_efficiency/20261101/report.md) |
 | R056-A_qdii_premium_feasibility | 20261101 | [R056 阶段A/B/C：QDII 场内溢价对跨市场卫星仓的可行性审计](R056-A_qdii_premium_feasibility/20261101/report.md) |
 | R056-B_premium_gated_satellite | 20261101 | [R056 溢价闸门卫星仓 验收报告](R056-B_premium_gated_satellite/20261101/report.md) |
-| R059_cba21801_index_substitution_sensitivity_analysis | 20261101 | [研究报告 r059: 中债30年期国债财富指数 (CBA21801) 替代 511090 ETF 最长周期敏感性测试与收益贡献分析](R059_cba21801_index_substitution_sensitivity_analysis/20261101/report.md) |
+| R059_cba21801_index_substitution_sensitivity_analysis | 20261102 | [R059：因子 ES 修正、重跑与配置合并](R059_cba21801_index_substitution_sensitivity_analysis/20261102/report.md) |
 | R060_es_index_etf_robustness_analysis | 20261101 | [R060：Expected Shortfall 指数/ETF 稳健性与可执行性比较](R060_es_index_etf_robustness_analysis/20261101/report.md) |
-| rebalance_frequency_study | 20261101 | [平台调仓频率研究报告：日调仓 (Daily) vs 月调仓 (Monthly) 的绩效与执行成本分析](rebalance_frequency_study/20261101/report.md) |
 | user_holdings | 20261101 | [用户持仓 (515080 & 563020) 替代回测与均衡调仓分析报告](user_holdings/20261101/report.md) |

@@ -1,5 +1,10 @@
 # R060：Expected Shortfall 指数/ETF 稳健性与可执行性比较
 
+> **2026-11-02 复核更新**：原窗口累计收益保持；active 年化与 Sharpe 采用含建仓首日损益的新口径，当前值见复核报告。原文表格保留发表时口径。 [查看复核与明细](../../refactor_conclusion_validation/20261102_02/report.md)。
+
+
+> 2026-11-02 算法修正复核见 [R059 新版](../../R059_cba21801_index_substitution_sensitivity_analysis/20261102/report.md)。本报告的标准资产 ES 方法没有被替换为因子方法；原窗口累计收益与风险限制保留，active 统计采用包含建仓首日的口径。
+
 ## 结论摘要
 
 本研究修复了 `CBA21801` 的官方同步链路，并在全部数据更新至 2026-08-12 后，对 `120/252/500` 日窗口、原始历史模拟（Historical Simulation，HS）和 EWMA 过滤历史模拟（Filtered Historical Simulation，FHS）进行了指数/ETF双轨比较。

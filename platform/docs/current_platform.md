@@ -1,5 +1,6 @@
 # Platform 当前有效说明
 
+
 ## 系统边界
 
 `platform/` 是独立的日频事件驱动回测与模拟组合平台，不依赖 `etf_selection/` 的内部实现，也不迁移旧 `research/` 策略插件接口。
