@@ -19,7 +19,7 @@ SHORT_NAMES = {"510300": "沪深300", "563020": "红利低波", "518880": "黄�
                "511130": "30年国债", "159985": "豆粕", "159980": "有色"}
 
 
-def load_daily_history(config: dict, portfolio_dir: Path, asof: str):
+def load_daily_history(config: dict, portfolio_dir: Path, asof: str, *, fill_missing: bool = False):
     """核对真实证券、现金及应收，禁止用目标持仓或残差补造归因。"""
     nav = pd.read_csv(portfolio_dir / "real_nav.csv", parse_dates=["date"]).set_index("date").sort_index()
     nav = nav.loc[:asof]
@@ -30,8 +30,8 @@ def load_daily_history(config: dict, portfolio_dir: Path, asof: str):
         raise ValueError("净值、现金或资金流无效")
     assets = config["assets"]
     codes = [str(a["code"]) for a in assets]
-    if not codes or len(codes) > len(COLORS) or len(codes) != len(set(codes)):
-        raise ValueError("六图邮件需要1至6只不同的配置资产")
+    if not codes or len(codes) != len(set(codes)):
+        raise ValueError("账户需要不同的配置资产")
     data_config = config.get("data", {})
     market = LocalCsvBarData(data_config.get("market_store_dir") or data_config.get("data_dir", "data"),
                              assets_from_config(assets))
@@ -49,14 +49,21 @@ def load_daily_history(config: dict, portfolio_dir: Path, asof: str):
     if len(latest_dates) != 1:
         raise ValueError("成分行情最新日期不一致")
     prices = pd.DataFrame(raw).loc[nav.index[0]:nav.index[-1]]
-    if prices.isna().any().any() or not prices.index.equals(nav.index):
-        raise ValueError("账户净值日期与成分行情未完整对齐")
+    missing = prices.index.difference(nav.index)
+    if prices.isna().any().any() or not nav.index.isin(prices.index).all() or (len(missing) and not fill_missing):
+        missing_nav = missing.strftime("%Y-%m-%d").tolist()
+        missing_market = nav.index.difference(prices.index).union(
+            prices.index[prices.isna().any(axis=1)]).strftime("%Y-%m-%d").tolist()
+        raise ValueError(f"账户净值日期与成分行情未完整对齐；缺少估值日：{missing_nav}；缺少行情日：{missing_market}")
+    if fill_missing:
+        nav = nav.reindex(prices.index)
     adjusted = pd.DataFrame(adjusted).reindex(nav.index)
     ledger = pd.read_csv(portfolio_dir / "execution_ledger.csv", dtype={"code": str}, parse_dates=["date"])
     ledger = ledger[ledger.date <= pd.Timestamp(asof)]
     quantity = pd.DataFrame(0., index=nav.index, columns=codes)
     costs = quantity.copy()
     income = quantity.copy()
+    flows = pd.DataFrame(0., index=nav.index, columns=["external_flow"])
     cash = pd.Series(0., index=nav.index)
     receivable = pd.Series(0., index=nav.index)
     recognized, paid = set(), set()
@@ -77,6 +84,7 @@ def load_daily_history(config: dict, portfolio_dir: Path, asof: str):
             raise ValueError("成交流水金额或数量无效")
         mask = nav.index >= row.date
         cash.loc[mask] += row.cash_delta
+        add_on_day(flows, "external_flow", row.date, row.external_flow)
         if row.event in {"BUY", "SELL", "INTERNAL_TRANSFER_IN"}:
             if row.code not in codes or row.quantity <= 0:
                 raise ValueError("成交流水资产或数量不匹配")
@@ -112,6 +120,22 @@ def load_daily_history(config: dict, portfolio_dir: Path, asof: str):
     value = quantity * prices
     if (quantity < -1e-8).any().any() or (receivable < -.011).any():
         raise ValueError("历史持仓或应收股息为负")
+    if fill_missing and len(missing):
+        from src.platform_core.live import LivePortfolio
+
+        known = nav.index.difference(missing)
+        if not np.allclose(flows.loc[known, "external_flow"], nav.loc[known, "external_flow"], rtol=0, atol=.011):
+            raise ValueError("资金流与已确认成交流水不一致，不能回补估值")
+        nav.loc[missing, "cash"] = cash.loc[missing].round(2)
+        nav.loc[missing, "positions_value"] = (value.sum(axis=1) + receivable).loc[missing].round(2)
+        nav.loc[missing, "total_value"] = (value.sum(axis=1) + cash + receivable).loc[missing].round(2)
+        nav.loc[missing, "external_flow"] = flows.loc[missing, "external_flow"]
+        rows = nav.reset_index().to_dict("records")
+        LivePortfolio._recompute_unit_chain(rows)
+        recomputed = pd.DataFrame(rows).set_index("date")
+        nav.loc[missing, ["units", "unit_nav"]] = recomputed.loc[missing, ["units", "unit_nav"]].astype(float)
+        if not np.isfinite(nav[fields]).all().all() or (nav[["total_value", "unit_nav"]] <= 0).any().any():
+            raise ValueError("回补估值无效")
     if not np.allclose(cash, nav.cash, rtol=0, atol=.011):
         raise ValueError("现金与已确认成交流水不一致")
     if not np.allclose(value.sum(axis=1) + cash + receivable, nav.total_value, rtol=0, atol=.011):
@@ -200,6 +224,8 @@ def _chart(curves, total, kind, colors):
 def build_daily_email(config: dict, portfolio_dir: Path, asof: str, digest: str):
     nav, adjusted, weights, linked, chain = load_daily_history(config, portfolio_dir, asof)
     codes = list(adjusted)
+    if len(codes) > len(COLORS):
+        raise ValueError("六图邮件需要1至6只不同的配置资产")
     colors = dict(zip(codes, COLORS))
     colors.update(cash="#D9D9D9", receivables="#595959")
     names = {str(a["code"]): SHORT_NAMES.get(str(a["code"]), a.get("name", str(a["code"])))

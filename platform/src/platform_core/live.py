@@ -340,6 +340,11 @@ class LivePortfolio:
 
         plan_result = self.plan(asof)
         valuation = self.mark_to_market(plan_result.plan_date)
+        try:
+            if self.backfill_missing_valuations(plan_result.plan_date):
+                valuation = self.mark_to_market(plan_result.plan_date)
+        except (ValueError, OSError, KeyError) as exc:
+            logger.warning("历史估值自动回补失败，保留原台账并继续日报与订单提醒：%s", exc)
         notified = False
         if notifier is not None:
             title, digest = self._render_daily_digest(valuation, plan_result)
@@ -347,6 +352,32 @@ class LivePortfolio:
             if plan_result.has_target and plan_result.order_count > 0:
                 notifier(f"调仓提醒 {date_str(plan_result.plan_date)}", plan_result.text)
         return CycleResult(self.portfolio_id, asof, synced, False, reconciled, plan_result, notified)
+
+    def backfill_missing_valuations(self, asof_date: str | date) -> list[str]:
+        """按已登记流水和股息补齐漏跑日；完整核对后仅插入缺失估值。"""
+        rows = self._read_real_nav_rows()
+        if not rows:
+            return []
+        asof = date_str(parse_date(asof_date))
+        data = self._load_data(parse_date(asof))
+        known = {row["date"] for row in rows}
+        missing = [date_str(day) for day in data.calendar if min(known) <= date_str(day) <= asof
+                   and date_str(day) not in known]
+        if not missing:
+            return []
+        from src.platform_core.live_email import load_daily_history
+
+        nav, *_ = load_daily_history(self.config, self.portfolio_dir, asof, fill_missing=True)
+        for day in missing:
+            row = {"date": day}
+            for field in ("cash", "positions_value", "total_value", "external_flow", "units", "unit_nav"):
+                precision = 8 if field == "unit_nav" else 6 if field == "units" else 2
+                row[field] = f"{nav.loc[day, field]:.{precision}f}"
+            rows.append(row)
+        rows.sort(key=lambda row: row["date"])
+        write_csv_stable(self.real_nav_path, pd.DataFrame(rows))
+        logger.info("已自动回补历史估值：%s（按已登记流水及股息）", ", ".join(missing))
+        return missing
 
     def mark_to_market(self, asof_date: str | date) -> dict[str, Any]:
         """按 asof 日收盘对真实持仓估值，写入 real_nav.csv 并返回摘要。

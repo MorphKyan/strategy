@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 from src.platform_core import live_email, notify
 from src.platform_core.live import LivePortfolio
+from src.platform_core.models import PortfolioState, Position, parse_date
 
 
 @pytest.fixture
@@ -26,7 +27,8 @@ def account(tmp_path, monkeypatch):
     market.mkdir()
     days = pd.to_datetime(["2024-01-29", "2024-01-30", "2024-01-31", "2024-02-01", "2024-02-02"])
     pd.DataFrame({"trade_date": days, "close": [10, 10, 9.9, 11, 12]}).to_csv(market / "AAA.csv", index=False)
-    config = {"data": {"data_dir": str(market)}, "assets": [{"asset_id": "A", "code": "AAA", "name": "资产A"}]}
+    config = {"data": {"data_dir": str(market)}, "assets": [{"asset_id": "A", "code": "AAA", "name": "资产A"}],
+              "strategy": {"strategy_name": "monthly_equal_weight", "params": {"universe": ["A"]}}}
     folder = tmp_path / "account"
     folder.mkdir()
     rows = [{"date": str(day.date()), "cash": cash, "total_value": value, "external_flow": flow}
@@ -152,7 +154,97 @@ def test_new_account_single_day_has_no_invented_annual_return(account):
     assert "0期收益观测" in body
 
 
-def test_cli_uses_new_mail_only_for_enabled_daily_digest(account, monkeypatch):
+def test_missing_valuation_day_is_reported_without_changing_account(account):
+    config, folder = account
+    path = folder / "real_nav.csv"
+    frame = pd.read_csv(path)
+    frame[frame.date != "2024-01-31"].to_csv(path, index=False)
+    before = {p.name: p.read_bytes() for p in folder.iterdir()}
+    with pytest.raises(ValueError, match="缺少估值日：\\['2024-01-31'\\]；缺少行情日：\\[\\]"):
+        live_email.load_daily_history(config, folder, "2024-02-02")
+    assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+
+
+@pytest.mark.parametrize("automatic", [False, True])
+def test_backfill_replays_trades_flows_and_dividends_preserving_known_rows(account, automatic):
+    config, folder = account
+    if automatic:
+        ledger = pd.read_csv(folder / "execution_ledger.csv")
+        ledger[~ledger.event.str.startswith("DIVIDEND_")].to_csv(folder / "execution_ledger.csv", index=False)
+    path = folder / "real_nav.csv"
+    original = pd.read_csv(path, dtype=str).set_index("date")
+    missing = ["2024-01-30", "2024-01-31", "2024-02-01"]
+    original.drop(missing).reset_index().to_csv(path, index=False)
+    before_state = (folder / "portfolio_state.json").read_bytes()
+    portfolio = LivePortfolio(folder.name, config, output_root=folder.parent)
+    assert portfolio.backfill_missing_valuations("2024-02-02") == missing
+    restored = pd.read_csv(path, dtype=str).set_index("date")
+    pd.testing.assert_frame_equal(restored.loc[original.index.difference(missing), original.columns],
+                                  original.loc[original.index.difference(missing)])
+    for field in ["cash", "total_value", "external_flow", "units", "unit_nav"]:
+        assert np.allclose(restored[field].astype(float), original[field].astype(float))
+    assert (folder / "portfolio_state.json").read_bytes() == before_state
+    before = path.read_bytes()
+    assert portfolio.backfill_missing_valuations("2024-02-02") == []
+    assert path.read_bytes() == before
+    body, images, _ = live_email.build_daily_email(config, folder, "2024-02-02", "已回补")
+    assert len(images) == 6
+
+
+@pytest.mark.parametrize("corruption", ["cash", "market", "ledger"])
+def test_backfill_does_not_write_when_history_cannot_be_verified(account, corruption):
+    config, folder = account
+    path = folder / "real_nav.csv"
+    frame = pd.read_csv(path)
+    frame = frame[frame.date != "2024-01-31"]
+    if corruption == "cash":
+        frame.loc[frame.date == "2024-02-02", "cash"] += 1
+    elif corruption == "market":
+        market_path = config["data"]["data_dir"] + "/AAA.csv"
+        market = pd.read_csv(market_path)
+        market[market.trade_date != "2024-01-30"].to_csv(market_path, index=False)
+    else:
+        ledger = pd.read_csv(folder / "execution_ledger.csv")
+        ledger.loc[ledger.event == "BUY", "quantity"] = 9
+        ledger.to_csv(folder / "execution_ledger.csv", index=False)
+    frame.to_csv(path, index=False)
+    before = {p.name: p.read_bytes() for p in folder.iterdir()}
+    portfolio = LivePortfolio(folder.name, config, output_root=folder.parent)
+    with pytest.raises(ValueError):
+        portfolio.backfill_missing_valuations("2024-02-02")
+    assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+
+
+@pytest.mark.parametrize("invalid_ledger", [False, True])
+def test_cycle_backfills_before_notifying_and_failure_keeps_notifications(account, invalid_ledger):
+    config, folder = account
+    path = folder / "real_nav.csv"
+    frame = pd.read_csv(path)
+    frame[frame.date != "2024-01-31"].to_csv(path, index=False)
+    accounting = json.loads((folder / "portfolio_state.json").read_text())["live_accounting"]
+    accounting["cash_asof"] = "2024-02-02"
+    for event in accounting["dividends"].values():
+        event["paid"] = True
+    state = PortfolioState(cash=1943, positions={"A": Position("A", 6, 10.1)},
+                           last_date=parse_date("2024-02-02"), live_accounting=accounting)
+    (folder / "portfolio_state.json").write_text(json.dumps(state.to_dict()), encoding="utf-8")
+    if invalid_ledger:
+        ledger = pd.read_csv(folder / "execution_ledger.csv")
+        ledger.loc[ledger.event == "BUY", "quantity"] = 9
+        ledger.to_csv(folder / "execution_ledger.csv", index=False)
+    sent = []
+
+    def notifier(title, text):
+        assert ("2024-01-31" in pd.read_csv(path).date.tolist()) != invalid_ledger
+        sent.append(title)
+        return True
+
+    portfolio = LivePortfolio(folder.name, config, output_root=folder.parent)
+    result = portfolio.cycle("2024-02-02", notifier=notifier)
+    assert result.notified and sent[0].startswith("组合日报")
+
+
+def test_cli_uses_new_mail_only_for_enabled_daily_digest(account, monkeypatch, capsys):
     from scripts import run_live_cycle as cli
     config, folder = account
     config = copy.deepcopy(config)
@@ -174,3 +266,4 @@ def test_cli_uses_new_mail_only_for_enabled_daily_digest(account, monkeypatch):
     monkeypatch.setattr(live_email, "build_daily_email", fail)
     assert cli.notify_and_report("组合日报 2024-02-02", "每日目标", config, portfolio)
     assert sent[-1][1] == {} and "图表暂不可用" in sent[-1][0][1]
+    assert "ValueError: 坏账" in capsys.readouterr().out
