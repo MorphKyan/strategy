@@ -589,24 +589,25 @@ def write_report(
 def run_platform_validation(config_paths: list[Path], platform_script: str | Path, repo_root: str | Path) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     repo_root = Path(repo_root)
+    experiment_script = repo_root / platform_script
+    sensitivity_script = experiment_script.with_name("run_sensitivity.py")
+    baseline = "configs/domestic_rolling_bond_10y.yaml"
     for config_path in config_paths:
         backtest = yaml.safe_load(config_path.read_text(encoding="utf-8")).get("backtest", {})
         if not backtest.get("start_date") or not backtest.get("end_date"):
             raise ValueError(f"平台验证需要明确的样本起止日期: {config_path}")
-        window = ["--start-date", str(backtest["start_date"]), "--end-date", str(backtest["end_date"]),
-                  "--slippage-scenario", "standard"]
-        baseline = "configs/domestic_rolling_bond_10y.yaml"
-        sensitivity_script = (repo_root / platform_script).with_name("run_sensitivity.py")
-        jobs = [
-            ("experiment", [sys.executable, str(repo_root / platform_script), "--config", str(config_path),
-                            "--baseline-config", baseline]),
-            ("candidate_sensitivity", [sys.executable, str(sensitivity_script), "--config", str(config_path),
-                                       "--calendar-month-step", "2"]),
-            ("baseline_sensitivity", [sys.executable, str(sensitivity_script), "--config", baseline,
-                                      "--calendar-month-step", "2"]),
+        common_args = [
+            "--start-date", str(backtest["start_date"]),
+            "--end-date", str(backtest["end_date"]),
+            "--slippage-scenario", "standard",
         ]
-        for phase, command in jobs:
-            command += window
+        jobs = [
+            ("experiment", experiment_script, str(config_path), ["--baseline-config", baseline]),
+            ("candidate_sensitivity", sensitivity_script, str(config_path), ["--calendar-month-step", "1"]),
+            ("baseline_sensitivity", sensitivity_script, baseline, ["--calendar-month-step", "1"]),
+        ]
+        for phase, script, config, options in jobs:
+            command = [sys.executable, str(script), "--config", config, *options, *common_args]
             completed = subprocess.run(command, cwd=repo_root, capture_output=True, text=True,
                                        encoding="utf-8", errors="replace", check=False)
             results.append({"config": str(config_path), "phase": phase, "command": command,

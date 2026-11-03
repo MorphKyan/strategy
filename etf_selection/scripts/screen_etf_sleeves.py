@@ -32,7 +32,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Screen mainland ETF sleeves and build platform risk-parity basket configs.")
     parser.add_argument("--config", default="etf_selection/configs/etf_universe.yaml", help="ETF selection YAML config path.")
     parser.add_argument("--allow-raw-prices", action="store_true", help="Allow ETFs without HFQ sidecar factors.")
-    parser.add_argument("--run-experiments", action="store_true", help="运行同窗口平台对比实验及候选/基线的两个月起点敏感性验证。")
+    parser.add_argument("--run-experiments", action="store_true", help="运行同窗口平台对比实验及候选/基线的每月起点敏感性验证。")
     args = parser.parse_args()
 
     config_path = resolve_repo_path(args.config)

@@ -53,11 +53,12 @@ def test_experiment_cli_defaults_to_two_scenarios(tmp_path, monkeypatch):
     assert calls == ["default", "stress"]
 
 
-@pytest.mark.parametrize("step,expected_days", [
-    (None, ("2024-01-02", "2024-03-04", "2024-05-06")),
-    (3, ("2024-01-02", "2024-05-06")),
+@pytest.mark.parametrize("spacing_args,expected_days", [
+    ([], ("2024-01-02", "2024-03-04", "2024-05-06", "2024-06-28")),
+    (["--calendar-month-step", "2"], ("2024-01-02", "2024-05-06")),
+    (["--step", "3"], ("2024-01-02", "2024-05-06")),
 ])
-def test_sensitivity_defaults_to_two_calendar_months_and_two_scenarios(tmp_path, monkeypatch, step, expected_days):
+def test_sensitivity_start_dates_and_default_scenarios(tmp_path, monkeypatch, spacing_args, expected_days):
     module = _script("run_sensitivity", monkeypatch)
     monkeypatch.setattr(module, "ROOT", tmp_path)
     path = tmp_path / "config.yaml"
@@ -78,9 +79,7 @@ def test_sensitivity_defaults_to_two_calendar_months_and_two_scenarios(tmp_path,
     monkeypatch.setattr(module, "run_backtest", run)
     arguments = ["run", "--config", str(path), "--raw-root", str(tmp_path / "raw"),
                  "--start-date", "2024-01-02", "--end-date", "2024-06-28"]
-    if step is not None:
-        arguments += ["--step", str(step)]
-    monkeypatch.setattr(sys, "argv", arguments)
+    monkeypatch.setattr(sys, "argv", arguments + spacing_args)
     assert module.main() == 0
     assert calls == [(scenario, day) for scenario in ("default", "stress") for day in expected_days]
     assert len(list((tmp_path / "results/sensitivity/summaries").rglob("manifest.json"))) == 1

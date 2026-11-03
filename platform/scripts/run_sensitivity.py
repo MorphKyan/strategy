@@ -3,6 +3,7 @@ import json
 import os
 import sys
 from datetime import datetime
+from itertools import groupby
 from pathlib import Path
 
 import pandas as pd
@@ -53,11 +54,11 @@ def main() -> int:
     parser.add_argument("--config", default="configs/domestic_rolling_bond_10y.yaml", help="Platform config path.")
     parser.add_argument("--db", default="data/platform/platform.sqlite3", help="SQLite metadata database path.")
     spacing = parser.add_mutually_exclusive_group()
-    spacing.add_argument("--step", type=int, help="诊断运行的交易日步长；常规研究默认每两个月一个起点。")
+    spacing.add_argument("--step", type=int, help="诊断运行的交易日步长；常规研究默认每月一个起点。")
     spacing.add_argument(
         "--calendar-month-step",
         type=int,
-        help="自然月步长（默认 2），取锚点当日或其后首个交易日。",
+        help="按有可用数据的月份取样（默认每月），每次取该月首个可用交易日。",
     )
     parser.add_argument(
         "--raw-root",
@@ -77,7 +78,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.step is None and args.calendar_month_step is None:
-        args.calendar_month_step = 2
+        args.calendar_month_step = 1
     if args.step is not None and args.step <= 0:
         raise ValueError("--step must be positive.")
     if args.calendar_month_step is not None and args.calendar_month_step <= 0:
@@ -98,22 +99,13 @@ def main() -> int:
     raw_dir.mkdir(parents=True, exist_ok=False)
 
     calendar = calendar_for_config(base_config)
-    if args.calendar_month_step is None:
-        dates = calendar[:: args.step]
-    elif calendar:
-        trading_dates = pd.DatetimeIndex(pd.to_datetime(calendar))
-        anchors = pd.date_range(
-            trading_dates[0], trading_dates[-1], freq=pd.DateOffset(months=args.calendar_month_step)
-        )
-        positions = trading_dates.searchsorted(anchors, side="left")
-        dates = []
-        for position in positions:
-            if position < len(trading_dates):
-                value = trading_dates[position].date().isoformat()
-                if not dates or dates[-1] != value:
-                    dates.append(value)
+    if args.step is not None:
+        dates = calendar[::args.step]
+        spacing_label = f"每 {args.step} 个可用交易日取一个起点"
     else:
-        dates = []
+        monthly_starts = [next(days) for _, days in groupby(calendar, key=lambda day: day[:7])]
+        dates = monthly_starts[::args.calendar_month_step]
+        spacing_label = f"每 {args.calendar_month_step} 个有数据的月份取该月首个可用交易日"
     rows = []
     enable_db = (base_config.get("backtest") or {}).get("enable_database", False)
     if enable_db:
@@ -166,7 +158,6 @@ def main() -> int:
         "runs": rows,
     }
     (report_dir / "manifest.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    spacing_label = f"{args.calendar_month_step} 个自然月" if args.calendar_month_step is not None else f"{args.step} 个交易日"
     (report_dir / "report.md").write_text(
         "\n".join(
             [
@@ -177,8 +168,6 @@ def main() -> int:
                 f"- 样本数量：`{len(rows)}`",
                 f"- 汇总 CSV：`{report_dir / 'sensitivity_summary.csv'}`",
                 f"- 原始结果根目录：`{raw_dir}`",
-                "",
-                f"本分析不限制样本数，按 {spacing_label} 生成起点并取当日或其后首个可用交易日。",
             ]
         )
         + "\n",

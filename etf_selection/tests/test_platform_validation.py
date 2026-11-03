@@ -26,4 +26,4 @@ def test_validation_matches_windows_runs_both_sensitivities_and_stops_on_failure
         assert command[command.index("--end-date") + 1] == "2025-06-30"
         assert command[command.index("--slippage-scenario") + 1] == "standard"
         if "run_sensitivity.py" in command[1]:
-            assert command[command.index("--calendar-month-step") + 1] == "2"
+            assert command[command.index("--calendar-month-step") + 1] == "1"
