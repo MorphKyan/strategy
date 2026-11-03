@@ -208,6 +208,30 @@ def test_expected_shortfall_binary_trend_filter_scaling():
     assert targets.weights["A"] > targets.weights["B"]
 
 
+@pytest.mark.parametrize("average", ["sma", "ema"])
+def test_binary_trend_confirmation_holds_until_three_consecutive_signals(monkeypatch, average):
+    context = _cooldown_context({
+        "trend_filter_window": 3,
+        "trend_filter_type": average,
+        "trend_filter_confirm_days": 3,
+        "trend_filter_scale_down": 0.25,
+    })
+    strategy = RiskParityExpectedShortfallFixedBudgetStrategy()
+    strategy.initialize(context)
+    monkeypatch.setattr(strategy, "_solve_expected_shortfall_risk_budget",
+                        lambda *args: np.array([0.5, 0.5]))
+    prices = pd.DataFrame({
+        "B": [*range(10, 22), 16, 23, 18, 17, 16, 24, 25, 26],
+        "C": range(10, 30),
+    })
+    context.data.get_price_frame = lambda *args, **kwargs: prices.loc[:context.date].copy()
+
+    for day, expected in enumerate([0.5, 0.5, 0.5, 0.5, 0.5, 0.125, 0.125, 0.125, 0.5], start=11):
+        context.date = day
+        target = strategy._inverse_vol_target(context, ["B", "C"])
+        assert target.weights == pytest.approx({"B": expected, "C": 0.5})
+
+
 def test_expected_shortfall_aqr_multi_horizon_trend_filter():
     rng = np.random.RandomState(42)
     dates = pd.date_range("2023-01-01", periods=300, freq="B")

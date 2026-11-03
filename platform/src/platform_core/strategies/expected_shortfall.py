@@ -23,7 +23,13 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
         super().initialize(context)
         if context.params.get("solver_method", "slsqp") not in {"auto", "slsqp"}:
             raise ValueError("Only the SLSQP ES budget solver is supported; the bisection fallback was removed.")
-        if str(context.params.get("trend_filter_mode", "binary")).lower() == "fast_slow":
+        trend_mode = str(context.params.get("trend_filter_mode", "binary")).lower()
+        confirm_days = context.params.get("trend_filter_confirm_days", 1)
+        if type(confirm_days) is not int or confirm_days < 1:
+            raise ValueError("trend_filter_confirm_days must be a positive integer.")
+        if confirm_days > 1 and (trend_mode != "binary" or int(context.params.get("trend_filter_window") or 0) <= 1):
+            raise ValueError("Trend confirmation requires binary mode and a trend_filter_window greater than 1.")
+        if trend_mode == "fast_slow":
             self._signal_interest_rate = SignalInterestRate(context.params.get("trend_filter_risk_free"))
 
     def _inverse_vol_target(
@@ -189,6 +195,7 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
             if tf_window > 1:
                 tf_type = str(context.params.get("trend_filter_type", "sma")).lower()
                 tf_scale_down = float(context.params.get("trend_filter_scale_down", 0.0))
+                confirm_days = context.params.get("trend_filter_confirm_days", 1)
                 for index, asset_id in enumerate(universe):
                     series = price_frame[asset_id].dropna()
                     if len(series) >= tf_window:
@@ -208,8 +215,20 @@ class RiskParityExpectedShortfallFixedBudgetStrategy(RiskParityStrategy):
                                 mult = 1.0 if current_price >= ma_val else 0.0
                             weights[index] *= mult
                         else:
-                            if current_price < ma_val:
-                                # Below trend moving average: cut weight to scale_down (default 0.0)
+                            below = current_price < ma_val
+                            if confirm_days > 1:
+                                held = context.runtime.setdefault("trend_filter_below", {})
+                                if asset_id in held and below != held[asset_id]:
+                                    if tf_type == "ema":
+                                        averages = series.ewm(span=tf_window, adjust=False).mean()
+                                    else:
+                                        averages = series.rolling(tf_window).mean()
+                                    recent = averages.dropna().tail(confirm_days)
+                                    signals = series.loc[recent.index] < recent
+                                    if len(signals) < confirm_days or not (signals == below).all():
+                                        below = held[asset_id]
+                                held[asset_id] = below
+                            if below:
                                 weights[index] *= tf_scale_down
 
         return TargetPortfolio(

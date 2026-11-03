@@ -55,7 +55,7 @@ These standards apply to both user-directed and autonomous research:
 - State the hypothesis or question, instruments, `asset_type`, sample window, price/NAV convention, benchmark, transaction-cost assumptions, and intended conclusion.
 - Prevent look-ahead. Data used at a decision point must have been available at that point; respect publication and reporting lags.
 - Preserve transaction-cost handling and trade reporting. When artifacts exist, report annualized return, annualized volatility, Sharpe, max drawdown, turnover, trade count, order count, and rejection count, plus other metrics material to the question.
-- For platform strategy or portfolio research, run start-date sensitivity using one runtime start date every 2 calendar months across the applicable research window. Report material changes in ranking and core metrics.
+- For platform strategy or portfolio research, run start-date sensitivity using one runtime start date every calendar month across the applicable research window. Report material changes in ranking and core metrics.
 - Distinguish exploratory evidence from an executable recommendation. Clearly disclose limitations caused by short history, selected windows, proxy assets, missing liquidity, or non-tradable instruments.
 
 ### User-directed research

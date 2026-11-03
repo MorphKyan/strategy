@@ -100,4 +100,5 @@ strategy:
     trend_filter_window: 200
     trend_filter_type: sma
     trend_filter_mode: binary
+    trend_filter_confirm_days: 3
     trend_filter_scale_down: 0.25

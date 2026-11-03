@@ -1,5 +1,11 @@
 # 研究报告索引
 
+2026-11-03：[月末均线确认期与缓冲带](monthly_trend_confirmation/20261103/report.md)。实际 ETF 与长期代理各按 20 万元测试，包含每月起点敏感性。
+
+2026-11-02 最新：[日/月频收益差归因与月频优化](monthly_frequency_attribution/20261102/report.md)。补充沪铜最小单位敏感性，验证月末3日趋势确认；原国债日频差距需按该限制解释。
+
+2026-11-02 最新：[当前定时策略：国债日频、其他资产月频](bond_daily_mixed_rebalance/20261102/report.md)。包含长期指数代理、实际ETF、default/stress与双月起点敏感性；未变更定时任务。
+
 2026-11-02 最新：[R059 ES 修正与配置合并](R059_cba21801_index_substitution_sensitivity_analysis/20261102/report.md)。原 R059 的论文优势/PIT 结论已撤回，Black-Litterman 已撤销。
 
 2026-11-02 配置与历史结论复核已完成，详见 [复核报告](refactor_conclusion_validation/20261102_02/report.md)。报告分别列出结果一致、收益或排序变化、指标口径变化及无法验证的历史输入。
@@ -12,6 +18,8 @@
 
 | 课题 | 版本 | 报告 |
 | --- | --- | --- |
+| monthly_frequency_attribution | 20261102 | [日/月频收益差归因、沪铜计价单位敏感性与月频优化](monthly_frequency_attribution/20261102/report.md) |
+| bond_daily_mixed_rebalance | 20261102 | [当前定时策略：国债日频、其他资产月频的长周期研究](bond_daily_mixed_rebalance/20261102/report.md) |
 | refactor_conclusion_validation | 20261102_02 | [重构后配置与研究结论验证](refactor_conclusion_validation/20261102_02/report.md) |
 | ablation_analysis | 20261101 | [自适应回撤恢复算法消融实验评估与最优组合研究报告](ablation_analysis/20261101/report.md) |
 | agri_energy_same_start_20260531 | 20261101 | [agri_energy 同起点诊断报告](agri_energy_same_start_20260531/20261101/report.md) |

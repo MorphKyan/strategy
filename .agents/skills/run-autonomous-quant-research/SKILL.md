@@ -30,7 +30,7 @@ Use this protocol only for autonomous research. Read the root `AGENTS.md` and th
 2. Create and maintain a research note from `research-dashboard/research_note_template.md`.
 3. Confirm the relevant baseline and candidate scope before running comparisons.
 4. Run training comparisons capped at `2025-06-30` for all three scenarios: `default`, `stress`, and `dynamic_participation`.
-5. Run start-date sensitivity from the earliest common training date through `2025-06-30`, using one runtime start date every 2 calendar months, for all three scenarios.
+5. Run start-date sensitivity from the earliest common training date through `2025-06-30`, using one runtime start date every calendar month, for all three scenarios.
 6. Use generated, demo, or archived configs only when the claim depends on them or the user asks. For strategy variants, cover the relevant active baselines and every config intended to use the variant. For ETF sleeve expansion, validate across multiple appropriate built-in strategies.
 7. Reuse a cache only when symbols, config hash or parameters, sample window, data snapshot, code version, and slippage scenario match. Never use final-test data or an older pre-sync snapshot for a research decision.
 8. After the candidate and thresholds are frozen, run final-test validation from `2025-07-01` onward for all three scenarios.

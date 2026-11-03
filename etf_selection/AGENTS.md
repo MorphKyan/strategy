@@ -29,7 +29,7 @@ Use `.\env\python.exe` instead when that is the project's actual Python layout.
 3. Build cross-sleeve baskets and evaluate common history, cross-sleeve correlation, inverse-volatility concentration, liquidity, and data quality.
 4. Use the history and research window specified by the user or config. Disclose short or uneven common history rather than silently changing the window.
 5. 生成配置写入 `results/configs/<课题键>/<运行ID>/`，排名、相关性和篮子明细写入 `results/screening/<运行ID>/`。最终报告与可重建筛选和验证的脚本或配置放入 `reports/`；确认能够重新生成后清理中间产物，不长期存档。历史报告缺少生成入口时，只将必要原始 YAML 随报告保留在 `configs/` 附件目录，并标记完整复现未验证。
-6. When platform validation is requested, use the root research mode: user-directed research runs `default` + `stress` and two-month start-date sensitivity; autonomous research follows `$run-autonomous-quant-research`.
+6. When platform validation is requested, use the root research mode: user-directed research runs `default` + `stress` and monthly start-date sensitivity; autonomous research follows `$run-autonomous-quant-research`.
 
 ## Default Sleeve Semantics
 

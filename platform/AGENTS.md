@@ -53,7 +53,7 @@ Use `.\env\python.exe` instead when that is the project's actual Python layout. 
 
 Apply the root research mode:
 
-- User-directed platform research: `default` + `stress`, plus two-calendar-month start-date sensitivity.
+- User-directed platform research: `default` + `stress`, plus monthly start-date sensitivity.
 - Autonomous research: `default` + `stress` + `dynamic_participation` and the full `$run-autonomous-quant-research` protocol.
 
 Identify the slippage scenario for every metric set. Compare annualized return, annualized volatility, Sharpe, max drawdown, turnover, trade count, order count, rejection count, pending-intent pressure, cash drag, and other task-relevant diagnostics.
