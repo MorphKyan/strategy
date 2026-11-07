@@ -146,3 +146,9 @@ data_manifest.json
 
 # 本机专用 Claude 约定（代理等环境细节，不入库）
 /CLAUDE.local.md
+
+# Local-only outputs. platform/reports/live holds real account values and this repo is public.
+/platform/reports/live/
+/etf_selection/generated_configs/
+# Timestamped selection runs only; curated reports under etf_selection/reports/ stay tracked.
+/etf_selection/reports/[0-9]*_[0-9]*/
