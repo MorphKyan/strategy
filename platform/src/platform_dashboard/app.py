@@ -26,17 +26,16 @@ from src.platform_dashboard.artifacts import (
     infer_slippage_scenario,
     latest_positions,
     latest_ticket,
-    list_tickets,
     market_history_for_window,
     max_drawdown,
     nav_analytics,
     nav_summary_metrics,
     platform_root,
     position_weights,
+    read_live_executions,
     read_portfolio_nav,
     read_run_metrics,
     read_sim_run_table,
-    read_ticket_orders,
     read_run_table,
     read_corporate_actions,
     read_market_history,
@@ -816,7 +815,8 @@ def render_portfolio_detail(portfolios: list[PortfolioRecord], runs: list[RunRec
     if 0 < summary["observations"] < 20:
         st.caption(f"净值观测仅 {summary['observations']} 天，年化类指标暂不计算（样本不足，随净值累积自动出现）。")
 
-    sections = ["概览", "净值与回撤", "收益分解", "票据与交易"]
+    activity_section = "实盘成交" if record.kind == "live" else "票据与交易"
+    sections = ["概览", "净值与回撤", "收益分解", activity_section]
     section = st.segmented_control("组合视图", sections, default=sections[0], label_visibility="collapsed")
 
     if section == "概览":
@@ -893,29 +893,35 @@ def _render_portfolio_snapshot(record: PortfolioRecord, state: dict[str, Any], p
 
 
 def _render_portfolio_activity(record: PortfolioRecord) -> None:
-    """票据与交易节：live 组合列历史下单票，sim 组合列建议订单与模拟成交。"""
     if record.kind == "live":
-        st.markdown("#### 下单票历史")
-        tickets_frame = list_tickets(record.path)
-        if tickets_frame.empty:
-            st.caption("暂无下单票。")
+        try:
+            executions = read_live_executions(record.path)
+        except (OSError, ValueError):
+            st.warning("无法读取实盘成交流水，请检查 execution_ledger.csv。")
+            return
+        if executions.empty:
+            st.caption("暂无已登记的实盘成交。")
+            return
+        executions["event"] = executions["event"].map({"BUY": "买入", "SELL": "卖出"})
+        shown = executions.rename(columns={
+            "date": "成交日期",
+            "code": "标的代码",
+            "event": "方向",
+            "quantity": "成交数量",
+            "price": "成交价（元）",
+            "gross_amount": "成交金额（元）",
+            "fee": "费用（元）",
+        })
+        st.dataframe(shown, width="stretch", hide_index=True)
+        return
+
+    for title, name in (("建议订单", "suggested_orders"), ("模拟成交", "trades")):
+        st.markdown(f"#### {title}")
+        frame = read_sim_run_table(record.path, name)
+        if frame.empty:
+            st.caption("无记录")
         else:
-            shown = tickets_frame.rename(
-                columns={"date": "日期", "kind": "类型", "summary": "摘要", "has_detail": "有明细"}
-            )
-            st.dataframe(shown, width="stretch", hide_index=True)
-        orders = read_ticket_orders(record.path)
-        if not orders.empty:
-            st.markdown("#### 调仓明细（全部票据）")
-            st.dataframe(orders, width="stretch", hide_index=True)
-    else:
-        for title, name in (("建议订单", "suggested_orders"), ("模拟成交", "trades")):
-            st.markdown(f"#### {title}")
-            frame = read_sim_run_table(record.path, name)
-            if frame.empty:
-                st.caption("无记录")
-            else:
-                st.dataframe(frame, width="stretch", hide_index=True)
+            st.dataframe(frame, width="stretch", hide_index=True)
 
 
 # ---------------------------------------------------------------- 策略配置

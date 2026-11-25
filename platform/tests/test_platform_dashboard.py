@@ -27,6 +27,7 @@ from src.platform_dashboard.artifacts import (
     nav_analytics,
     nav_summary_metrics,
     position_weights,
+    read_live_executions,
     read_portfolio_nav,
     read_run_metrics,
     read_sim_run_table,
@@ -624,6 +625,25 @@ def test_ticket_history_and_sim_run_tables(tmp_path: Path) -> None:
     assert trades["date"].iloc[0] == "2026-07-10"  # 倒序
     with pytest.raises(ValueError, match="Unsupported sim run table"):
         read_sim_run_table(tmp_path, "nav")
+
+
+def test_read_live_executions_only_lists_filled_buys_and_sells(tmp_path: Path) -> None:
+    assert read_live_executions(tmp_path).empty
+    (tmp_path / "execution_ledger.csv").write_text(
+        "date,event,code,quantity,price,gross_amount,fee\n"
+        "2026-07-09,BUY,000001,100,10,1000,2\n"
+        "2026-07-10,DIVIDEND_RECEIVABLE,000001,100,,10,0\n"
+        "2026-07-11,SELL,000001,100,11,1100,2\n"
+        "2026-07-12,BUY,000001,0,12,0,0\n"
+        "2026-07-13,INTERNAL_TRANSFER_IN,000002,100,10,1000,0\n",
+        encoding="utf-8",
+    )
+    executions = read_live_executions(tmp_path)
+    assert executions["date"].tolist() == ["2026-07-11", "2026-07-09"]
+    assert executions["event"].tolist() == ["SELL", "BUY"]
+    assert executions["code"].tolist() == ["000001", "000001"]
+    assert executions["gross_amount"].tolist() == [1100, 1000]
+    assert executions["fee"].tolist() == [2, 2]
 
 
 def test_max_drawdown_and_staleness() -> None:

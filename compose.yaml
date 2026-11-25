@@ -1,0 +1,8 @@
+services:
+  dashboard:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "192.168.1.200:8501:8501"
+    volumes:
+      - ./runtime-results:/app/platform/results:ro

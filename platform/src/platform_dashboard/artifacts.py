@@ -846,6 +846,17 @@ def read_ticket_orders(portfolio_dir: Path) -> pd.DataFrame:
     return frame.reset_index(drop=True)
 
 
+def read_live_executions(portfolio_dir: Path) -> pd.DataFrame:
+    columns = ["date", "code", "event", "quantity", "price", "gross_amount", "fee"]
+    try:
+        ledger = pd.read_csv(portfolio_dir / "execution_ledger.csv", dtype={"code": str}, usecols=columns)
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        return pd.DataFrame(columns=columns)
+    quantity = pd.to_numeric(ledger["quantity"], errors="coerce")
+    executed = ledger["event"].isin(["BUY", "SELL"]) & quantity.between(0, float("inf"), inclusive="neither")
+    return ledger.loc[executed, columns].sort_values("date", ascending=False, kind="stable", ignore_index=True)
+
+
 def read_sim_run_table(portfolio_dir: Path, name: str) -> pd.DataFrame:
     """拼接 sim 组合 runs/*/{name}.csv 增量段（同 read_portfolio_nav 的口径）。
 
