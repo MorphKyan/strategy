@@ -1,5 +1,13 @@
 .git
+.env
+.env.*
+runtime-data
 runtime-results
 platform/results
+platform/reports
+platform/tests
+etf_selection
+research-dashboard
+doc
 **/__pycache__
 **/.pytest_cache

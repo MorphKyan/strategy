@@ -152,3 +152,7 @@ data_manifest.json
 /etf_selection/generated_configs/
 # Timestamped selection runs only; curated reports under etf_selection/reports/ stay tracked.
 /etf_selection/reports/[0-9]*_[0-9]*/
+
+# Docker / Unraid runtime mounts
+/runtime-data/
+/runtime-results/

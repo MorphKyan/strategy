@@ -1,0 +1,57 @@
+name: tm-strategy
+
+services:
+  dashboard:
+    image: tm-strategy:live
+    pull_policy: never
+    build: .
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "192.168.1.200:8501:8501"
+    volumes:
+      - ./runtime-data:/app/platform/data:ro
+      - ./runtime-results:/app/platform/results:ro
+    restart: unless-stopped
+    init: true
+    labels:
+      net.unraid.docker.managed: composeman
+      net.unraid.docker.webui: http://192.168.1.200:8501/
+      net.unraid.docker.shell: sh
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  live-worker:
+    image: tm-strategy:live
+    pull_policy: never
+    build: .
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+    command: ["python", "-u", "scripts/run_live_scheduler.py"]
+    volumes:
+      - ./runtime-data:/app/platform/data
+      - ./runtime-results:/app/platform/results
+    restart: unless-stopped
+    init: true
+    depends_on:
+      dashboard:
+        condition: service_started
+    labels:
+      net.unraid.docker.managed: composeman
+      net.unraid.docker.shell: sh
+    logging:
+      options:
+        max-size: "5m"
+        max-file: "2"

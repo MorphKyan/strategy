@@ -207,7 +207,8 @@ def markdown_to_html(text: str) -> str:
         if re.match(r"^[-*]\s+", stripped):
             items = []
             while index < len(lines) and re.match(r"^[-*]\s+", lines[index].strip()):
-                items.append(f'<li style="{_STYLE["li"]}">{_inline(re.sub(r"^[-*]\s+", "", lines[index].strip()))}</li>')
+                item_text = _inline(re.sub(r"^[-*]\s+", "", lines[index].strip()))
+                items.append(f'<li style="{_STYLE["li"]}">{item_text}</li>')
                 index += 1
             out.append(f'<ul style="{_STYLE["ul"]}">{"".join(items)}</ul>')
             continue
@@ -215,7 +216,8 @@ def markdown_to_html(text: str) -> str:
         if re.match(r"^\d+\.\s+", stripped):
             items = []
             while index < len(lines) and re.match(r"^\d+\.\s+", lines[index].strip()):
-                items.append(f'<li style="{_STYLE["li"]}">{_inline(re.sub(r"^\d+\.\s+", "", lines[index].strip()))}</li>')
+                item_text = _inline(re.sub(r"^\d+\.\s+", "", lines[index].strip()))
+                items.append(f'<li style="{_STYLE["li"]}">{item_text}</li>')
                 index += 1
             out.append(f'<ol style="{_STYLE["ol"]}">{"".join(items)}</ol>')
             continue
