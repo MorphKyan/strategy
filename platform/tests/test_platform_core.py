@@ -103,10 +103,32 @@ def test_fee_profile_rejects_invalid_costs(rate, minimum):
     (1000, 0, 1001, 0), (1000, 0, 990, 1),
 ])
 def test_buy_cash_cap_respects_minimum_and_rate(cash, rate, minimum, expected):
-    engine = ExecutionEngine(ExecutionConfig(fee_profile=FeeProfile(rate=rate, min_fee=minimum)))
-    quantity = engine._cap_buy_quantity(1000, price=10, cash=cash, lot_size=1)
+    fee = FeeProfile(rate=rate, min_fee=minimum)
+    quantity = ExecutionEngine._cap_buy_quantity(1000, price=10, cash=cash, lot_size=1, fee=fee)
     assert quantity == expected
-    assert quantity == 0 or quantity * 10 + engine.config.fee_profile.calculate(quantity * 10) <= cash
+    assert quantity == 0 or quantity * 10 + fee.calculate(quantity * 10) <= cash
+
+
+@pytest.mark.parametrize("override,expected_quantity,expected_fee", [
+    ({}, 99, 5), ({"min_fee": 0}, 99, 0.99), ({"rate": 0, "min_fee": 0}, 100, 0),
+])
+def test_asset_fee_override_applies_to_buy_cash_cap_and_both_sides(override, expected_quantity, expected_fee):
+    asset_id = "CN_ETF:511130.SH"
+    asset = Asset(asset_id=asset_id, code="511130", name="国债ETF", lot_size=1)
+    day = date(2024, 1, 1)
+    bar = Bar(date=day, asset_id=asset_id, open=10, high=10, low=10, close=10)
+    fee = {"rate": 0.001, "min_fee": 5, "by_asset_id": {asset_id: override} if override else {}}
+    engine = ExecutionEngine(ExecutionConfig.from_config({"fee": fee, "slippage_bps": 0}))
+    state = PortfolioState(cash=1000)
+
+    _, buys = engine.apply_target(day, state, {asset_id: asset}, {asset_id: bar}, TargetPortfolio({asset_id: 1.0}))
+    _, sells = engine.apply_target(day, state, {asset_id: asset}, {asset_id: bar}, TargetPortfolio({}))
+
+    assert [(trade.side, trade.quantity) for trade in buys + sells] == [
+        ("BUY", expected_quantity), ("SELL", expected_quantity),
+    ]
+    assert [trade.fee for trade in buys + sells] == pytest.approx([expected_fee, expected_fee])
+    assert state.cash == pytest.approx(1000 - 2 * expected_fee)
 
 
 def test_execution_applies_default_and_qdii_commodity_slippage():

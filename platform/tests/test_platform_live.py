@@ -270,6 +270,7 @@ def test_plan_uses_close_even_when_backtest_uses_open(tmp_path: Path):
     )
     config = _live_config(data_dir)
     config["execution"].update({"execution_price_field": "open", "slippage_bps": 0.0})
+    config["execution"]["fee"] = {"rate": 0.001, "min_fee": 5, "by_asset_id": {"B": {"rate": 0, "min_fee": 0}}}
     portfolio = LivePortfolio("live_test", config, output_root=tmp_path / "live")
     holdings = _write_holdings(tmp_path / "holdings.csv", ["AAA,300,"])
     portfolio.reconcile(holdings, cash=7100.0, asof_date="2024-01-30")
@@ -282,6 +283,8 @@ def test_plan_uses_close_even_when_backtest_uses_open(tmp_path: Path):
     assert float(rows["B"]["est_price"]) == pytest.approx(10.0)
     assert float(rows["A"]["quantity"]) == 200
     assert float(rows["B"]["quantity"]) == 500
+    assert float(rows["A"]["est_fee"]) == 5
+    assert float(rows["B"]["est_fee"]) == 0
     assert "基于 2024-01-31 收盘估算" in result.text
     assert config["execution"]["execution_price_field"] == "open"
 

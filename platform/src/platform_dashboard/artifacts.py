@@ -64,15 +64,7 @@ def platform_root() -> Path:
 
 
 def _normalize_assets(assets: list[Any]) -> list[dict[str, Any]]:
-    """把资产条目的 code 统一成字符串。
-
-    部分 YAML 里 `code: 511260` 没加引号，被 yaml 解析成 int，而其余是 `'510300'`
-    这样的字符串——同一列混 str/int 时 pyarrow 无法序列化，Streamlit 每次渲染
-    "资产篮子"表都会抛 ArrowTypeError 并刷自动修复警告（实测 27 个配置命中）。
-    `platform_core` 侧（data_store.py / live.py 的 Asset 构造）早已做 `str(item["code"])`，
-    看板是唯一直接吃原始 payload 的地方，故在此对齐，而不是去改 27 个配置文件——
-    加载层兜底对将来新写的未加引号配置同样有效。
-    """
+    """将 YAML 中可能被解析为整数的资产代码统一转为字符串。"""
     normalized: list[dict[str, Any]] = []
     for asset in assets:
         if isinstance(asset, dict) and "code" in asset:

@@ -1,0 +1,29 @@
+{
+  "name": "strategy-dashboard",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@lucide/vue": "1.81.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "plotly.js-dist-min": "4.3.0",
+    "reka-ui": "2.11.0",
+    "tailwind-merge": "^3.3.1",
+    "vue": "^3.5.46",
+    "vue-router": "^4.6.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/plotly.js": "^3.0.0",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.4.0",
+    "vue-tsc": "^3.3.14"
+  }
+}

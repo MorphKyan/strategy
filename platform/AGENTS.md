@@ -46,7 +46,7 @@ Use `.\env\python.exe` instead when that is the project's actual Python layout. 
 - Generated/non-fixed configs, bounded windows, experiments, training/final-test runs, and ad hoc setups belong under `results/temporary_backtests/`.
 - Use `results/temporary_backtests/direct/` for temporary direct runs and `results/temporary_backtests/experiments/` for standardized experiments.
 - Sensitivity artifacts and automated summaries stay under `results/sensitivity/`; include the final conclusion in the owning report under `reports/`.
-- Streamlit loads only `results/backtests/` by default. It may include temporary backtests through one global option that defaults off, and must never load sensitivity artifacts.
+- The dashboard loads only `results/backtests/` by default. It may include temporary backtests through one global option that defaults off, and must never load sensitivity artifacts.
 - If provenance cannot prove both a fixed config and a full-common-history window, classify the result as temporary.
 
 ## Research Execution

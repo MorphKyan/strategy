@@ -6,6 +6,8 @@ runtime-results
 platform/results
 platform/reports
 platform/tests
+platform/dashboard_web/node_modules
+platform/dashboard_web/dist
 etf_selection
 research-dashboard
 doc

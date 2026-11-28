@@ -68,13 +68,7 @@ strategy:
 
 
 def test_discover_configs_normalizes_unquoted_code_to_str(tmp_path: Path) -> None:
-    """YAML 里未加引号的 code 会被解析成 int，同列混 str/int 时 Arrow 序列化失败。
-
-    实测 27 个既有配置命中（511260 未加引号），Streamlit 渲染"资产篮子"表时
-    每次都抛 ArrowTypeError 并刷自动修复警告。
-    """
-    import pyarrow as pa
-
+    """配置里的证券代码保持字符串类型，供看板一致展示。"""
     config_dir = tmp_path / "configs"
     config_dir.mkdir()
     (config_dir / "mixed.yaml").write_text(
@@ -99,8 +93,6 @@ strategy:
 
     assert codes == ["510300", "511260"]
     assert all(isinstance(code, str) for code in codes)
-    # 真正要防的回归：这张表必须能序列化成 Arrow
-    pa.Table.from_pandas(pd.DataFrame(list(records[0].assets))[["code", "name"]])
 
 
 def test_discover_runs_and_read_tables(tmp_path: Path) -> None:

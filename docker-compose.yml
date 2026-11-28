@@ -21,7 +21,7 @@ services:
       net.unraid.docker.webui: http://192.168.1.200:8501/
       net.unraid.docker.shell: sh
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3

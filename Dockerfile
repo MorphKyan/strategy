@@ -1,3 +1,12 @@
+FROM node:24-bookworm-slim AS dashboard-build
+
+WORKDIR /dashboard
+RUN npm install --global pnpm@11.25.0
+COPY platform/dashboard_web/package.json platform/dashboard_web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY platform/dashboard_web ./
+RUN pnpm build
+
 FROM python:3.11-slim
 
 ENV TZ=Asia/Shanghai \
@@ -18,6 +27,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 COPY platform /app/platform
+COPY --from=dashboard-build /dashboard/dist /app/platform/dashboard_web/dist
 WORKDIR /app/platform
 EXPOSE 8501
-CMD ["python", "-m", "streamlit", "run", "src/platform_dashboard/app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true", "--browser.gatherUsageStats=false"]
+CMD ["python", "-m", "uvicorn", "src.platform_dashboard.api:app", "--host", "0.0.0.0", "--port", "8501"]

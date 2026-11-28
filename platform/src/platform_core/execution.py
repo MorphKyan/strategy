@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from itertools import count
 from math import isfinite
@@ -40,6 +40,7 @@ class ExecutionConfig:
     participation_impact: dict[str, float | bool] | None = None
     round_mode: str = "round"
     weight_tolerance_by_asset_id: dict[str, float] | None = None
+    fee_by_asset_id: dict[str, FeeProfile] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for field_name, choices in {
@@ -69,9 +70,21 @@ class ExecutionConfig:
     @classmethod
     def from_config(cls, config: dict[str, Any], *, price_field: str | None = None) -> "ExecutionConfig":
         fee = config.get("fee", {})
+        fee_profile = FeeProfile(rate=float(fee.get("rate", 0.0002)), min_fee=float(fee.get("min_fee", 0.0)))
+        fee_overrides = fee.get("by_asset_id", {})
+        if not isinstance(fee_overrides, dict):
+            raise ValueError("Execution fee.by_asset_id must be a mapping of asset IDs to fee overrides.")
+        fee_by_asset_id = {}
+        for asset_id, override in fee_overrides.items():
+            if not isinstance(override, dict) or override.keys() - {"rate", "min_fee"}:
+                raise ValueError(f"Execution fee override for {asset_id} must contain only rate and/or min_fee.")
+            fee_by_asset_id[str(asset_id)] = FeeProfile(
+                rate=float(override.get("rate", fee_profile.rate)),
+                min_fee=float(override.get("min_fee", fee_profile.min_fee)),
+            )
         slippage = config.get("slippage", {})
         return cls(
-            fee_profile=FeeProfile(rate=float(fee.get("rate", 0.0002)), min_fee=float(fee.get("min_fee", 0.0))),
+            fee_profile=fee_profile,
             price_field=price_field or config.get("execution_price_field", "open"),
             weight_tolerance=float(config.get("weight_tolerance", 0.0005)),
             unfilled_policy=config.get("unfilled_policy", "retry_next_day"),
@@ -87,6 +100,7 @@ class ExecutionConfig:
             participation_impact=slippage.get("participation_impact"),
             round_mode=config.get("round_mode", "round"),
             weight_tolerance_by_asset_id=config.get("weight_tolerance_by_asset_id"),
+            fee_by_asset_id=fee_by_asset_id,
         )
 
 
@@ -193,9 +207,10 @@ class ExecutionEngine:
                 self._handle_unfilled(state, asset_id, target_weight, current_date, failure, order.signal_date)
                 continue
 
+            fee_profile = self.config.fee_by_asset_id.get(asset_id, self.config.fee_profile)
             if side == "BUY":
                 buy_cash = max(0.0, state.cash - cash_buffer * state_value)
-                quantity = self._cap_buy_quantity(quantity, execution_price, buy_cash, asset.lot_size)
+                quantity = self._cap_buy_quantity(quantity, execution_price, buy_cash, asset.lot_size, fee_profile)
                 order.quantity = quantity
             if quantity <= 0:
                 if side == "BUY":
@@ -212,7 +227,7 @@ class ExecutionEngine:
                 continue
 
             trade_value = quantity * execution_price
-            fee = self.config.fee_profile.calculate(trade_value)
+            fee = fee_profile.calculate(trade_value)
             if side == "BUY":
                 total_cost = trade_value + fee
                 if total_cost > state.cash + 1e-9:
@@ -385,11 +400,11 @@ class ExecutionEngine:
         else: # floor
             return float(int(quantity // lot) * lot)
 
-    def _cap_buy_quantity(self, quantity: float, price: float, cash: float, lot_size: int) -> float:
+    @staticmethod
+    def _cap_buy_quantity(quantity: float, price: float, cash: float, lot_size: int, fee: FeeProfile) -> float:
         if quantity <= 0:
             return 0.0
         lot = max(1, int(lot_size))
-        fee = self.config.fee_profile
         affordable_value = max(0.0, min(cash / (1 + fee.rate), cash - fee.min_fee))
         max_qty = int((affordable_value / price) // lot) * lot
         return float(min(quantity, max_qty))

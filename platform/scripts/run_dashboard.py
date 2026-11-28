@@ -8,21 +8,18 @@ from pathlib import Path
 
 def main() -> int:
     platform_dir = Path(__file__).resolve().parents[1]
-    app_path = platform_dir / "src" / "platform_dashboard" / "app.py"
+    if not (platform_dir / "dashboard_web" / "dist" / "index.html").is_file():
+        print("请先执行 pnpm -C platform/dashboard_web build。", file=sys.stderr)
+        return 1
     command = [
         sys.executable,
         "-m",
-        "streamlit",
-        "run",
-        str(app_path),
-        "--server.address",
+        "uvicorn",
+        "src.platform_dashboard.api:app",
+        "--host",
         "127.0.0.1",
-        "--server.port",
+        "--port",
         os.environ.get("PORT", "8501"),
-        "--server.headless",
-        "true",
-        "--browser.gatherUsageStats",
-        "false",
     ]
     return subprocess.call(command, cwd=platform_dir)
 

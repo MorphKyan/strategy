@@ -28,8 +28,9 @@ This directory contains the newer daily event-driven platform runtime. It is sep
   - `notify.py`: push notifications (ServerChan/WeChat and SMTP; auto-enabled via RQ_SERVERCHAN_KEY or RQ_SMTP_* env vars; failures never break the flow).
   - `corporate_actions.py`: shared split loading and effective-date application for engine and sim.
   - `storage.py`: SQLite metadata store.
-- `src/platform_dashboard/`: local read-only Streamlit dashboard.
-  - `app.py`: page rendering (overview, run analysis, run comparison, strategy configs).
+- `dashboard_web/`: Vue frontend. See [看板构建与运行](dashboard_web/README.md).
+- `src/platform_dashboard/`: read-only dashboard API and analysis.
+  - `api.py`: FastAPI routes for build assets and dashboard data.
   - `artifacts.py`: artifact discovery and derived return analytics (`nav_analytics`, `rebase_benchmark`, `align_navs`, `window_start_date`).
 - `configs/`: platform YAML configs.
 - `data/`: platform-owned market data and SQLite metadata.
@@ -85,7 +86,7 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 - Standardized experiment reports with optional baseline comparison under `results/temporary_backtests/experiments/summaries/`.
 - Research-grade metrics: annualized return, volatility, max drawdown, Sharpe, turnover, trade/order counts, rejection counts, pending-intent pressure, and cash drag.
 - CSV-only visualization module for NAV/drawdown, position weights, cash/pending-intent effects, and rejected-order reasons.
-- Local Streamlit dashboard with four pages: overview, run analysis (net-value/return display with trailing-window rebasing, benchmark overlay and excess-return curve, monthly return heatmap, yearly returns, rolling volatility/Sharpe, training vs frozen-sample table, positions with cash layer, orders and trades), run comparison (2-5 runs re-normalized at the selected window start), and strategy configs.
+- Local dashboard with seven pages covering portfolio snapshots, market data, run analysis, comparison of two to eight runs, and strategy configs.
 - 起点敏感性使用每两个自然月一个起点；样本窗口由本次研究模式和运行参数决定，诊断可显式指定交易日步长。
 - HFQ validation against the old research data chain.
 
@@ -95,12 +96,12 @@ All generated markdown reports should be written in Chinese. Keep exact config p
 - Temporary direct backtests: `results/temporary_backtests/direct/<run_id>/`
 - Raw standardized experiments: `results/temporary_backtests/experiments/<experiment>/<timestamp>/<strategy>/<run_id>/`
 - Standardized experiment reports: `results/temporary_backtests/experiments/summaries/<experiment>/<timestamp>/`
-- Sensitivity raw runs: `results/sensitivity/<strategy>/<timestamp>/` (never loaded by Streamlit)
+- Sensitivity raw runs: `results/sensitivity/<strategy>/<timestamp>/` (excluded from the dashboard)
 - Sensitivity reports: `results/sensitivity/summaries/<strategy>/<timestamp>/`
 - Data validation reports: `results/data_validation/<timestamp>/`
 
 `reports/README.md` 是研究报告索引，课题直接放在 `reports/<课题键>/<发布日期>/`。研究发布保留报告与可执行的脚本或配置，报告注明代码、依赖和基础数据版本。执行入口一次生成所需配置、数据、图表和汇总；中间产物在 `results/` 临时生成，完成报告并验证可重建后清理，不长期存档。
-The Streamlit dashboard loads only fixed-config backtests by default. Its global sidebar option can additionally load temporary backtests. Training, final-test, experiment, sensitivity, generated-config, partial-window, and ad hoc runs must never be written to the fixed-config directory.
+The dashboard loads only fixed-config backtests by default. Its global sidebar option can additionally load temporary backtests. Training, final-test, experiment, sensitivity, generated-config, partial-window, and ad hoc runs must never be written to the fixed-config directory.
 
 Direct runs record `artifact_provenance` in their manifest. A run enters `results/backtests/` only when its source matches a fixed config and its actual window matches the full common history. Older runs without this proof remain available through the temporary-backtest option; historical files are not moved or rewritten.
 
